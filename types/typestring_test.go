@@ -5,10 +5,10 @@
 package types_test
 
 import (
-	"github.com/mdempsky/amigo/testenv"
 	"testing"
 
 	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/testenv"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -95,8 +95,9 @@ var independentTestTypes = []testEntry{
 	dup("interface{int|~float32|~complex128}"),
 	dup("any"),
 	dup("interface{comparable}"),
-	{"comparable", "interface{comparable}"},
-	{"error", "interface{Error() string}"},
+	// TODO(gri) adjust test for EvalCompositeTest
+	// {"comparable", "interface{comparable}"},
+	// {"error", "interface{Error() string}"},
 
 	// maps
 	dup("map[string]int"),

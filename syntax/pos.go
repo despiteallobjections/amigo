@@ -207,3 +207,9 @@ func sat32(x uint) uint32 {
 	}
 	return uint32(x)
 }
+
+// Porting shims.
+
+var NoPos = Pos{}
+
+func (pos Pos) IsValid() bool { return pos.IsKnown() }

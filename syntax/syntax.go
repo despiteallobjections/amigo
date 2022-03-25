@@ -95,3 +95,20 @@ func ParseFile(filename string, errh ErrorHandler, pragh PragmaHandler, mode Mod
 	defer f.Close()
 	return Parse(NewFileBase(filename), f, errh, pragh, mode)
 }
+
+func ParseExpr(base *PosBase, src io.Reader, errh ErrorHandler, pragh PragmaHandler, mode Mode) (_ Expr, first error) {
+	defer func() {
+		if p := recover(); p != nil {
+			if err, ok := p.(Error); ok {
+				first = err
+				return
+			}
+			panic(p)
+		}
+	}()
+
+	var p parser
+	p.init(base, src, errh, pragh, mode)
+	p.next()
+	return p.expr(), p.first
+}
