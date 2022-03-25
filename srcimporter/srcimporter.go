@@ -11,9 +11,7 @@ import (
 	"go/build"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	_ "unsafe" // for go:linkname
 
@@ -203,32 +201,10 @@ func (p *Importer) cgo(bp *build.Package) (*syntax.File, error) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	args := []string{"cgotool", "-objdir", tmpdir}
-	if bp.Goroot {
-		switch bp.ImportPath {
-		case "runtime/cgo":
-			args = append(args, "-import_runtime_cgo=false", "-import_syscall=false")
-		case "runtime/race":
-			args = append(args, "-import_syscall=false")
-		}
-	}
-	args = append(args, "--")
-	args = append(args, strings.Fields(os.Getenv("CGO_CPPFLAGS"))...)
-	args = append(args, bp.CgoCPPFLAGS...)
-
-	cflags, err := cgo.PkgConfigFlags(bp)
+	cmd, err := cgo.Command(bp, bp.Dir, tmpdir)
 	if err != nil {
 		return nil, err
 	}
-	args = append(args, cflags...)
-
-	args = append(args, "-I", tmpdir)
-	args = append(args, strings.Fields(os.Getenv("CGO_CFLAGS"))...)
-	args = append(args, bp.CgoCFLAGS...)
-	args = append(args, bp.CgoFiles...)
-
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Dir = bp.Dir
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}

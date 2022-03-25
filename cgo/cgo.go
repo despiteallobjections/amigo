@@ -81,7 +81,7 @@ func ProcessFiles(bp *build.Package, DisplayPath func(path string) string) ([]*s
 		pkgdir = DisplayPath(pkgdir)
 	}
 
-	cgoFiles, cgoDisplayFiles, err := Run(bp, pkgdir, tmpdir, false)
+	cgoFiles, cgoDisplayFiles, err := Run(bp, pkgdir, tmpdir)
 	if err != nil {
 		return nil, err
 	}
@@ -111,26 +111,22 @@ var cgoRe = regexp.MustCompile(`[/\\:]`)
 // Run is adapted from (*builder).cgo in
 // $GOROOT/src/cmd/go/build.go, but these features are unsupported:
 // Objective C, CGOPKGPATH, CGO_FLAGS.
-//
-// If useabs is set to true, absolute paths of the bp.CgoFiles will be passed in
-// to the cgo preprocessor. This in turn will set the // line comments
-// referring to those files to use absolute paths. This is needed for
-// go/packages using the legacy go list support so it is able to find
-// the original files.
-func Run(bp *build.Package, pkgdir, tmpdir string, useabs bool) (files, displayFiles []string, err error) {
-	cgoCPPFLAGS, _, _, _ := cflags(bp, true)
-	_, cgoexeCFLAGS, _, _ := cflags(bp, false)
-
-	if len(bp.CgoPkgConfig) > 0 {
-		pcCFLAGS, err := PkgConfigFlags(bp)
-		if err != nil {
-			return nil, nil, err
-		}
-		cgoCPPFLAGS = append(cgoCPPFLAGS, pcCFLAGS...)
+func Run(bp *build.Package, pkgdir, tmpdir string) (files, displayFiles []string, err error) {
+	cmd, err := Command(bp, pkgdir, tmpdir)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	// Allows including _cgo_export.h from .[ch] files in the package.
-	cgoCPPFLAGS = append(cgoCPPFLAGS, "-I", tmpdir)
+	if false {
+		log.Printf("Running cgo for package %q: %v (dir=%s)", bp.ImportPath, cmd, pkgdir)
+	}
+
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, nil, fmt.Errorf("cgo failed: %v: %s", cmd, err)
+	}
 
 	// _cgo_gotypes.go (displayed "C") contains the type definitions.
 	files = append(files, filepath.Join(tmpdir, "_cgo_gotypes.go"))
@@ -142,80 +138,41 @@ func Run(bp *build.Package, pkgdir, tmpdir string, useabs bool) (files, displayF
 		displayFiles = append(displayFiles, fn)
 	}
 
-	var cgoflags []string
-	if bp.Goroot && bp.ImportPath == "runtime/cgo" {
-		cgoflags = append(cgoflags, "-import_runtime_cgo=false")
-	}
-	if bp.Goroot && bp.ImportPath == "runtime/race" || bp.ImportPath == "runtime/cgo" {
-		cgoflags = append(cgoflags, "-import_syscall=false")
-	}
-
-	var cgoFiles []string = bp.CgoFiles
-	if useabs {
-		cgoFiles = make([]string, len(bp.CgoFiles))
-		for i := range cgoFiles {
-			cgoFiles[i] = filepath.Join(pkgdir, bp.CgoFiles[i])
-		}
-	}
-
-	args := stringList(
-		"cgotool", "-objdir", tmpdir, cgoflags, "--",
-		cgoCPPFLAGS, cgoexeCFLAGS, cgoFiles,
-	)
-	if false {
-		log.Printf("Running cgo for package %q: %s (dir=%s)", bp.ImportPath, args, pkgdir)
-	}
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Dir = pkgdir
-	cmd.Env = append(os.Environ(), "PWD="+pkgdir)
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return nil, nil, fmt.Errorf("cgo failed: %s: %s", args, err)
-	}
-
 	return files, displayFiles, nil
 }
 
-// -- unmodified from 'go build' ---------------------------------------
-
-// Return the flags to use when invoking the C or C++ compilers, or cgo.
-func cflags(p *build.Package, def bool) (cppflags, cflags, cxxflags, ldflags []string) {
-	var defaults string
-	if def {
-		defaults = "-g -O2"
-	}
-
-	cppflags = stringList(envList("CGO_CPPFLAGS", ""), p.CgoCPPFLAGS)
-	cflags = stringList(envList("CGO_CFLAGS", defaults), p.CgoCFLAGS)
-	cxxflags = stringList(envList("CGO_CXXFLAGS", defaults), p.CgoCXXFLAGS)
-	ldflags = stringList(envList("CGO_LDFLAGS", defaults), p.CgoLDFLAGS)
-	return
-}
-
-// envList returns the value of the given environment variable broken
-// into fields, using the default value when the variable is empty.
-func envList(key, def string) []string {
-	v := os.Getenv(key)
-	if v == "" {
-		v = def
-	}
-	return strings.Fields(v)
-}
-
-// stringList's arguments should be a sequence of string or []string values.
-// stringList flattens them into a single []string.
-func stringList(args ...interface{}) []string {
-	var x []string
-	for _, arg := range args {
-		switch arg := arg.(type) {
-		case []string:
-			x = append(x, arg...)
-		case string:
-			x = append(x, arg)
-		default:
-			panic("stringList: invalid argument")
+// Command returns a prepared exec.Cmd to invoke the cgo preprocessor
+// on bp.CgoFiles. The caller is responsible for running it.
+func Command(bp *build.Package, pkgdir, tmpdir string) (*exec.Cmd, error) {
+	args := []string{"cgotool", "-objdir", tmpdir}
+	if bp.Goroot {
+		switch bp.ImportPath {
+		case "runtime/cgo":
+			args = append(args, "-import_runtime_cgo=false", "-import_syscall=false")
+		case "runtime/race":
+			args = append(args, "-import_syscall=false")
 		}
 	}
-	return x
+	args = append(args, "--")
+	args = append(args, strings.Fields(os.Getenv("CGO_CPPFLAGS"))...)
+	args = append(args, bp.CgoCPPFLAGS...)
+
+	cflags, err := PkgConfigFlags(bp)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, cflags...)
+
+	// Allows including _cgo_export.h from .[ch] files in the package.
+	args = append(args, "-I", tmpdir)
+
+	args = append(args, strings.Fields(os.Getenv("CGO_CFLAGS"))...)
+	args = append(args, bp.CgoCFLAGS...)
+
+	args = append(args, bp.CgoFiles...)
+
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = pkgdir
+	cmd.Env = append(os.Environ(), "PWD="+pkgdir)
+	return cmd, nil
 }
