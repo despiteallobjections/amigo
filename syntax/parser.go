@@ -19,7 +19,7 @@ type parser struct {
 	errh  ErrorHandler
 	mode  Mode
 	pragh PragmaHandler
-	scanner
+	tapescanner
 
 	base   *PosBase // current position base
 	first  error    // first error encountered
@@ -36,7 +36,7 @@ func (p *parser) init(file *PosBase, r io.Reader, errh ErrorHandler, pragh Pragm
 	p.errh = errh
 	p.mode = mode
 	p.pragh = pragh
-	p.scanner.init(
+	p.tapescanner.init(
 		r,
 		// Error and directive handler for scanner.
 		// Because the (line, col) positions passed to the
@@ -71,7 +71,7 @@ func (p *parser) init(file *PosBase, r io.Reader, errh ErrorHandler, pragh Pragm
 
 			// go: directive (but be conservative and test)
 			if pragh != nil && strings.HasPrefix(text, "go:") {
-				p.pragma = pragh(p.posAt(line, col+2), p.scanner.blank, text, p.pragma) // +2 to skip over // or /*
+				p.pragma = pragh(p.posAt(line, col+2), p.blank, text, p.pragma) // +2 to skip over // or /*
 			}
 		},
 		directives,
@@ -103,7 +103,7 @@ func (p *parser) takePragma() Pragma {
 // to be reported as unused.
 func (p *parser) clearPragma() {
 	if p.pragma != nil {
-		p.pragh(p.pos(), p.scanner.blank, "", p.pragma)
+		p.pragh(p.pos(), p.blank, "", p.pragma)
 		p.pragma = nil
 	}
 }

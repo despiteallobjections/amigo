@@ -9,8 +9,9 @@ type token uint
 //go:generate stringer -type token -linecomment tokens.go
 
 const (
-	_    token = iota
-	_EOF       // EOF
+	_      token = iota
+	_EOF         // EOF
+	_Error       // pseudo-token for reporting errors
 
 	// names and literals
 	_Name    // name

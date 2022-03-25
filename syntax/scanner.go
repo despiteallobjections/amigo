@@ -27,20 +27,15 @@ const (
 	directives                  // call handler for directives only
 )
 
+type source1 struct{ source } // prevent tapeelem selectors from being ambiguous
+
 type scanner struct {
-	source
+	source1
 	mode   uint
 	nlsemi bool // if set '\n' and EOF translate to ';'
 
 	// current token, valid after calling next()
-	line, col uint
-	blank     bool // line is blank up to col
-	tok       token
-	lit       string   // valid if tok is _Name, _Literal, or _Semi ("semicolon", "newline", or "EOF"); may be malformed if bad is true
-	bad       bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
-	kind      LitKind  // valid if tok is _Literal
-	op        Operator // valid if tok is _Operator, _AssignOp, or _IncOp
-	prec      int      // valid if tok is _Operator, _AssignOp, or _IncOp
+	tapeelem
 }
 
 func (s *scanner) init(src io.Reader, errh func(line, col uint, msg string), mode uint) {
