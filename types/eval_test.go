@@ -192,8 +192,8 @@ func TestEvalPos(t *testing.T) {
 
 // split splits string s at the first occurrence of s, trimming spaces.
 func split(s, sep string) (string, string) {
-	before, after, _ := strings.Cut(s, sep)
-	return strings.TrimSpace(before), strings.TrimSpace(after)
+	i := strings.Index(s, sep)
+	return strings.TrimSpace(s[:i]), strings.TrimSpace(s[i+len(sep):])
 }
 
 func TestCheckExpr(t *testing.T) {
