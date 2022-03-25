@@ -7,7 +7,6 @@ package syntax
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 )
 
@@ -15,16 +14,8 @@ const debug = false
 const trace = false
 
 type parser struct {
-	file  *PosBase
-	errh  ErrorHandler
-	mode  Mode
-	pragh PragmaHandler
+	mode Mode
 	tapescanner
-
-	base   *PosBase // current position base
-	first  error    // first error encountered
-	errcnt int      // number of errors encountered
-	pragma Pragma   // pragmas
 
 	fnest  int    // function nesting level (for error handling)
 	xnest  int    // expression nesting level (for complit ambiguity resolution)
@@ -36,46 +27,7 @@ func (p *parser) init(file *PosBase, r io.Reader, errh ErrorHandler, pragh Pragm
 	p.errh = errh
 	p.mode = mode
 	p.pragh = pragh
-	p.tapescanner.init(
-		r,
-		// Error and directive handler for scanner.
-		// Because the (line, col) positions passed to the
-		// handler is always at or after the current reading
-		// position, it is safe to use the most recent position
-		// base to compute the corresponding Pos value.
-		func(line, col uint, msg string) {
-			if msg[0] != '/' {
-				p.errorAt(p.posAt(line, col), msg)
-				return
-			}
-
-			// otherwise it must be a comment containing a line or go: directive.
-			// //line directives must be at the start of the line (column colbase).
-			// /*line*/ directives can be anywhere in the line.
-			text := commentText(msg)
-			if (col == colbase || msg[1] == '*') && strings.HasPrefix(text, "line ") {
-				var pos Pos // position immediately following the comment
-				if msg[1] == '/' {
-					// line comment (newline is part of the comment)
-					pos = MakePos(p.file, line+1, colbase)
-				} else {
-					// regular comment
-					// (if the comment spans multiple lines it's not
-					// a valid line directive and will be discarded
-					// by updateBase)
-					pos = MakePos(p.file, line, col+uint(len(msg)))
-				}
-				p.updateBase(pos, line, col+2+5, text[5:]) // +2 to skip over // or /*
-				return
-			}
-
-			// go: directive (but be conservative and test)
-			if pragh != nil && strings.HasPrefix(text, "go:") {
-				p.pragma = pragh(p.posAt(line, col+2), p.blank, text, p.pragma) // +2 to skip over // or /*
-			}
-		},
-		directives,
-	)
+	p.tapescanner.init(r, directives)
 
 	p.base = file
 	p.first = nil
@@ -106,80 +58,6 @@ func (p *parser) clearPragma() {
 		p.pragh(p.pos(), p.blank, "", p.pragma)
 		p.pragma = nil
 	}
-}
-
-// updateBase sets the current position base to a new line base at pos.
-// The base's filename, line, and column values are extracted from text
-// which is positioned at (tline, tcol) (only needed for error messages).
-func (p *parser) updateBase(pos Pos, tline, tcol uint, text string) {
-	i, n, ok := trailingDigits(text)
-	if i == 0 {
-		return // ignore (not a line directive)
-	}
-	// i > 0
-
-	if !ok {
-		// text has a suffix :xxx but xxx is not a number
-		p.errorAt(p.posAt(tline, tcol+i), "invalid line number: "+text[i:])
-		return
-	}
-
-	var line, col uint
-	i2, n2, ok2 := trailingDigits(text[:i-1])
-	if ok2 {
-		//line filename:line:col
-		i, i2 = i2, i
-		line, col = n2, n
-		if col == 0 || col > PosMax {
-			p.errorAt(p.posAt(tline, tcol+i2), "invalid column number: "+text[i2:])
-			return
-		}
-		text = text[:i2-1] // lop off ":col"
-	} else {
-		//line filename:line
-		line = n
-	}
-
-	if line == 0 || line > PosMax {
-		p.errorAt(p.posAt(tline, tcol+i), "invalid line number: "+text[i:])
-		return
-	}
-
-	// If we have a column (//line filename:line:col form),
-	// an empty filename means to use the previous filename.
-	filename := text[:i-1] // lop off ":line"
-	trimmed := false
-	if filename == "" && ok2 {
-		filename = p.base.Filename()
-		trimmed = p.base.Trimmed()
-	}
-
-	p.base = NewLineBase(pos, filename, trimmed, line, col)
-}
-
-func commentText(s string) string {
-	if s[:2] == "/*" {
-		return s[2 : len(s)-2] // lop off /* and */
-	}
-
-	// line comment (does not include newline)
-	// (on Windows, the line comment may end in \r\n)
-	i := len(s)
-	if s[i-1] == '\r' {
-		i--
-	}
-	return s[2:i] // lop off //, and \r at end, if any
-}
-
-func trailingDigits(text string) (uint, uint, bool) {
-	// Want to use LastIndexByte below but it's not defined in Go1.4 and bootstrap fails.
-	i := strings.LastIndex(text, ":") // look from right (Windows filenames may contain ':')
-	if i < 0 {
-		return 0, 0, false // no ":"
-	}
-	// i >= 0
-	n, err := strconv.ParseUint(text[i+1:], 10, 0)
-	return uint(i + 1), uint(n), err == nil
 }
 
 func (p *parser) got(tok token) bool {
@@ -213,24 +91,6 @@ func (p *parser) gotAssign() bool {
 
 // ----------------------------------------------------------------------------
 // Error handling
-
-// posAt returns the Pos value for (line, col) and the current position base.
-func (p *parser) posAt(line, col uint) Pos {
-	return MakePos(p.base, line, col)
-}
-
-// error reports an error at the given position.
-func (p *parser) errorAt(pos Pos, msg string) {
-	err := Error{pos, msg}
-	if p.first == nil {
-		p.first = err
-	}
-	p.errcnt++
-	if p.errh == nil {
-		panic(p.first)
-	}
-	p.errh(err)
-}
 
 // syntaxErrorAt reports a syntax error at the given position.
 func (p *parser) syntaxErrorAt(pos Pos, msg string) {
