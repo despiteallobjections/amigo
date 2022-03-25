@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"golang.org/x/tools/go/packages"
 
@@ -51,7 +50,7 @@ func main() {
 //
 func Example_buildPackage() {
 	// Parse the source files.
-	f, err := syntax.Parse(syntax.NewFileBase("hello.go"), strings.NewReader(hello), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("hello.go", hello)
 	if err != nil {
 		fmt.Print(err) // parse error
 		return

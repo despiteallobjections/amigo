@@ -6,11 +6,12 @@ package types_test
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
 
 	. "github.com/mdempsky/amigo/types"
 )

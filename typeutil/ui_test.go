@@ -22,7 +22,7 @@ func (A) f()
 func (*A) g()
 `
 
-	f, err := syntax.Parse(syntax.NewFileBase("hello.go"), strings.NewReader(source), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("hello.go", source)
 	if err != nil {
 		t.Fatal(err)
 	}

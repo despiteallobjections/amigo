@@ -5,12 +5,13 @@
 package types_test
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"path"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/mdempsky/amigo/syntax"
 
 	. "github.com/mdempsky/amigo/types"
 )

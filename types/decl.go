@@ -5,9 +5,10 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 func (err *error_) recordAltDecl(obj Object) {

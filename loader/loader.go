@@ -201,7 +201,7 @@ func (info *PackageInfo) appendError(err error) {
 //
 func (conf *Config) ParseFile(filename string, src string) (*syntax.File, error) {
 	// TODO(adonovan): use conf.build() etc like parseFiles does.
-	return syntax.Parse(syntax.NewFileBase(filename), strings.NewReader(src), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	return syntax.ParseString(filename, src)
 }
 
 // FromArgsUsage is a partial usage message that applications calling

@@ -6,9 +6,10 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"sort"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // ----------------------------------------------------------------------------

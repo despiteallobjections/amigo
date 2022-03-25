@@ -5,9 +5,10 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 func TestInvalidTypeSet(t *testing.T) {

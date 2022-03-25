@@ -178,7 +178,7 @@ func (p *Importer) parseFiles(dir string, filenames []string) ([]*syntax.File, e
 				errors[i] = err // open provides operation and filename in error
 				return
 			}
-			files[i], errors[i] = syntax.Parse(syntax.NewFileBase(filepath), src, nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+			files[i], errors[i] = syntax.ParseReader(filepath, src)
 			src.Close() // ignore Close error - parsing may have succeeded which is all we need
 		}(i, p.joinPath(dir, filename))
 	}

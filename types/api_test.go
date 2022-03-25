@@ -6,15 +6,16 @@ package types_test
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"errors"
 	"fmt"
-	"github.com/mdempsky/amigo/testenv"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
 )

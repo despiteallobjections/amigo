@@ -51,7 +51,7 @@ func noncalls() {
 }
 `
 	// parse
-	f, err := syntax.Parse(syntax.NewFileBase("p.go"), strings.NewReader(src), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("p.go", src)
 	if err != nil {
 		t.Fatal(err)
 	}

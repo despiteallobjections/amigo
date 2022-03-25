@@ -26,9 +26,10 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // An Error describes a type-checking error; it implements the error interface.

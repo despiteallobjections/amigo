@@ -8,8 +8,9 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 const useConstraintTypeInference = true

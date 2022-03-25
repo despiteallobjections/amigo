@@ -5,11 +5,12 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // langCompat reports an error if the representation of a numeric

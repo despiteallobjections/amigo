@@ -6,9 +6,10 @@ package types_test
 
 import (
 	"go/build"
-	"github.com/mdempsky/amigo/testenv"
 	"os"
 	"testing"
+
+	"github.com/mdempsky/amigo/testenv"
 )
 
 func TestMain(m *testing.M) {

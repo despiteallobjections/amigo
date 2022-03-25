@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/mdempsky/amigo/testenv"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
@@ -17,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mdempsky/amigo/testenv"
 )
 
 var (

@@ -7,11 +7,12 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
 	"go/token"
 	"math"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 /*

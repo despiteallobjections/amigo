@@ -5,8 +5,9 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"strconv"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // ----------------------------------------------------------------------------

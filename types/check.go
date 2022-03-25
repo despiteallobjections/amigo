@@ -7,10 +7,11 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"errors"
 	"fmt"
 	"go/constant"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 var nopos syntax.Pos

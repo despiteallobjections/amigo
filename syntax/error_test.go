@@ -31,7 +31,6 @@ package syntax
 import (
 	"flag"
 	"fmt"
-	"github.com/mdempsky/amigo/testenv"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -39,6 +38,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/testenv"
 )
 
 const testdata = "testdata" // directory containing test files

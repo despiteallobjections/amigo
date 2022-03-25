@@ -4,9 +4,10 @@
 package types_test
 
 import (
-	. "github.com/mdempsky/amigo/types"
 	"strings"
 	"testing"
+
+	. "github.com/mdempsky/amigo/types"
 )
 
 func TestInstantiateEquality(t *testing.T) {

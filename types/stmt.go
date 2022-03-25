@@ -7,9 +7,10 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"go/constant"
 	"sort"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 func (check *Checker) funcBody(decl *declInfo, name string, sig *Signature, body *syntax.BlockStmt, iota constant.Value) {

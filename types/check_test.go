@@ -24,16 +24,17 @@ package types_test
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"flag"
 	"fmt"
-	"github.com/mdempsky/amigo/testenv"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
 )

@@ -7,8 +7,9 @@
 package typeutil
 
 import (
-	"github.com/mdempsky/amigo/types"
 	"sync"
+
+	"github.com/mdempsky/amigo/types"
 )
 
 // A MethodSetCache records the method set of each type T for which

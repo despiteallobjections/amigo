@@ -8,10 +8,11 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
 	"go/token"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // An operandMode specifies the (addressing) mode of an operand.

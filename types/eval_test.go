@@ -161,7 +161,7 @@ func TestEvalPos(t *testing.T) {
 
 	var files []*syntax.File
 	for i, src := range sources {
-		file, err := syntax.Parse(syntax.NewFileBase("p"), strings.NewReader(src), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+		file, err := syntax.ParseString("p", src)
 		if err != nil {
 			t.Fatalf("could not parse file %d: %s", i, err)
 		}
@@ -237,7 +237,7 @@ func f(a int, s string) S {
 		src = strings.ReplaceAll(src, "func (fmt.Stringer).", "func (interface).")
 	}
 
-	f, err := syntax.Parse(syntax.NewFileBase("p"), strings.NewReader(src), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("p", src)
 	if err != nil {
 		t.Fatal(err)
 	}

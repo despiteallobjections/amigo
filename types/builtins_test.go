@@ -5,10 +5,11 @@
 package types_test
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
 
 	. "github.com/mdempsky/amigo/types"
 )

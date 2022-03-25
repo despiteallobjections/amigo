@@ -5,11 +5,12 @@
 package types_test
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
-	"github.com/mdempsky/amigo/testenv"
 	"sort"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
 )

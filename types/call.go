@@ -7,9 +7,10 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"strings"
 	"unicode"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // funcInst type-checks a function instantiation inst and returns the result in x.

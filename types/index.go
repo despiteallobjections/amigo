@@ -7,8 +7,9 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"go/constant"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // If e is a valid function instantiation, indexExpr returns true.

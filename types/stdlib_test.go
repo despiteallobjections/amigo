@@ -9,15 +9,16 @@ package types_test
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/build"
-	"github.com/mdempsky/amigo/testenv"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
 )

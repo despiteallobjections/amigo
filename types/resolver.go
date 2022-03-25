@@ -5,13 +5,14 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // A declInfo describes a package-level const, type, var, or func declaration.

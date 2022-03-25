@@ -58,7 +58,7 @@ func parseFiles(ctxt *build.Context, displayPath func(string) string, dir string
 			}
 
 			// ParseFile may return both an AST and an error.
-			parsed[i], errors[i] = syntax.Parse(syntax.NewFileBase(displayPath(file)), rd, nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+			parsed[i], errors[i] = syntax.ParseReader(displayPath(file), rd)
 			rd.Close()
 		}(i, file)
 	}

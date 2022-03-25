@@ -8,7 +8,6 @@
 package ssa_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/mdempsky/amigo/importer"
@@ -33,7 +32,7 @@ func TestBuildPackageGo117(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f, err := syntax.Parse(syntax.NewFileBase("p.go"), strings.NewReader(tc.src), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+			f, err := syntax.ParseString("p.go", tc.src)
 			if err != nil {
 				t.Error(err)
 			}
@@ -63,7 +62,7 @@ func TestBuildPackageFailuresGo117(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f, err := syntax.Parse(syntax.NewFileBase("p.go"), strings.NewReader(tc.src), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+			f, err := syntax.ParseString("p.go", tc.src)
 			if err != nil {
 				t.Error(err)
 			}

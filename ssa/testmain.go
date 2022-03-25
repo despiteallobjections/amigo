@@ -164,7 +164,7 @@ func (prog *Program) CreateTestMainPackage(pkg *Package) *Package {
 	}
 
 	// Parse and type-check the testmain package.
-	f, err := syntax.Parse(syntax.NewFileBase(path+".go"), &buf, nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseReader(path+".go", &buf)
 	if err != nil {
 		log.Fatalf("internal error parsing %s: %v", path, err)
 	}

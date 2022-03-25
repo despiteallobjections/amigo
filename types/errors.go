@@ -8,10 +8,11 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 func unimplemented() {

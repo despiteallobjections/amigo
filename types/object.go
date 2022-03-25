@@ -6,11 +6,12 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // An Object describes a named language entity such as a package,

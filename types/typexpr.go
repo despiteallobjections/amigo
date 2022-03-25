@@ -7,10 +7,11 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"go/constant"
 	"strings"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // ident type-checks identifier e and initializes x with the value or type of e.

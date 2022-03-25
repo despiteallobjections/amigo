@@ -6,12 +6,13 @@ package types_test
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/types"
 )
 
 func checkMono(t *testing.T, body string) error {

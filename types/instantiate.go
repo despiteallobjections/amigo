@@ -8,9 +8,10 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"errors"
 	"fmt"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // Instantiate instantiates the type orig with the given type arguments targs.

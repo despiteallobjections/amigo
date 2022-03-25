@@ -7,7 +7,6 @@ package typeutil_test
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
@@ -28,7 +27,7 @@ func g(rune) (uint8, bool)
 `
 
 	// Parse and type-check the package.
-	f, err := syntax.Parse(syntax.NewFileBase("P.go"), strings.NewReader(source), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("P.go", source)
 	if err != nil {
 		panic(err)
 	}

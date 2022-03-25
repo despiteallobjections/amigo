@@ -32,7 +32,7 @@ func TestBuildPackage(t *testing.T) {
 	// There is a more substantial test of BuildPackage and the
 	// SSA program it builds in ../ssa/builder_test.go.
 
-	f, err := syntax.Parse(syntax.NewFileBase("hello.go"), strings.NewReader(hello), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("hello.go", hello)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func NewBuffer(buf []byte) *Buffer:
 }
 
 func TestBuildPackage_MissingImport(t *testing.T) {
-	f, err := syntax.Parse(syntax.NewFileBase("bad.go"), strings.NewReader(`package bad; import "missing"`), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("bad.go", `package bad; import "missing"`)
 	if err != nil {
 		t.Fatal(err)
 	}

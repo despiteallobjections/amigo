@@ -7,9 +7,10 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
 	"go/constant"
 	"go/token"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // builtin type-checks a call to the built-in specified by id and

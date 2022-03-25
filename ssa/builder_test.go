@@ -46,7 +46,7 @@ func main() {
 `
 
 	// Parse the file.
-	f, err := syntax.Parse(syntax.NewFileBase("input.go"), strings.NewReader(input), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	f, err := syntax.ParseString("input.go", input)
 	if err != nil {
 		t.Error(err)
 		return
@@ -214,7 +214,7 @@ func TestRuntimeTypes(t *testing.T) {
 	}
 	for _, test := range tests {
 		// Parse the file.
-		f, err := syntax.Parse(syntax.NewFileBase("input.go"), strings.NewReader(test.input), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+		f, err := syntax.ParseString("input.go", test.input)
 		if err != nil {
 			t.Errorf("test %q: %s", test.input[:15], err)
 			continue

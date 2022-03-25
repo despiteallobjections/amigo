@@ -6,7 +6,6 @@ package typeutil_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/mdempsky/amigo/syntax"
@@ -36,7 +35,7 @@ func TestDependencies(t *testing.T) {
 		`package d; import (_ "b"; _ "c")`,
 		`package f; import (_ "d"; _ "e")`,
 	} {
-		f, err := syntax.Parse(syntax.NewFileBase(fmt.Sprintf("%d.go", i)), strings.NewReader(content), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+		f, err := syntax.ParseString(fmt.Sprintf("%d.go", i), content)
 		if err != nil {
 			t.Fatal(err)
 		}

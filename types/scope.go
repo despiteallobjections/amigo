@@ -8,12 +8,13 @@ package types
 
 import (
 	"bytes"
-	"github.com/mdempsky/amigo/syntax"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/mdempsky/amigo/syntax"
 )
 
 // A Scope maintains a set of objects and links to its containing
