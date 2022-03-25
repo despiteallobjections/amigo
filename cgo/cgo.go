@@ -52,94 +52,12 @@
 package cgo
 
 import (
-	"fmt"
 	"go/build"
-	"io/ioutil"
-	"log"
 	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
 
 	exec "golang.org/x/sys/execabs"
-
-	"github.com/mdempsky/amigo/syntax"
 )
-
-// ProcessFiles invokes the cgo preprocessor on bp.CgoFiles, parses
-// the output and returns the resulting ASTs.
-//
-func ProcessFiles(bp *build.Package, DisplayPath func(path string) string) ([]*syntax.File, error) {
-	tmpdir, err := ioutil.TempDir("", strings.Replace(bp.ImportPath, "/", "_", -1)+"_C")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(tmpdir)
-
-	pkgdir := bp.Dir
-	if DisplayPath != nil {
-		pkgdir = DisplayPath(pkgdir)
-	}
-
-	cgoFiles, cgoDisplayFiles, err := Run(bp, pkgdir, tmpdir)
-	if err != nil {
-		return nil, err
-	}
-	var files []*syntax.File
-	for i := range cgoFiles {
-		rd, err := os.Open(cgoFiles[i])
-		if err != nil {
-			return nil, err
-		}
-		display := filepath.Join(bp.Dir, cgoDisplayFiles[i])
-		f, err := syntax.Parse(syntax.NewFileBase(display), rd, nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
-		rd.Close()
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, f)
-	}
-	return files, nil
-}
-
-var cgoRe = regexp.MustCompile(`[/\\:]`)
-
-// Run invokes the cgo preprocessor on bp.CgoFiles and returns two
-// lists of files: the resulting processed files (in temporary
-// directory tmpdir) and the corresponding names of the unprocessed files.
-//
-// Run is adapted from (*builder).cgo in
-// $GOROOT/src/cmd/go/build.go, but these features are unsupported:
-// Objective C, CGOPKGPATH, CGO_FLAGS.
-func Run(bp *build.Package, pkgdir, tmpdir string) (files, displayFiles []string, err error) {
-	cmd, err := Command(bp, pkgdir, tmpdir)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if false {
-		log.Printf("Running cgo for package %q: %v (dir=%s)", bp.ImportPath, cmd, pkgdir)
-	}
-
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, nil, fmt.Errorf("cgo failed: %v: %s", cmd, err)
-	}
-
-	// _cgo_gotypes.go (displayed "C") contains the type definitions.
-	files = append(files, filepath.Join(tmpdir, "_cgo_gotypes.go"))
-	displayFiles = append(displayFiles, "C")
-	for _, fn := range bp.CgoFiles {
-		// "foo.cgo1.go" (displayed "foo.go") is the processed Go source.
-		f := cgoRe.ReplaceAllString(fn[:len(fn)-len("go")], "_")
-		files = append(files, filepath.Join(tmpdir, f+"cgo1.go"))
-		displayFiles = append(displayFiles, fn)
-	}
-
-	return files, displayFiles, nil
-}
 
 // Command returns a prepared exec.Cmd to invoke the cgo preprocessor
 // on bp.CgoFiles. The caller is responsible for running it.

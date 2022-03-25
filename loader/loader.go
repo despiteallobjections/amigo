@@ -10,8 +10,11 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -735,7 +738,7 @@ func (conf *Config) parsePackageFiles(bp *build.Package, which rune) ([]*syntax.
 
 	// Preprocess CgoFiles and parse the outputs (sequentially).
 	if which == 'g' && bp.CgoFiles != nil {
-		cgofiles, err := cgo.ProcessFiles(bp, conf.DisplayPath)
+		cgofiles, err := cgoProcessFiles(bp, conf.DisplayPath)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -745,6 +748,70 @@ func (conf *Config) parsePackageFiles(bp *build.Package, which rune) ([]*syntax.
 
 	return files, errs
 }
+
+// cgoProcessFiles invokes the cgo preprocessor on bp.CgoFiles, parses
+// the output and returns the resulting ASTs.
+//
+func cgoProcessFiles(bp *build.Package, DisplayPath func(path string) string) ([]*syntax.File, error) {
+	tmpdir, err := ioutil.TempDir("", strings.Replace(bp.ImportPath, "/", "_", -1)+"_C")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpdir)
+
+	pkgdir := bp.Dir
+	if DisplayPath != nil {
+		pkgdir = DisplayPath(pkgdir)
+	}
+
+	cmd, err := cgo.Command(bp, pkgdir, tmpdir)
+	if err != nil {
+		return nil, err
+	}
+
+	if false {
+		log.Printf("Running cgo for package %q: %v (dir=%s)", bp.ImportPath, cmd, pkgdir)
+	}
+
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("cgo failed: %v: %s", cmd, err)
+	}
+
+	parse := func(cgoFile, cgoDisplayFile string) (*syntax.File, error) {
+		rd, err := os.Open(filepath.Join(tmpdir, cgoFile))
+		if err != nil {
+			return nil, err
+		}
+		defer rd.Close()
+		return syntax.ParseReader(filepath.Join(bp.Dir, cgoDisplayFile), rd)
+	}
+
+	var files []*syntax.File
+
+	f, err := parse("_cgo_gotypes.go", "C")
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, f)
+
+	for _, fn := range bp.CgoFiles {
+		// "foo.cgo1.go" (displayed "foo.go") is the processed Go source.
+		processed := cgoRe.ReplaceAllString(fn[:len(fn)-len("go")], "_") + "cgo1.go"
+
+		f, err := parse(processed, fn)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+
+	return files, nil
+}
+
+var cgoRe = regexp.MustCompile(`[/\\:]`)
 
 // doImport imports the package denoted by path.
 // It implements the types.Importer signature.

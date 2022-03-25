@@ -5,9 +5,11 @@
 package syntax
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // Mode describes the parser mode.
@@ -111,4 +113,18 @@ func ParseExpr(base *PosBase, src io.Reader, errh ErrorHandler, pragh PragmaHand
 	p.init(base, src, errh, pragh, mode)
 	p.next()
 	return p.expr(), p.first
+}
+
+// Convenience functions.
+
+func ParseReader(filename string, src io.Reader) (*File, error) {
+	return Parse(NewFileBase(filename), src, nil, nil, CheckBranches|AllowGenerics)
+}
+
+func ParseString(filename string, src string) (*File, error) {
+	return ParseReader(filename, strings.NewReader(src))
+}
+
+func ParseBytes(filename string, src []byte) (*File, error) {
+	return ParseReader(filename, bytes.NewReader(src))
 }
