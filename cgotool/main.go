@@ -255,14 +255,8 @@ func main() {
 
 	if *dynobj != "" {
 		// cgo -dynimport is essentially a separate helper command
-		// built into the cgo binary. It scans a gcc-produced executable
-		// and dumps information about the imported symbols and the
-		// imported libraries. The 'go build' rules for cgo prepare an
-		// appropriate executable and then use its import information
-		// instead of needing to make the linkers duplicate all the
-		// specialized knowledge gcc has about where to look for imported
-		// symbols and which ones to use.
-		dynimport(*dynobj)
+		// built into the cgo binary.
+		dynimport()
 		return
 	}
 
