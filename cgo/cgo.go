@@ -159,7 +159,7 @@ func Run(bp *build.Package, pkgdir, tmpdir string, useabs bool) (files, displayF
 	}
 
 	args := stringList(
-		"go", "tool", "cgo", "-objdir", tmpdir, cgoflags, "--",
+		"cgotool", "-objdir", tmpdir, cgoflags, "--",
 		cgoCPPFLAGS, cgoexeCFLAGS, cgoFiles,
 	)
 	if false {

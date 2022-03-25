@@ -202,11 +202,7 @@ func (p *Importer) cgo(bp *build.Package) (*syntax.File, error) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	goCmd := "go"
-	if p.ctxt.GOROOT != "" {
-		goCmd = filepath.Join(p.ctxt.GOROOT, "bin", "go")
-	}
-	args := []string{goCmd, "tool", "cgo", "-objdir", tmpdir}
+	args := []string{"cgotool", "-objdir", tmpdir}
 	if bp.Goroot {
 		switch bp.ImportPath {
 		case "runtime/cgo":
