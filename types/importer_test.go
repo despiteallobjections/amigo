@@ -4,18 +4,6 @@
 
 package types_test
 
-import (
-	"go/build"
+import "github.com/mdempsky/amigo/importer"
 
-	"github.com/mdempsky/amigo/srcimporter"
-	"github.com/mdempsky/amigo/types"
-)
-
-// To avoid coupling to any particular compiler, we use srcimporter
-// for tests. But to avoid too much slow down from having to
-// repeatedly type check the entire package dependency subgraph, we
-// reuse a single common importer across all tests.
-
-var importer = srcimporter.New(&build.Default, map[string]*types.Package{})
-
-func defaultImporter() types.Importer { return importer }
+var defaultImporter = importer.Default

@@ -17,5 +17,11 @@ func Builder() string            { return os.Getenv("GO_BUILDER_NAME") }
 
 func MustHaveGoBuild(t testing.TB) {}
 func MustHaveCGO(t testing.TB)     {}
+func NeedsGoPackages(t testing.TB) {}
 
 func HasSrc() bool { return true }
+
+func NeedsTool(t testing.TB, tool string) {}
+func UsesGenerics(path string) bool       { return false }
+
+func ExitIfSmallMachine() {}

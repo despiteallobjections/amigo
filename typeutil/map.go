@@ -9,8 +9,9 @@ package typeutil // import "github.com/mdempsky/amigo/typeutil"
 import (
 	"bytes"
 	"fmt"
-	"github.com/mdempsky/amigo/types"
 	"reflect"
+
+	"github.com/mdempsky/amigo/types"
 )
 
 // Map is a hash-table-based mapping from types (types.Type) to
@@ -298,7 +299,12 @@ func (h Hasher) hashFor(t types.Type) uint32 {
 
 	case *types.Tuple:
 		return h.hashTuple(t)
+
+	case *types.TypeParam:
+		// Not safe with a copying GC; objects may move.
+		return uint32(reflect.ValueOf(t.Obj()).Pointer())
 	}
+
 	panic(t)
 }
 
