@@ -11,12 +11,19 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Note: Keep 1.17 in this list. Go 1.17 is minimum supported
+        # bootstrap toolchain (see https://go.dev/issue/44505), and
+        # amigo intends to be usable by the Go toolchain eventually.
+        go: [ '1.17', '1.18' ]
+
     steps:
 
-    - name: Set up Go 1.17
+    - name: Set up Go ${{ matrix.go }}
       uses: actions/setup-go@v2
       with:
-        go-version: '1.17.x'
+        go-version: ${{ matrix.go }}
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
