@@ -184,6 +184,7 @@ func TestStdFixed(t *testing.T) {
 		"bug248.go", "bug302.go", "bug369.go", // complex test instructions - ignore
 		"issue6889.go",   // gc-specific test
 		"issue11362.go",  // canonical import path check
+		"issue14652.go",  // test case expectation varies between Go 1.17 and Go 1.8
 		"issue16369.go",  // types2 handles this correctly - not an issue
 		"issue18459.go",  // types2 doesn't check validity of //go:xxx directives
 		"issue18882.go",  // types2 doesn't check validity of //go:xxx directives
