@@ -22,12 +22,12 @@ type parser struct {
 	indent []byte // tracing support
 }
 
-func (p *parser) init(file *PosBase, r io.Reader, errh ErrorHandler, pragh PragmaHandler, mode Mode) {
+func (p *parser) init(file *PosBase, src string, errh ErrorHandler, pragh PragmaHandler, mode Mode) {
 	p.file = file
 	p.errh = errh
 	p.mode = mode
 	p.pragh = pragh
-	p.tapescanner.init(r, directives)
+	p.tapescanner.init(src, directives)
 
 	p.base = file
 	p.first = nil
@@ -37,6 +37,11 @@ func (p *parser) init(file *PosBase, r io.Reader, errh ErrorHandler, pragh Pragm
 	p.fnest = 0
 	p.xnest = 0
 	p.indent = nil
+}
+
+// Deprecated: Use init instead.
+func (p *parser) initReader(file *PosBase, r io.Reader, errh ErrorHandler, pragh PragmaHandler, mode Mode) {
+	p.init(file, readAllString(r), errh, pragh, mode)
 }
 
 func (p *parser) allowGenerics() bool { return p.mode&AllowGenerics != 0 }

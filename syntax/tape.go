@@ -5,7 +5,6 @@
 package syntax
 
 import (
-	"io"
 	"strconv"
 	"strings"
 )
@@ -38,7 +37,7 @@ type tapescanner struct {
 	errcnt int      // number of errors encountered
 }
 
-func (s *tapescanner) init(src io.Reader, mode uint) {
+func (s *tapescanner) init(src string, mode uint) {
 	s.tape = nil
 	s.tapepos = 0
 

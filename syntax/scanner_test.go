@@ -23,7 +23,7 @@ func TestSmoke(t *testing.T) {
 	tokens := []token{_If, _Lparen, _Operator, _Name, _AssignOp, _Dot, _Literal, _Literal, _Literal, _Literal, _Literal, _Dot, _Dot, _Name, _Semi, _EOF}
 
 	var got scanner
-	got.init(strings.NewReader(src), errh, 0)
+	got.initReader(strings.NewReader(src), errh, 0)
 	for _, want := range tokens {
 		got.next()
 		if got.tok != want {
@@ -37,7 +37,7 @@ func TestSmoke(t *testing.T) {
 func TestTokens(t *testing.T) {
 	var got scanner
 	for _, want := range sampleTokens {
-		got.init(strings.NewReader(want.src), func(line, col uint, msg string) {
+		got.initReader(strings.NewReader(want.src), func(line, col uint, msg string) {
 			t.Errorf("%s:%d:%d: %s", want.src, line, col, msg)
 		}, 0)
 		got.next()
@@ -64,7 +64,7 @@ func TestScanner(t *testing.T) {
 	defer src.Close()
 
 	var s scanner
-	s.init(src, errh, 0)
+	s.initReader(src, errh, 0)
 	for {
 		s.next()
 		if s.tok == _EOF {
@@ -97,7 +97,7 @@ func TestEmbeddedTokens(t *testing.T) {
 	// scan source
 	var got scanner
 	var src string
-	got.init(&buf, func(line, col uint, msg string) {
+	got.initReader(&buf, func(line, col uint, msg string) {
 		t.Fatalf("%s:%d:%d: %s", src, line, col, msg)
 	}, 0)
 	got.next()
@@ -352,7 +352,7 @@ func TestComments(t *testing.T) {
 	} {
 		var s scanner
 		var got comment
-		s.init(strings.NewReader(test.src), func(line, col uint, msg string) {
+		s.initReader(strings.NewReader(test.src), func(line, col uint, msg string) {
 			if msg[0] != '/' {
 				// error
 				if msg != "comment not terminated" {
@@ -536,7 +536,7 @@ func TestNumbers(t *testing.T) {
 	} {
 		var s scanner
 		var err string
-		s.init(strings.NewReader(test.src), func(_, _ uint, msg string) {
+		s.initReader(strings.NewReader(test.src), func(_, _ uint, msg string) {
 			if err == "" {
 				err = msg
 			}
@@ -660,7 +660,7 @@ func TestScanErrors(t *testing.T) {
 		var s scanner
 		var line, col uint
 		var err string
-		s.init(strings.NewReader(test.src), func(l, c uint, msg string) {
+		s.initReader(strings.NewReader(test.src), func(l, c uint, msg string) {
 			if err == "" {
 				line, col = l-linebase, c-colbase
 				err = msg
@@ -707,7 +707,7 @@ func TestDirectives(t *testing.T) {
 	} {
 		got := ""
 		var s scanner
-		s.init(strings.NewReader(src), func(_, col uint, msg string) {
+		s.initReader(strings.NewReader(src), func(_, col uint, msg string) {
 			if col != colbase {
 				t.Errorf("%s: got col = %d; want %d", src, col, colbase)
 			}
@@ -736,7 +736,7 @@ func TestIssue21938(t *testing.T) {
 	s := "/*" + strings.Repeat(" ", 4089) + "*/ .5"
 
 	var got scanner
-	got.init(strings.NewReader(s), errh, 0)
+	got.initReader(strings.NewReader(s), errh, 0)
 	got.next()
 
 	if got.tok != _Literal || got.lit != ".5" {
@@ -749,7 +749,7 @@ func TestIssue33961(t *testing.T) {
 	for _, lit := range strings.Split(literals, " ") {
 		n := 0
 		var got scanner
-		got.init(strings.NewReader(lit), func(_, _ uint, msg string) {
+		got.initReader(strings.NewReader(lit), func(_, _ uint, msg string) {
 			// fmt.Printf("%s: %s\n", lit, msg) // uncomment for debugging
 			n++
 		}, 0)

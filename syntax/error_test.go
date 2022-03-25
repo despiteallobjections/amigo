@@ -84,7 +84,7 @@ func declaredErrors(t *testing.T, filename string) map[position]string {
 
 	var s scanner
 	var pattern string
-	s.init(f, func(line, col uint, msg string) {
+	s.initReader(f, func(line, col uint, msg string) {
 		// errors never start with '/' so they are automatically excluded here
 		switch {
 		case strings.HasPrefix(msg, "// ERROR "):

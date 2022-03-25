@@ -17,7 +17,7 @@ import (
 // the comment text; otherwise it is the error message.
 func CommentsDo(src io.Reader, handler func(line, col uint, text string)) {
 	var s scanner
-	s.init(src, handler, comments)
+	s.initReader(src, handler, comments)
 	for s.tok != _EOF {
 		s.next()
 	}
@@ -43,7 +43,7 @@ func ErrorMap(src io.Reader) (errmap map[uint][]Error) {
 	var prev struct{ line, col uint }
 
 	var s scanner
-	s.init(src, func(_, _ uint, text string) {
+	s.initReader(src, func(_, _ uint, text string) {
 		if text[0] != '/' {
 			return // error, ignore
 		}

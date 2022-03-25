@@ -38,10 +38,23 @@ type scanner struct {
 	tapeelem
 }
 
-func (s *scanner) init(src io.Reader, errh func(line, col uint, msg string), mode uint) {
+func (s *scanner) init(src string, errh func(line, col uint, msg string), mode uint) {
 	s.source.init(src, errh)
 	s.mode = mode
 	s.nlsemi = false
+}
+
+// Deprecated: Use init instead.
+func (s *scanner) initReader(src io.Reader, errh func(line, col uint, msg string), mode uint) {
+	s.init(readAllString(src), errh, mode)
+}
+
+func readAllString(src io.Reader) string {
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		panic(err) // TODO(mdempsky): Proper error handling.
+	}
+	return string(buf)
 }
 
 // errorf reports an error at the most recently read character position.

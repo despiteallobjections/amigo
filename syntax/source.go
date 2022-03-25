@@ -14,6 +14,7 @@ package syntax
 
 import (
 	"io"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -44,7 +45,7 @@ import (
 // Invariant: -1 <= b < r <= e < len(buf) && buf[e] == sentinel
 
 type source struct {
-	in   io.Reader
+	in   *strings.Reader
 	errh func(line, col uint, msg string)
 
 	buf       []byte // source buffer
@@ -57,8 +58,8 @@ type source struct {
 
 const sentinel = utf8.RuneSelf
 
-func (s *source) init(in io.Reader, errh func(line, col uint, msg string)) {
-	s.in = in
+func (s *source) init(in string, errh func(line, col uint, msg string)) {
+	s.in = strings.NewReader(in)
 	s.errh = errh
 
 	if s.buf == nil {
