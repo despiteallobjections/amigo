@@ -8,12 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
-	exec "golang.org/x/sys/execabs"
 	"strings"
+
+	exec "golang.org/x/sys/execabs"
 )
 
-// pkgConfig runs pkg-config with the specified arguments and returns the flags it prints.
-func pkgConfig(mode string, pkgs []string) (flags []string, err error) {
+// PkgConfig runs pkg-config with the specified arguments and returns the flags it prints.
+func PkgConfig(mode string, pkgs []string) (flags []string, err error) {
 	cmd := exec.Command("pkg-config", append([]string{mode}, pkgs...)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -29,11 +30,11 @@ func pkgConfig(mode string, pkgs []string) (flags []string, err error) {
 	return
 }
 
-// pkgConfigFlags calls pkg-config if needed and returns the cflags
+// PkgConfigFlags calls pkg-config if needed and returns the cflags
 // needed to build the package.
-func pkgConfigFlags(p *build.Package) (cflags []string, err error) {
+func PkgConfigFlags(p *build.Package) (cflags []string, err error) {
 	if len(p.CgoPkgConfig) == 0 {
 		return nil, nil
 	}
-	return pkgConfig("--cflags", p.CgoPkgConfig)
+	return PkgConfig("--cflags", p.CgoPkgConfig)
 }

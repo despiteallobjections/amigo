@@ -122,7 +122,7 @@ func Run(bp *build.Package, pkgdir, tmpdir string, useabs bool) (files, displayF
 	_, cgoexeCFLAGS, _, _ := cflags(bp, false)
 
 	if len(bp.CgoPkgConfig) > 0 {
-		pcCFLAGS, err := pkgConfigFlags(bp)
+		pcCFLAGS, err := PkgConfigFlags(bp)
 		if err != nil {
 			return nil, nil, err
 		}

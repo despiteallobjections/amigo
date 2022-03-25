@@ -17,6 +17,7 @@ import (
 	"sync"
 	_ "unsafe" // for go:linkname
 
+	"github.com/mdempsky/amigo/cgo"
 	"github.com/mdempsky/amigo/syntax"
 	types "github.com/mdempsky/amigo/types"
 )
@@ -214,14 +215,13 @@ func (p *Importer) cgo(bp *build.Package) (*syntax.File, error) {
 	args = append(args, "--")
 	args = append(args, strings.Fields(os.Getenv("CGO_CPPFLAGS"))...)
 	args = append(args, bp.CgoCPPFLAGS...)
-	if len(bp.CgoPkgConfig) > 0 {
-		cmd := exec.Command("pkg-config", append([]string{"--cflags"}, bp.CgoPkgConfig...)...)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, strings.Fields(string(out))...)
+
+	cflags, err := cgo.PkgConfigFlags(bp)
+	if err != nil {
+		return nil, err
 	}
+	args = append(args, cflags...)
+
 	args = append(args, "-I", tmpdir)
 	args = append(args, strings.Fields(os.Getenv("CGO_CFLAGS"))...)
 	args = append(args, bp.CgoCFLAGS...)
