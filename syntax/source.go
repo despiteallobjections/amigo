@@ -14,7 +14,6 @@ package syntax
 
 import (
 	"io"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -45,8 +44,9 @@ import (
 // Invariant: -1 <= b < r <= e < len(buf) && buf[e] == sentinel
 
 type source struct {
-	in   *strings.Reader
-	errh func(line, col uint, msg string)
+	in    string
+	inPos int
+	errh  func(line, col uint, msg string)
 
 	buf       []byte // source buffer
 	ioerr     error  // pending I/O error, or nil
@@ -59,7 +59,8 @@ type source struct {
 const sentinel = utf8.RuneSelf
 
 func (s *source) init(in string, errh func(line, col uint, msg string)) {
-	s.in = strings.NewReader(in)
+	s.in = in
+	s.inPos = 0
 	s.errh = errh
 
 	if s.buf == nil {
@@ -186,23 +187,16 @@ func (s *source) fill() {
 	s.r -= b
 	s.e -= b
 
-	// read more data: try a limited number of times
-	for i := 0; i < 10; i++ {
-		var n int
-		n, s.ioerr = s.in.Read(s.buf[s.e : len(s.buf)-1]) // -1 to leave space for sentinel
-		if n < 0 {
-			panic("negative read") // incorrect underlying io.Reader implementation
-		}
-		if n > 0 || s.ioerr != nil {
-			s.e += n
-			s.buf[s.e] = sentinel
-			return
-		}
-		// n == 0
+	// read more data
+	if s.inPos == len(s.in) {
+		s.ioerr = io.EOF
+	} else {
+		b := s.buf[s.e : len(s.buf)-1]
+		n := copy(b, s.in[s.inPos:])
+		s.inPos += n
+		s.e += n
 	}
-
 	s.buf[s.e] = sentinel
-	s.ioerr = io.ErrNoProgress
 }
 
 // nextSize returns the next bigger size for a buffer of a given size.
