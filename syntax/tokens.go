@@ -156,3 +156,31 @@ const (
 	precAdd
 	precMul
 )
+
+func (op Operator) prec() int { return opPrec[op] }
+
+var opPrec = [...]int{
+	OrOr: precOrOr,
+
+	AndAnd: precAndAnd,
+
+	Leq: precCmp,
+	Lss: precCmp,
+	Gtr: precCmp,
+	Geq: precCmp,
+	Eql: precCmp,
+	Neq: precCmp,
+
+	Add: precAdd,
+	Sub: precAdd,
+	Or:  precAdd,
+	Xor: precAdd,
+
+	Mul:    precMul,
+	Div:    precMul,
+	Rem:    precMul,
+	And:    precMul,
+	AndNot: precMul,
+	Shl:    precMul,
+	Shr:    precMul,
+}

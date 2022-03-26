@@ -675,11 +675,15 @@ func (p *parser) binaryExpr(x Expr, prec int) Expr {
 	if x == nil {
 		x = p.unaryExpr()
 	}
-	for (p.tok == _Operator || p.tok == _Star) && p.prec > prec {
+	for p.tok == _Operator || p.tok == _Star {
+		tprec := p.op.prec()
+		if tprec <= prec {
+			break
+		}
+
 		t := new(Operation)
 		t.pos = p.pos()
 		t.Op = p.op
-		tprec := p.prec
 		p.next()
 		t.X = x
 		t.Y = p.binaryExpr(nil, tprec)

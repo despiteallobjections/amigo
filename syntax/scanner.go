@@ -204,7 +204,7 @@ redo:
 
 	case '+':
 		s.source.nextch()
-		s.op, s.prec = Add, precAdd
+		s.op = Add
 		if s.source.ch != '+' {
 			goto assignop
 		}
@@ -214,7 +214,7 @@ redo:
 
 	case '-':
 		s.source.nextch()
-		s.op, s.prec = Sub, precAdd
+		s.op = Sub
 		if s.source.ch != '-' {
 			goto assignop
 		}
@@ -224,7 +224,7 @@ redo:
 
 	case '*':
 		s.source.nextch()
-		s.op, s.prec = Mul, precMul
+		s.op = Mul
 		// don't goto assignop - want _Star token
 		if s.source.ch == '=' {
 			s.source.nextch()
@@ -252,23 +252,23 @@ redo:
 			}
 			goto redo
 		}
-		s.op, s.prec = Div, precMul
+		s.op = Div
 		goto assignop
 
 	case '%':
 		s.source.nextch()
-		s.op, s.prec = Rem, precMul
+		s.op = Rem
 		goto assignop
 
 	case '&':
 		s.source.nextch()
 		if s.source.ch == '&' {
 			s.source.nextch()
-			s.op, s.prec = AndAnd, precAndAnd
+			s.op = AndAnd
 			s.tok = _Operator
 			break
 		}
-		s.op, s.prec = And, precMul
+		s.op = And
 		if s.source.ch == '^' {
 			s.source.nextch()
 			s.op = AndNot
@@ -279,29 +279,29 @@ redo:
 		s.source.nextch()
 		if s.source.ch == '|' {
 			s.source.nextch()
-			s.op, s.prec = OrOr, precOrOr
+			s.op = OrOr
 			s.tok = _Operator
 			break
 		}
-		s.op, s.prec = Or, precAdd
+		s.op = Or
 		goto assignop
 
 	case '^':
 		s.source.nextch()
-		s.op, s.prec = Xor, precAdd
+		s.op = Xor
 		goto assignop
 
 	case '<':
 		s.source.nextch()
 		if s.source.ch == '=' {
 			s.source.nextch()
-			s.op, s.prec = Leq, precCmp
+			s.op = Leq
 			s.tok = _Operator
 			break
 		}
 		if s.source.ch == '<' {
 			s.source.nextch()
-			s.op, s.prec = Shl, precMul
+			s.op = Shl
 			goto assignop
 		}
 		if s.source.ch == '-' {
@@ -309,30 +309,30 @@ redo:
 			s.tok = _Arrow
 			break
 		}
-		s.op, s.prec = Lss, precCmp
+		s.op = Lss
 		s.tok = _Operator
 
 	case '>':
 		s.source.nextch()
 		if s.source.ch == '=' {
 			s.source.nextch()
-			s.op, s.prec = Geq, precCmp
+			s.op = Geq
 			s.tok = _Operator
 			break
 		}
 		if s.source.ch == '>' {
 			s.source.nextch()
-			s.op, s.prec = Shr, precMul
+			s.op = Shr
 			goto assignop
 		}
-		s.op, s.prec = Gtr, precCmp
+		s.op = Gtr
 		s.tok = _Operator
 
 	case '=':
 		s.source.nextch()
 		if s.source.ch == '=' {
 			s.source.nextch()
-			s.op, s.prec = Eql, precCmp
+			s.op = Eql
 			s.tok = _Operator
 			break
 		}
@@ -342,16 +342,16 @@ redo:
 		s.source.nextch()
 		if s.source.ch == '=' {
 			s.source.nextch()
-			s.op, s.prec = Neq, precCmp
+			s.op = Neq
 			s.tok = _Operator
 			break
 		}
-		s.op, s.prec = Not, 0
+		s.op = Not
 		s.tok = _Operator
 
 	case '~':
 		s.source.nextch()
-		s.op, s.prec = Tilde, 0
+		s.op = Tilde
 		s.tok = _Operator
 
 	default:

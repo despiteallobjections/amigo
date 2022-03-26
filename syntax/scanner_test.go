@@ -77,7 +77,7 @@ func TestScanner(t *testing.T) {
 		case _Name, _Literal:
 			fmt.Printf("%s:%d:%d: %s => %s\n", filename, s.line, s.col, s.tok, s.lit)
 		case _Operator:
-			fmt.Printf("%s:%d:%d: %s => %s (prec = %d)\n", filename, s.line, s.col, s.tok, s.op, s.prec)
+			fmt.Printf("%s:%d:%d: %s => %s\n", filename, s.line, s.col, s.tok, s.op)
 		default:
 			fmt.Printf("%s:%d:%d: %s\n", filename, s.line, s.col, s.tok)
 		}
@@ -132,8 +132,8 @@ func TestEmbeddedTokens(t *testing.T) {
 				t.Errorf("%s: got op %s; want %s", src, got.op, want.op)
 				continue
 			}
-			if got.prec != want.prec {
-				t.Errorf("%s: got prec %d; want %d", src, got.prec, want.prec)
+			if got.op.prec() != want.prec {
+				t.Errorf("%s: got prec %d; want %d", src, got.op.prec(), want.prec)
 				continue
 			}
 			nlsemi = want.tok == _IncOp

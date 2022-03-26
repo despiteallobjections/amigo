@@ -18,7 +18,6 @@ type tapeelem struct {
 	bad       bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
 	kind      LitKind  // valid if tok is _Literal
 	op        Operator // valid if tok is _Operator, _AssignOp, or _IncOp
-	prec      int      // valid if tok is _Operator, _AssignOp, or _IncOp
 }
 
 type tapescanner struct {
