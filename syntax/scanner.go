@@ -36,7 +36,7 @@ type scanner struct {
 	tapeelem
 }
 
-func (s *scanner) init(src string, errh func(line, col uint, msg string), mode uint) {
+func (s *scanner) init(src string, errh func(pos spos, msg string), mode uint) {
 	s.source.init(src, errh)
 	s.mode = mode
 	s.nlsemi = false
@@ -44,7 +44,7 @@ func (s *scanner) init(src string, errh func(line, col uint, msg string), mode u
 
 // Deprecated: Use init instead.
 func (s *scanner) initReader(src io.Reader, errh func(line, col uint, msg string), mode uint) {
-	s.init(readAllString(src), errh, mode)
+	s.init(readAllString(src), func(pos spos, msg string) { errh(pos.line, pos.col, msg) }, mode)
 }
 
 func readAllString(src io.Reader) string {
@@ -62,7 +62,11 @@ func (s *scanner) errorf(format string, args ...interface{}) {
 
 // errorAtf reports an error at a byte column offset relative to the current token start.
 func (s *scanner) errorAtf(offset int, format string, args ...interface{}) {
-	s.source.errh(s.line, s.col+uint(offset), fmt.Sprintf(format, args...))
+	pos := s.spos
+	pos.offset += offset
+	pos.col += uint(offset)
+
+	s.source.errh(pos, fmt.Sprintf(format, args...))
 }
 
 // setLit sets the scanner state for a recognized _Literal token.
@@ -98,14 +102,14 @@ func (s *scanner) next() {
 redo:
 	// skip white space
 	s.source.stop()
-	startLine, startCol := s.source.pos()
+	start := s.source.pos()
 	for s.source.ch == ' ' || s.source.ch == '\t' || s.source.ch == '\n' && !nlsemi || s.source.ch == '\r' {
 		s.source.nextch()
 	}
 
 	// token start
-	s.line, s.col = s.source.pos()
-	s.blank = s.line > startLine || startCol == colbase
+	s.spos = s.source.pos()
+	s.blank = s.line > start.line || start.col == colbase
 	s.source.start()
 	if isLetter(s.source.ch) || s.source.ch >= utf8.RuneSelf && s.atIdentChar(true) {
 		s.source.nextch()
@@ -243,7 +247,7 @@ redo:
 		if s.source.ch == '*' {
 			s.source.nextch()
 			s.fullComment()
-			if line, _ := s.source.pos(); line > s.line && nlsemi {
+			if pos := s.source.pos(); pos.line > s.line && nlsemi {
 				// A multi-line comment acts like a newline;
 				// it translates to a ';' if nlsemi is set.
 				s.lit = "newline"
@@ -459,8 +463,8 @@ func (s *scanner) digits(base int, invalid *int) (digsep int) {
 			if s.source.ch == '_' {
 				ds = 2
 			} else if s.source.ch >= max && *invalid < 0 {
-				_, col := s.source.pos()
-				*invalid = int(col - s.col) // record invalid rune index
+				pos := s.source.pos()
+				*invalid = int(pos.col - s.col) // record invalid rune index
 			}
 			digsep |= ds
 			s.source.nextch()

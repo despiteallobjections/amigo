@@ -11,13 +11,13 @@ import (
 
 type tapeelem struct {
 	// current token, valid after calling next()
-	line, col uint
-	blank     bool // line is blank up to col
-	tok       token
-	lit       string   // valid if tok is _Name, _Literal, or _Semi ("semicolon", "newline", or "EOF"); may be malformed if bad is true
-	bad       bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
-	kind      LitKind  // valid if tok is _Literal
-	op        Operator // valid if tok is _Operator, _AssignOp, or _IncOp
+	spos
+	blank bool // line is blank up to col
+	tok   token
+	lit   string   // valid if tok is _Name, _Literal, or _Semi ("semicolon", "newline", or "EOF"); may be malformed if bad is true
+	bad   bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
+	kind  LitKind  // valid if tok is _Literal
+	op    Operator // valid if tok is _Operator, _AssignOp, or _IncOp
 }
 
 type tapescanner struct {
@@ -41,8 +41,8 @@ func (s *tapescanner) init(src string, mode uint) {
 	s.tapepos = 0
 
 	var old scanner
-	old.init(src, func(line, col uint, msg string) {
-		s.tape = append(s.tape, tapeelem{line: line, col: col, tok: _Error, lit: msg})
+	old.init(src, func(pos spos, msg string) {
+		s.tape = append(s.tape, tapeelem{spos: pos, tok: _Error, lit: msg})
 	}, mode)
 
 	for {
@@ -60,7 +60,7 @@ again:
 	s.tapepos++
 
 	if s.tok == _Error {
-		s.errh0(s.line, s.col, s.lit)
+		s.errh0(s.spos, s.lit)
 		goto again
 	}
 }
@@ -70,9 +70,9 @@ again:
 // handler is always at or after the current reading
 // position, it is safe to use the most recent position
 // base to compute the corresponding Pos value.
-func (s *tapescanner) errh0(line, col uint, msg string) {
+func (s *tapescanner) errh0(pos0 spos, msg string) {
 	if msg[0] != '/' {
-		s.errorAt(s.posAt(line, col), msg)
+		s.errorAt(s.posAt(pos0.line, pos0.col), msg)
 		return
 	}
 
@@ -80,25 +80,25 @@ func (s *tapescanner) errh0(line, col uint, msg string) {
 	// //line directives must be at the start of the line (column colbase).
 	// /*line*/ directives can be anywhere in the line.
 	text := commentText(msg)
-	if (col == colbase || msg[1] == '*') && strings.HasPrefix(text, "line ") {
+	if (pos0.col == colbase || msg[1] == '*') && strings.HasPrefix(text, "line ") {
 		var pos Pos // position immediately following the comment
 		if msg[1] == '/' {
 			// line comment (newline is part of the comment)
-			pos = MakePos(s.file, line+1, colbase)
+			pos = MakePos(s.file, pos0.line+1, colbase)
 		} else {
 			// regular comment
 			// (if the comment spans multiple lines it's not
 			// a valid line directive and will be discarded
 			// by updateBase)
-			pos = MakePos(s.file, line, col+uint(len(msg)))
+			pos = MakePos(s.file, pos0.line, pos0.col+uint(len(msg)))
 		}
-		s.updateBase(pos, line, col+2+5, text[5:]) // +2 to skip over // or /*
+		s.updateBase(pos, pos0.line, pos0.col+2+5, text[5:]) // +2 to skip over // or /*
 		return
 	}
 
 	// go: directive (but be conservative and test)
 	if s.pragh != nil && strings.HasPrefix(text, "go:") {
-		s.pragma = s.pragh(s.posAt(line, col+2), s.blank, text, s.pragma) // +2 to skip over // or /*
+		s.pragma = s.pragh(s.posAt(pos0.line, pos0.col+2), s.blank, text, s.pragma) // +2 to skip over // or /*
 	}
 }
 

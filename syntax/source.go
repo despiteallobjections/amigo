@@ -16,8 +16,13 @@ import (
 	"unicode/utf8"
 )
 
+type spos struct {
+	offset    int  // byte offset into file
+	line, col uint // line, column (1-based)
+}
+
 type source struct {
-	errh func(line, col uint, msg string)
+	errh func(pos spos, msg string)
 
 	buf  string
 	b    int  // buffer index for start of active segment, or -1 if none
@@ -28,7 +33,7 @@ type source struct {
 	chw  int  // width of ch
 }
 
-func (s *source) init(in string, errh func(line, col uint, msg string)) {
+func (s *source) init(in string, errh func(pos spos, msg string)) {
 	s.buf = in
 	s.errh = errh
 
@@ -45,14 +50,13 @@ const linebase = 1
 const colbase = 1
 
 // pos returns the (line, col) source position of s.ch.
-func (s *source) pos() (line, col uint) {
-	return linebase + s.line, colbase + uint(s.r-s.bol)
+func (s *source) pos() spos {
+	return spos{s.r, linebase + s.line, colbase + uint(s.r-s.bol)}
 }
 
 // error reports the error msg at source position s.pos().
 func (s *source) error(msg string) {
-	line, col := s.pos()
-	s.errh(line, col, msg)
+	s.errh(s.pos(), msg)
 }
 
 // start starts a new active source segment (including s.ch).
