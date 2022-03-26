@@ -19,19 +19,23 @@ import (
 type source struct {
 	errh func(line, col uint, msg string)
 
-	buf       string
-	b, r      int  // buffer indices (see comment above)
-	line, col uint // source position of ch (0-based)
-	ch        rune // most recently read character
-	chw       int  // width of ch
+	buf  string
+	b    int  // buffer index for start of active segment, or -1 if none
+	r    int  // buffer index of ch
+	line uint // source position of ch (0-based)
+	bol  int  // buffer index for beginning of current line
+	ch   rune // most recently read character
+	chw  int  // width of ch
 }
 
 func (s *source) init(in string, errh func(line, col uint, msg string)) {
 	s.buf = in
 	s.errh = errh
 
-	s.b, s.r = -1, 0
-	s.line, s.col = 0, 0
+	s.b = -1
+	s.r = 0
+	s.line = 0
+	s.bol = 0
 	s.ch = ' '
 	s.chw = 0
 }
@@ -42,7 +46,7 @@ const colbase = 1
 
 // pos returns the (line, col) source position of s.ch.
 func (s *source) pos() (line, col uint) {
-	return linebase + s.line, colbase + s.col
+	return linebase + s.line, colbase + uint(s.r-s.bol)
 }
 
 // error reports the error msg at source position s.pos().
@@ -54,9 +58,9 @@ func (s *source) error(msg string) {
 // start starts a new active source segment (including s.ch).
 // As long as stop has not been called, the active segment's
 // bytes (excluding s.ch) may be retrieved by calling segment.
-func (s *source) start()          { s.b = s.r - s.chw }
+func (s *source) start()          { s.b = s.r }
 func (s *source) stop()           { s.b = -1 }
-func (s *source) segment() string { return s.buf[s.b : s.r-s.chw] }
+func (s *source) segment() string { return s.buf[s.b:s.r] }
 
 // rewind rewinds the scanner's read position and character s.ch
 // to the start of the currently active segment, which must not
@@ -69,17 +73,17 @@ func (s *source) rewind() {
 	if s.b < 0 {
 		panic("no active segment")
 	}
-	s.col -= uint(s.r - s.b)
 	s.r = s.b
+	s.chw = 0
 	s.nextch()
 }
 
 func (s *source) nextch() {
 redo:
-	s.col += uint(s.chw)
+	s.r += s.chw
 	if s.ch == '\n' {
 		s.line++
-		s.col = 0
+		s.bol = s.r
 	}
 
 	// EOF
@@ -92,7 +96,6 @@ redo:
 	// fast common case: at least one ASCII character
 	if s.buf[s.r] < utf8.RuneSelf {
 		s.ch = rune(s.buf[s.r])
-		s.r++
 		s.chw = 1
 		if s.ch == 0 {
 			s.error("invalid NUL character")
@@ -102,7 +105,6 @@ redo:
 	}
 
 	s.ch, s.chw = utf8.DecodeRuneInString(s.buf[s.r:])
-	s.r += s.chw
 
 	if s.ch == utf8.RuneError && s.chw == 1 {
 		s.error("invalid UTF-8 encoding")
@@ -112,7 +114,7 @@ redo:
 	// BOM's are only allowed as the first character in a file
 	const BOM = 0xfeff
 	if s.ch == BOM {
-		if s.line > 0 || s.col > 0 {
+		if s.r > 0 {
 			s.error("invalid BOM in the middle of the file")
 		}
 		goto redo
