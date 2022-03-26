@@ -81,7 +81,6 @@ func Parse(base *PosBase, src io.Reader, errh ErrorHandler, pragh PragmaHandler,
 
 	var p parser
 	p.initReader(base, src, errh, pragh, mode)
-	p.next()
 	return p.fileOrNil(), p.first
 }
 
@@ -111,7 +110,6 @@ func ParseExpr(base *PosBase, src io.Reader, errh ErrorHandler, pragh PragmaHand
 
 	var p parser
 	p.initReader(base, src, errh, pragh, mode)
-	p.next()
 	return p.expr(), p.first
 }
 

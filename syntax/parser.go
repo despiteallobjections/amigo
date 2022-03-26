@@ -37,6 +37,8 @@ func (p *parser) init(file *PosBase, src string, errh ErrorHandler, pragh Pragma
 	p.fnest = 0
 	p.xnest = 0
 	p.indent = nil
+
+	p.next()
 }
 
 // Deprecated: Use init instead.
