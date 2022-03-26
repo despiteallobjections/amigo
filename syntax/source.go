@@ -13,62 +13,24 @@
 package syntax
 
 import (
-	"io"
 	"unicode/utf8"
 )
 
-// The source buffer is accessed using three indices b (begin),
-// r (read), and e (end):
-//
-// - If b >= 0, it points to the beginning of a segment of most
-//   recently read characters (typically a Go literal).
-//
-// - r points to the byte immediately following the most recently
-//   read character ch, which starts at r-chw.
-//
-// - e points to the byte immediately following the last byte that
-//   was read into the buffer.
-//
-// The buffer content is terminated at buf[e] with the sentinel
-// character utf8.RuneSelf. This makes it possible to test for
-// the common case of ASCII characters with a single 'if' (see
-// nextch method).
-//
-//                +------ content in use -------+
-//                v                             v
-// buf [...read...|...segment...|ch|...unread...|s|...free...]
-//                ^             ^  ^            ^
-//                |             |  |            |
-//                b         r-chw  r            e
-//
-// Invariant: -1 <= b < r <= e < len(buf) && buf[e] == sentinel
-
 type source struct {
-	in    string
-	inPos int
-	errh  func(line, col uint, msg string)
+	errh func(line, col uint, msg string)
 
-	buf       []byte // source buffer
-	ioerr     error  // pending I/O error, or nil
-	b, r, e   int    // buffer indices (see comment above)
-	line, col uint   // source position of ch (0-based)
-	ch        rune   // most recently read character
-	chw       int    // width of ch
+	buf       string
+	b, r      int  // buffer indices (see comment above)
+	line, col uint // source position of ch (0-based)
+	ch        rune // most recently read character
+	chw       int  // width of ch
 }
 
-const sentinel = utf8.RuneSelf
-
 func (s *source) init(in string, errh func(line, col uint, msg string)) {
-	s.in = in
-	s.inPos = 0
+	s.buf = in
 	s.errh = errh
 
-	if s.buf == nil {
-		s.buf = make([]byte, nextSize(0))
-	}
-	s.buf[0] = sentinel
-	s.ioerr = nil
-	s.b, s.r, s.e = -1, 0, 0
+	s.b, s.r = -1, 0
 	s.line, s.col = 0, 0
 	s.ch = ' '
 	s.chw = 0
@@ -94,7 +56,7 @@ func (s *source) error(msg string) {
 // bytes (excluding s.ch) may be retrieved by calling segment.
 func (s *source) start()          { s.b = s.r - s.chw }
 func (s *source) stop()           { s.b = -1 }
-func (s *source) segment() []byte { return s.buf[s.b : s.r-s.chw] }
+func (s *source) segment() string { return s.buf[s.b : s.r-s.chw] }
 
 // rewind rewinds the scanner's read position and character s.ch
 // to the start of the currently active segment, which must not
@@ -120,8 +82,16 @@ redo:
 		s.col = 0
 	}
 
+	// EOF
+	if s.r >= len(s.buf) {
+		s.ch = -1
+		s.chw = 0
+		return
+	}
+
 	// fast common case: at least one ASCII character
-	if s.ch = rune(s.buf[s.r]); s.ch < sentinel {
+	if s.buf[s.r] < utf8.RuneSelf {
+		s.ch = rune(s.buf[s.r])
 		s.r++
 		s.chw = 1
 		if s.ch == 0 {
@@ -131,24 +101,7 @@ redo:
 		return
 	}
 
-	// slower general case: add more bytes to buffer if we don't have a full rune
-	for s.e-s.r < utf8.UTFMax && !utf8.FullRune(s.buf[s.r:s.e]) && s.ioerr == nil {
-		s.fill()
-	}
-
-	// EOF
-	if s.r == s.e {
-		if s.ioerr != io.EOF {
-			// ensure we never start with a '/' (e.g., rooted path) in the error message
-			s.error("I/O error: " + s.ioerr.Error())
-			s.ioerr = nil
-		}
-		s.ch = -1
-		s.chw = 0
-		return
-	}
-
-	s.ch, s.chw = utf8.DecodeRune(s.buf[s.r:s.e])
+	s.ch, s.chw = utf8.DecodeRuneInString(s.buf[s.r:])
 	s.r += s.chw
 
 	if s.ch == utf8.RuneError && s.chw == 1 {
@@ -164,50 +117,4 @@ redo:
 		}
 		goto redo
 	}
-}
-
-// fill reads more source bytes into s.buf.
-// It returns with at least one more byte in the buffer, or with s.ioerr != nil.
-func (s *source) fill() {
-	// determine content to preserve
-	b := s.r
-	if s.b >= 0 {
-		b = s.b
-		s.b = 0 // after buffer has grown or content has been moved down
-	}
-	content := s.buf[b:s.e]
-
-	// grow buffer or move content down
-	if len(content)*2 > len(s.buf) {
-		s.buf = make([]byte, nextSize(len(s.buf)))
-		copy(s.buf, content)
-	} else if b > 0 {
-		copy(s.buf, content)
-	}
-	s.r -= b
-	s.e -= b
-
-	// read more data
-	if s.inPos == len(s.in) {
-		s.ioerr = io.EOF
-	} else {
-		b := s.buf[s.e : len(s.buf)-1]
-		n := copy(b, s.in[s.inPos:])
-		s.inPos += n
-		s.e += n
-	}
-	s.buf[s.e] = sentinel
-}
-
-// nextSize returns the next bigger size for a buffer of a given size.
-func nextSize(size int) int {
-	const min = 4 << 10 // 4K: minimum buffer size
-	const max = 1 << 20 // 1M: maximum buffer size which is still doubled
-	if size < min {
-		return min
-	}
-	if size <= max {
-		return size << 1
-	}
-	return size + max
 }
