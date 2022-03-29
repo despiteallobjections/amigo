@@ -15,7 +15,7 @@ import (
 
 type closure map[string]*types.Package
 
-func (c closure) Import(path string) (*types.Package, error) { return c[path], nil }
+func (c closure) Import(path, srcDir string) (*types.Package, error) { return c[path], nil }
 
 func TestDependencies(t *testing.T) {
 	packages := make(map[string]*types.Package)

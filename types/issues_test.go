@@ -488,14 +488,14 @@ type importHelper struct {
 	fallback Importer
 }
 
-func (h importHelper) Import(path string) (*Package, error) {
+func (h importHelper) Import(path, srcDir string) (*Package, error) {
 	if path == h.pkg.Path() {
 		return h.pkg, nil
 	}
 	if h.fallback == nil {
 		return nil, fmt.Errorf("got package path %q; want %q", path, h.pkg.Path())
 	}
-	return h.fallback.Import(path)
+	return h.fallback.Import(path, srcDir)
 }
 
 // TestIssue34921 verifies that we don't update an imported type's underlying

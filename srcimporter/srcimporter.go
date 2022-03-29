@@ -45,22 +45,13 @@ func New(ctxt *build.Context, packages map[string]*types.Package) *Importer {
 // for a package that is in the process of being imported.
 var importing types.Package
 
-// Import(path) is a shortcut for ImportFrom(path, ".", 0).
-func (p *Importer) Import(path string) (*types.Package, error) {
-	return p.ImportFrom(path, ".", 0) // use "." rather than "" (see issue #24441)
-}
-
-// ImportFrom imports the package with the given import path resolved from the given srcDir,
+// Import imports the package with the given import path resolved from the given srcDir,
 // adds the new package to the set of packages maintained by the importer, and returns the
 // package. Package path resolution and file system operations are controlled by the context
 // maintained with the importer. The import mode must be zero but is otherwise ignored.
 // Packages that are not comprised entirely of pure Go files may fail to import because the
 // type checker may not be able to determine all exported entities (e.g. due to cgo dependencies).
-func (p *Importer) ImportFrom(path, srcDir string, mode types.ImportMode) (*types.Package, error) {
-	if mode != 0 {
-		panic("non-zero import mode")
-	}
-
+func (p *Importer) Import(path, srcDir string) (*types.Package, error) {
 	if abs, err := p.absPath(srcDir); err == nil { // see issue #14282
 		srcDir = abs
 	}

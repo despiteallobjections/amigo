@@ -11,28 +11,20 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
-
 	. "github.com/mdempsky/amigo/types"
 )
 
 type resolveTestImporter struct {
-	importer ImporterFrom
+	importer Importer
 	imported map[string]bool
 }
 
-func (imp *resolveTestImporter) Import(string) (*Package, error) {
-	panic("should not be called")
-}
-
-func (imp *resolveTestImporter) ImportFrom(path, srcDir string, mode ImportMode) (*Package, error) {
-	if mode != 0 {
-		panic("mode must be 0")
-	}
+func (imp *resolveTestImporter) Import(path, srcDir string) (*Package, error) {
 	if imp.importer == nil {
-		imp.importer = defaultImporter().(ImporterFrom)
+		imp.importer = defaultImporter()
 		imp.imported = make(map[string]bool)
 	}
-	pkg, err := imp.importer.ImportFrom(path, srcDir, mode)
+	pkg, err := imp.importer.Import(path, srcDir)
 	if err != nil {
 		return nil, err
 	}

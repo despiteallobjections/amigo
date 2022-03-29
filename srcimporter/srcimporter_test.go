@@ -32,7 +32,7 @@ var importer = New(&build.Default, make(map[string]*types.Package))
 
 func doImport(t *testing.T, path, srcDir string) {
 	t0 := time.Now()
-	if _, err := importer.ImportFrom(path, srcDir, 0); err != nil {
+	if _, err := importer.Import(path, srcDir); err != nil {
 		// don't report an error if there's no buildable Go files
 		if _, nogo := err.(*build.NoGoError); !nogo {
 			t.Errorf("import %q failed (%v)", path, err)
@@ -123,7 +123,7 @@ func TestImportedTypes(t *testing.T) {
 		importPath := test.name[:i]
 		objName := test.name[i+1:]
 
-		pkg, err := importer.ImportFrom(importPath, ".", 0)
+		pkg, err := importer.Import(importPath, ".")
 		if err != nil {
 			t.Error(err)
 			continue
@@ -190,7 +190,7 @@ func TestReimport(t *testing.T) {
 
 	mathPkg := types.NewPackage("math", "math") // incomplete package
 	importer := New(&build.Default, map[string]*types.Package{mathPkg.Path(): mathPkg})
-	_, err := importer.ImportFrom("math", ".", 0)
+	_, err := importer.Import("math", ".")
 	if err == nil || !strings.HasPrefix(err.Error(), "reimport") {
 		t.Errorf("got %v; want reimport error", err)
 	}
@@ -201,7 +201,7 @@ func TestIssue20855(t *testing.T) {
 		t.Skip("no source code available")
 	}
 
-	pkg, err := importer.ImportFrom("go/internal/srcimporter/testdata/issue20855", ".", 0)
+	pkg, err := importer.Import("go/internal/srcimporter/testdata/issue20855", ".")
 	if err == nil || !strings.Contains(err.Error(), "missing function body") {
 		t.Fatalf("got unexpected or no error: %v", err)
 	}
@@ -217,7 +217,7 @@ func testImportPath(t *testing.T, pkgPath string) {
 
 	pkgName := path.Base(pkgPath)
 
-	pkg, err := importer.Import(pkgPath)
+	pkg, err := importer.Import(pkgPath, ".")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestCgo(t *testing.T) {
 	testenv.MustHaveCGO(t)
 
 	importer := New(&build.Default, make(map[string]*types.Package))
-	_, err := importer.ImportFrom("./misc/cgo/test", testenv.GOROOT(t), 0)
+	_, err := importer.Import("./misc/cgo/test", testenv.GOROOT(t))
 	if err != nil {
 		t.Fatalf("Import failed: %v", err)
 	}

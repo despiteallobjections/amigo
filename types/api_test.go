@@ -1378,7 +1378,7 @@ func TestFiles(t *testing.T) {
 
 type testImporter map[string]*Package
 
-func (m testImporter) Import(path string) (*Package, error) {
+func (m testImporter) Import(path, srcDir string) (*Package, error) {
 	if pkg := m[path]; pkg != nil {
 		return pkg, nil
 	}

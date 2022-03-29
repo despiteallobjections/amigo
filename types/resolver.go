@@ -141,15 +141,10 @@ func (check *Checker) importPackage(pos syntax.Pos, path, dir string) *Package {
 		var err error
 		if importer := check.conf.Importer; importer == nil {
 			err = fmt.Errorf("Config.Importer not installed")
-		} else if importerFrom, ok := importer.(ImporterFrom); ok {
-			imp, err = importerFrom.ImportFrom(path, dir, 0)
-			if imp == nil && err == nil {
-				err = fmt.Errorf("Config.Importer.ImportFrom(%s, %s, 0) returned nil but no error", path, dir)
-			}
 		} else {
-			imp, err = importer.Import(path)
+			imp, err = importer.Import(path, dir)
 			if imp == nil && err == nil {
-				err = fmt.Errorf("Config.Importer.Import(%s) returned nil but no error", path)
+				err = fmt.Errorf("Config.Importer.ImportFrom(%s, %s) returned nil but no error", path, dir)
 			}
 		}
 		// make sure we have a valid package name

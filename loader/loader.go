@@ -1122,4 +1122,6 @@ type closure struct {
 	info *PackageInfo
 }
 
-func (c closure) Import(to string) (*types.Package, error) { return c.imp.doImport(c.info, to) }
+func (c closure) Import(path, srcDir string) (*types.Package, error) {
+	return c.imp.doImport(c.info, path)
+}

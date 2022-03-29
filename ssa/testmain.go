@@ -200,7 +200,7 @@ type importer struct {
 	pkg *Package // package under test; may be non-importable
 }
 
-func (imp importer) Import(path string) (*types.Package, error) {
+func (imp importer) Import(path, srcDir string) (*types.Package, error) {
 	if p := imp.pkg.Prog.ImportedPackage(path); p != nil {
 		return p.Pkg, nil
 	}
