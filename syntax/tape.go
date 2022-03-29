@@ -12,12 +12,12 @@ import (
 type tapeelem struct {
 	// current token, valid after calling next()
 	spos
-	blank bool // line is blank up to col
 	tok   token
 	lit   string   // valid if tok is _Name, _Literal, or _Semi ("semicolon", "newline", or "EOF"); may be malformed if bad is true
-	bad   bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
-	kind  LitKind  // valid if tok is _Literal
 	op    Operator // valid if tok is _Operator, _AssignOp, or _IncOp
+	kind  LitKind  // valid if tok is _Literal
+	bad   bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
+	blank bool     // line is blank up to col
 }
 
 type tapescanner struct {
