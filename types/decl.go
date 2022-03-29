@@ -474,7 +474,7 @@ func (check *Checker) isImportedConstraint(typ Type) bool {
 	return u != nil && !u.IsMethodSet()
 }
 
-func (check *Checker) typeDecl(obj *TypeName, tdecl *syntax.TypeDecl, def *Named) {
+func (check *Checker) typeDecl(obj *TypeName, tdecl *syntax.TypeSpec, def *Named) {
 	assert(obj.typ == nil)
 
 	var rhs Type
@@ -721,22 +721,24 @@ func (check *Checker) funcDecl(obj *Func, decl *declInfo) {
 	}
 }
 
-func (check *Checker) declStmt(list []syntax.Decl) {
+func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
 	pkg := check.pkg
 
 	first := -1                // index of first ConstDecl in the current group, or -1
-	var last *syntax.ConstDecl // last ConstDecl with init expressions, or nil
+	var last *syntax.ConstSpec // last ConstDecl with init expressions, or nil
+
+	list := decl0.SpecList
 	for index, decl := range list {
-		if _, ok := decl.(*syntax.ConstDecl); !ok {
+		if _, ok := decl.(*syntax.ConstSpec); !ok {
 			first = -1 // we're not in a constant declaration
 		}
 
 		switch s := decl.(type) {
-		case *syntax.ConstDecl:
+		case *syntax.ConstSpec:
 			top := len(check.delayed)
 
 			// iota is the index of the current constDecl within the group
-			if first < 0 || list[index-1].(*syntax.ConstDecl).Group != s.Group {
+			if first < 0 || false {
 				first = index
 				last = nil
 			}
@@ -749,7 +751,7 @@ func (check *Checker) declStmt(list []syntax.Decl) {
 				last = s
 				inherited = false
 			case last == nil:
-				last = new(syntax.ConstDecl) // make sure last exists
+				last = new(syntax.ConstSpec) // make sure last exists
 				inherited = false
 			}
 
@@ -783,7 +785,7 @@ func (check *Checker) declStmt(list []syntax.Decl) {
 				check.declare(check.scope, name, lhs[i], scopePos)
 			}
 
-		case *syntax.VarDecl:
+		case *syntax.VarSpec:
 			top := len(check.delayed)
 
 			lhs0 := make([]*Var, len(s.NameList))
@@ -841,7 +843,7 @@ func (check *Checker) declStmt(list []syntax.Decl) {
 				check.declare(check.scope, name, lhs0[i], scopePos)
 			}
 
-		case *syntax.TypeDecl:
+		case *syntax.TypeSpec:
 			obj := NewTypeName(s.Name.Pos(), pkg, s.Name.Value, nil)
 			// spec: "The scope of a type identifier declared inside a function
 			// begins at the identifier in the TypeSpec and ends at the end of

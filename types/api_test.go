@@ -893,7 +893,7 @@ func TestImplicitsInfo(t *testing.T) {
 		var got string
 		for n, obj := range info.Implicits {
 			switch x := n.(type) {
-			case *syntax.ImportDecl:
+			case *syntax.ImportSpec:
 				got = "importSpec"
 			case *syntax.CaseClause:
 				got = "caseClause"
@@ -2055,7 +2055,7 @@ func TestCompositeLitTypes(t *testing.T) {
 		}
 
 		// test type of composite literal expression
-		rhs := f.DeclList[0].(*syntax.VarDecl).Values
+		rhs := f.DeclList[0].(*syntax.GenDecl).SpecList[0].(*syntax.VarSpec).Values
 		cmptype(rhs, test.typ)
 
 		// test type of composite literal type expression

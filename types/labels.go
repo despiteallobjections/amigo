@@ -118,8 +118,8 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 	stmtBranches = func(s syntax.Stmt) {
 		switch s := s.(type) {
 		case *syntax.DeclStmt:
-			for _, d := range s.DeclList {
-				if d, _ := d.(*syntax.VarDecl); d != nil {
+			for _, d := range s.Decl.SpecList {
+				if d, _ := d.(*syntax.VarSpec); d != nil {
 					recordVarDecl(d.Pos())
 				}
 			}

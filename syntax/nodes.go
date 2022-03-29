@@ -45,53 +45,64 @@ type File struct {
 // Declarations
 
 type (
-	Decl interface {
+	Spec interface {
 		Node
-		aDecl()
+		aSpec()
 	}
 
 	//              Path
 	// LocalPkgName Path
-	ImportDecl struct {
-		Group        *Group // nil means not part of a group
+	ImportSpec struct {
 		Pragma       Pragma
 		LocalPkgName *Name     // including "."; nil means no rename present
 		Path         *BasicLit // Path.Bad || Path.Kind == StringLit; nil means no path
-		decl
+		spec
 	}
 
 	// NameList
 	// NameList      = Values
 	// NameList Type = Values
-	ConstDecl struct {
-		Group    *Group // nil means not part of a group
+	ConstSpec struct {
 		Pragma   Pragma
 		NameList []*Name
 		Type     Expr // nil means no type
 		Values   Expr // nil means no values
-		decl
+		spec
 	}
 
 	// Name Type
-	TypeDecl struct {
-		Group      *Group // nil means not part of a group
+	TypeSpec struct {
 		Pragma     Pragma
 		Name       *Name
 		TParamList []*Field // nil means no type parameters
 		Alias      bool
 		Type       Expr
-		decl
+		spec
 	}
 
 	// NameList Type
 	// NameList Type = Values
 	// NameList      = Values
-	VarDecl struct {
-		Group    *Group // nil means not part of a group
+	VarSpec struct {
 		Pragma   Pragma
 		NameList []*Name
 		Type     Expr // nil means no type
 		Values   Expr // nil means no values
+		spec
+	}
+)
+
+type (
+	Decl interface {
+		Node
+		aDecl()
+	}
+
+	GenDecl struct {
+		Tok      token // _Import, _Const, _Type, or _Var
+		Lparen   Pos   // position of '(', if any
+		SpecList []Spec
+		Rparen   Pos // position of ')', if any
 		decl
 	}
 
@@ -114,10 +125,9 @@ type decl struct{ node }
 
 func (*decl) aDecl() {}
 
-// All declarations belonging to the same group point to the same Group node.
-type Group struct {
-	_ int // not empty so we are guaranteed different Group instances
-}
+type spec struct{ node }
+
+func (*spec) aSpec() {}
 
 // ----------------------------------------------------------------------------
 // Expressions
@@ -361,7 +371,7 @@ type (
 	}
 
 	DeclStmt struct {
-		DeclList []Decl
+		Decl *GenDecl // Decl.Tok is _Const, _Type, or _Var
 		stmt
 	}
 

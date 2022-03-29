@@ -530,7 +530,7 @@ func (p *printer) printRawNode(n Node) {
 
 	// statements
 	case *DeclStmt:
-		p.printDecl(n.DeclList)
+		p.printDecl(n.Decl)
 
 	case *EmptyStmt:
 		// nothing to print
@@ -639,19 +639,13 @@ func (p *printer) printRawNode(n Node) {
 		}
 		p.print(n.Body)
 
-	case *ImportDecl:
-		if n.Group == nil {
-			p.print(_Import, blank)
-		}
+	case *ImportSpec:
 		if n.LocalPkgName != nil {
 			p.print(n.LocalPkgName, blank)
 		}
 		p.print(n.Path)
 
-	case *ConstDecl:
-		if n.Group == nil {
-			p.print(_Const, blank)
-		}
+	case *ConstSpec:
 		p.printNameList(n.NameList)
 		if n.Type != nil {
 			p.print(blank, n.Type)
@@ -660,10 +654,7 @@ func (p *printer) printRawNode(n Node) {
 			p.print(blank, _Assign, blank, n.Values)
 		}
 
-	case *TypeDecl:
-		if n.Group == nil {
-			p.print(_Type, blank)
-		}
+	case *TypeSpec:
 		p.print(n.Name)
 		if n.TParamList != nil {
 			p.printParameterList(n.TParamList, true)
@@ -674,10 +665,7 @@ func (p *printer) printRawNode(n Node) {
 		}
 		p.print(n.Type)
 
-	case *VarDecl:
-		if n.Group == nil {
-			p.print(_Var, blank)
-		}
+	case *VarSpec:
 		p.printNameList(n.NameList)
 		if n.Type != nil {
 			p.print(blank, n.Type)
@@ -685,6 +673,25 @@ func (p *printer) printRawNode(n Node) {
 		if n.Values != nil {
 			p.print(blank, _Assign, blank, n.Values)
 		}
+
+	case *GenDecl:
+		p.print(n.Tok, blank)
+
+		if len(n.SpecList) == 1 && !n.Lparen.IsKnown() {
+			p.print(n.SpecList[0])
+			return
+		}
+
+		p.print(_Lparen)
+		if len(n.SpecList) > 0 {
+			p.print(newline, indent)
+			for _, spec := range n.SpecList {
+				p.printNode(spec)
+				p.print(_Semi, newline)
+			}
+			p.print(outdent)
+		}
+		p.print(_Rparen)
 
 	case *FuncDecl:
 		p.print(_Func, blank)
@@ -705,25 +712,10 @@ func (p *printer) printRawNode(n Node) {
 			p.print(blank, n.Body)
 		}
 
-	case *printGroup:
-		p.print(n.Tok, blank, _Lparen)
-		if len(n.Decls) > 0 {
-			p.print(newline, indent)
-			for _, d := range n.Decls {
-				p.printNode(d)
-				p.print(_Semi, newline)
-			}
-			p.print(outdent)
-		}
-		p.print(_Rparen)
-
 	// files
 	case *File:
 		p.print(_Package, blank, n.PkgName)
-		if len(n.DeclList) > 0 {
-			p.print(_Semi, newline, newline)
-			p.printDeclList(n.DeclList)
-		}
+		p.printDeclList(n.DeclList)
 
 	default:
 		panic(fmt.Sprintf("syntax.Iterate: unexpected node type %T", n))
@@ -808,78 +800,15 @@ func (p *printer) printExprLines(list []Expr) {
 	}
 }
 
-func groupFor(d Decl) (token, *Group) {
-	switch d := d.(type) {
-	case *ImportDecl:
-		return _Import, d.Group
-	case *ConstDecl:
-		return _Const, d.Group
-	case *TypeDecl:
-		return _Type, d.Group
-	case *VarDecl:
-		return _Var, d.Group
-	case *FuncDecl:
-		return _Func, nil
-	default:
-		panic("unreachable")
-	}
-}
-
-type printGroup struct {
-	node
-	Tok   token
-	Decls []Decl
-}
-
-func (p *printer) printDecl(list []Decl) {
-	tok, group := groupFor(list[0])
-
-	if group == nil {
-		if len(list) != 1 {
-			panic("unreachable")
-		}
-		p.printNode(list[0])
-		return
-	}
-
-	// if _, ok := list[0].(*EmptyDecl); ok {
-	// 	if len(list) != 1 {
-	// 		panic("unreachable")
-	// 	}
-	// 	// TODO(gri) if there are comments inside the empty
-	// 	// group, we may need to keep the list non-nil
-	// 	list = nil
-	// }
-
-	// printGroup is here for consistent comment handling
-	// (this is not yet used)
-	var pg printGroup
-	// *pg.Comments() = *group.Comments()
-	pg.Tok = tok
-	pg.Decls = list
-	p.printNode(&pg)
+func (p *printer) printDecl(decl Decl) {
+	p.printNode(decl)
 }
 
 func (p *printer) printDeclList(list []Decl) {
-	i0 := 0
-	var tok token
-	var group *Group
-	for i, x := range list {
-		if s, g := groupFor(x); g == nil || g != group {
-			if i0 < i {
-				p.printDecl(list[i0:i])
-				p.print(_Semi, newline)
-				// print empty line between different declaration groups,
-				// different kinds of declarations, or between functions
-				if g != group || s != tok || s == _Func {
-					p.print(newline)
-				}
-				i0 = i
-			}
-			tok, group = s, g
-		}
+	for _, x := range list {
+		p.print(_Semi, newline, newline)
+		p.printDecl(x)
 	}
-	p.printDecl(list[i0:])
 }
 
 func (p *printer) printSignature(sig *FuncType) {

@@ -92,16 +92,20 @@ func scanImports(files []*syntax.File) map[string]bool {
 	imports := make(map[string]bool)
 	for _, f := range files {
 		for _, decl := range f.DeclList {
-			if decl, ok := decl.(*syntax.ImportDecl); ok {
-				// NB: do not assume the program is well-formed!
-				path, err := strconv.Unquote(decl.Path.Value)
-				if err != nil {
-					continue // quietly ignore the error
+			if decl, ok := decl.(*syntax.GenDecl); ok {
+				for _, spec := range decl.SpecList {
+					if spec, ok := spec.(*syntax.ImportSpec); ok {
+						// NB: do not assume the program is well-formed!
+						path, err := strconv.Unquote(spec.Path.Value)
+						if err != nil {
+							continue // quietly ignore the error
+						}
+						if path == "C" {
+							continue // skip pseudopackage
+						}
+						imports[path] = true
+					}
 				}
-				if path == "C" {
-					continue // skip pseudopackage
-				}
-				imports[path] = true
 			}
 		}
 	}

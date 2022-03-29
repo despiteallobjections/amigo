@@ -377,7 +377,7 @@ func (check *Checker) stmt(ctxt stmtContext, s syntax.Stmt) {
 		// ignore
 
 	case *syntax.DeclStmt:
-		check.declStmt(s.DeclList)
+		check.declStmt(s.Decl)
 
 	case *syntax.LabeledStmt:
 		check.hasLabel = true

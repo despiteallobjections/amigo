@@ -131,9 +131,9 @@ func EndPos(n Node) Pos {
 			return n.EOF
 
 		// declarations
-		case *ImportDecl:
+		case *ImportSpec:
 			m = n.Path
-		case *ConstDecl:
+		case *ConstSpec:
 			if n.Values != nil {
 				m = n.Values
 				continue
@@ -147,9 +147,9 @@ func EndPos(n Node) Pos {
 				continue
 			}
 			return n.Pos()
-		case *TypeDecl:
+		case *TypeSpec:
 			m = n.Type
-		case *VarDecl:
+		case *VarSpec:
 			if n.Values != nil {
 				m = n.Values
 				continue
@@ -275,7 +275,7 @@ func EndPos(n Node) Pos {
 		case *SendStmt:
 			m = n.Value
 		case *DeclStmt:
-			if l := lastDecl(n.DeclList); l != nil {
+			if l := lastSpec(n.Decl.SpecList); l != nil {
 				m = l
 				continue
 			}
@@ -335,7 +335,7 @@ func EndPos(n Node) Pos {
 	}
 }
 
-func lastDecl(list []Decl) Decl {
+func lastSpec(list []Spec) Spec {
 	if l := len(list); l > 0 {
 		return list[l-1]
 	}

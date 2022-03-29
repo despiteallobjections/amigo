@@ -168,8 +168,8 @@ func (ls *labelScope) blockBranches(parent *block, ctxt targets, lstmt *LabeledS
 	L:
 		switch s := stmt.(type) {
 		case *DeclStmt:
-			for _, d := range s.DeclList {
-				if v, ok := d.(*VarDecl); ok {
+			for _, d := range s.Decl.SpecList {
+				if v, ok := d.(*VarSpec); ok {
 					recordVarDecl(v.Pos(), v.NameList[0])
 					break // the first VarDecl will do
 				}

@@ -85,13 +85,13 @@ func (w walker) node(n Node) {
 		w.declList(n.DeclList)
 
 	// declarations
-	case *ImportDecl:
+	case *ImportSpec:
 		if n.LocalPkgName != nil {
 			w.node(n.LocalPkgName)
 		}
 		w.node(n.Path)
 
-	case *ConstDecl:
+	case *ConstSpec:
 		w.nameList(n.NameList)
 		if n.Type != nil {
 			w.node(n.Type)
@@ -100,18 +100,23 @@ func (w walker) node(n Node) {
 			w.node(n.Values)
 		}
 
-	case *TypeDecl:
+	case *TypeSpec:
 		w.node(n.Name)
 		w.fieldList(n.TParamList)
 		w.node(n.Type)
 
-	case *VarDecl:
+	case *VarSpec:
 		w.nameList(n.NameList)
 		if n.Type != nil {
 			w.node(n.Type)
 		}
 		if n.Values != nil {
 			w.node(n.Values)
+		}
+
+	case *GenDecl:
+		for _, spec := range n.SpecList {
+			w.node(spec)
 		}
 
 	case *FuncDecl:
@@ -245,7 +250,7 @@ func (w walker) node(n Node) {
 		w.node(n.Value)
 
 	case *DeclStmt:
-		w.declList(n.DeclList)
+		w.node(n.Decl)
 
 	case *AssignStmt:
 		w.node(n.Lhs)

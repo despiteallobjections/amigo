@@ -322,25 +322,16 @@ func (p *parser) fileOrNil() *File {
 	}
 
 	// { ImportDecl ";" }
-	for p.got(_Import) {
-		f.DeclList = p.appendGroup(f.DeclList, p.importDecl)
+	for p.tok == _Import {
+		f.DeclList = append(f.DeclList, p.genDecl())
 		p.want(_Semi)
 	}
 
 	// { TopLevelDecl ";" }
 	for p.tok != _EOF {
 		switch p.tok {
-		case _Const:
-			p.next()
-			f.DeclList = p.appendGroup(f.DeclList, p.constDecl)
-
-		case _Type:
-			p.next()
-			f.DeclList = p.appendGroup(f.DeclList, p.typeDecl)
-
-		case _Var:
-			p.next()
-			f.DeclList = p.appendGroup(f.DeclList, p.varDecl)
+		case _Const, _Type, _Var:
+			f.DeclList = append(f.DeclList, p.genDecl())
 
 		case _Func:
 			p.next()
@@ -419,42 +410,56 @@ func (p *parser) list(sep, close token, f func() bool) Pos {
 }
 
 // appendGroup(f) = f | "(" { f ";" } ")" . // ";" is optional before ")"
-func (p *parser) appendGroup(list []Decl, f func(*Group) Decl) []Decl {
-	if p.tok == _Lparen {
-		g := new(Group)
-		p.clearPragma() // must clearPragma before consuming "("!
+func (p *parser) genDecl() *GenDecl {
+	s := new(GenDecl)
+	s.pos = p.pos()
+	s.Tok = p.tok
+	p.next()
 
-		// TODO(mdempsky): Could allow async here, but we need to know how
-		// many _Semi's are present to reserve space in list. Also, need
-		// to worry about latter calls appending to list and growing it
-		// further.
-		p.asyncTODO(func() {
+	var spec func(*parser) Spec
+	switch s.Tok {
+	case _Import:
+		spec = (*parser).importSpec
+	case _Const:
+		spec = (*parser).constSpec
+	case _Type:
+		spec = (*parser).typeSpec
+	case _Var:
+		spec = (*parser).varSpec
+	}
+
+	if p.tok == _Lparen {
+		// must clearPragma before consuming "("!
+		// TODO(mdempsky): Elaborate.
+		p.clearPragma()
+
+		p.async(func() {
+			s.Lparen = p.pos()
 			p.next()
-			p.list(_Semi, _Rparen, func() bool {
-				if x := f(g); x != nil {
-					list = append(list, x)
+			s.Rparen = p.list(_Semi, _Rparen, func() bool {
+				if x := spec(p); x != nil {
+					s.SpecList = append(s.SpecList, x)
 				}
 				return false
 			})
 		})
 	} else {
-		if x := f(nil); x != nil {
-			list = append(list, x)
+		if x := spec(p); x != nil {
+			s.SpecList = append(s.SpecList, x)
 		}
 	}
-	return list
+	return s
 }
 
 // ImportSpec = [ "." | PackageName ] ImportPath .
 // ImportPath = string_lit .
-func (p *parser) importDecl(group *Group) Decl {
+func (p *parser) importSpec() Spec {
 	if trace {
 		defer p.trace("importDecl")()
 	}
 
-	d := new(ImportDecl)
+	d := new(ImportSpec)
 	d.pos = p.pos()
-	d.Group = group
 	d.Pragma = p.takePragma()
 
 	switch p.tok {
@@ -480,14 +485,13 @@ func (p *parser) importDecl(group *Group) Decl {
 }
 
 // ConstSpec = IdentifierList [ [ Type ] "=" ExpressionList ] .
-func (p *parser) constDecl(group *Group) Decl {
+func (p *parser) constSpec() Spec {
 	if trace {
 		defer p.trace("constDecl")()
 	}
 
-	d := new(ConstDecl)
+	d := new(ConstSpec)
 	d.pos = p.pos()
-	d.Group = group
 	d.Pragma = p.takePragma()
 
 	d.NameList = p.nameList(p.name())
@@ -502,14 +506,13 @@ func (p *parser) constDecl(group *Group) Decl {
 }
 
 // TypeSpec = identifier [ TypeParams ] [ "=" ] Type .
-func (p *parser) typeDecl(group *Group) Decl {
+func (p *parser) typeSpec() Spec {
 	if trace {
 		defer p.trace("typeDecl")()
 	}
 
-	d := new(TypeDecl)
+	d := new(TypeSpec)
 	d.pos = p.pos()
-	d.Group = group
 	d.Pragma = p.takePragma()
 
 	d.Name = p.name()
@@ -633,14 +636,13 @@ func isTypeLit(x Expr) bool {
 }
 
 // VarSpec = IdentifierList ( Type [ "=" ExpressionList ] | "=" ExpressionList ) .
-func (p *parser) varDecl(group *Group) Decl {
+func (p *parser) varSpec() Spec {
 	if trace {
 		defer p.trace("varDecl")()
 	}
 
-	d := new(VarDecl)
+	d := new(VarSpec)
 	d.pos = p.pos()
-	d.Group = group
 	d.Pragma = p.takePragma()
 
 	d.NameList = p.nameList(p.name())
@@ -2267,16 +2269,14 @@ func (p *parser) blockStmt(context string) *BlockStmt {
 	return s
 }
 
-func (p *parser) declStmt(f func(*Group) Decl) *DeclStmt {
+func (p *parser) declStmt() *DeclStmt {
 	if trace {
 		defer p.trace("declStmt")()
 	}
 
 	s := new(DeclStmt)
 	s.pos = p.pos()
-
-	p.next() // _Const, _Type, or _Var
-	s.DeclList = p.appendGroup(nil, f)
+	s.Decl = p.genDecl()
 
 	return s
 }
@@ -2565,14 +2565,8 @@ func (p *parser) stmtOrNil() Stmt {
 	}
 
 	switch p.tok {
-	case _Var:
-		return p.declStmt(p.varDecl)
-
-	case _Const:
-		return p.declStmt(p.constDecl)
-
-	case _Type:
-		return p.declStmt(p.typeDecl)
+	case _Const, _Type, _Var:
+		return p.declStmt()
 	}
 
 	p.clearPragma()

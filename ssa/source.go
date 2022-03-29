@@ -75,8 +75,8 @@ func HasEnclosingFunction(pkg *Package, path []syntax.Node) bool {
 func findEnclosingPackageLevelFunction(pkg *Package, path []syntax.Node) *Function {
 	if n := len(path); n >= 2 { // [... {Gen,Func}Decl File]
 		switch decl := path[n-2].(type) {
-		case *syntax.VarDecl:
-			if n >= 3 { // TODO(mdempsky): Does this still make sense?
+		case *syntax.VarSpec:
+			if n >= 3 {
 				// Package-level 'var' initializer.
 				return pkg.init
 			}

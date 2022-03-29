@@ -22,7 +22,7 @@ type declInfo struct {
 	vtyp      syntax.Expr      // type, or nil (for const and var declarations only)
 	init      syntax.Expr      // init/orig expression, or nil (for const and var declarations only)
 	inherited bool             // if set, the init expression is inherited from a previous constant declaration
-	tdecl     *syntax.TypeDecl // type declaration, or nil
+	tdecl     *syntax.TypeSpec // type declaration, or nil
 	fdecl     *syntax.FuncDecl // func declaration, or nil
 
 	// The deps field tracks initialization expression dependencies.
@@ -226,193 +226,191 @@ func (check *Checker) collectObjects() {
 		// we get "." as the directory which is what we would want.
 		fileDir := dir(file.PkgName.Pos().RelFilename()) // TODO(gri) should this be filename?
 
-		first := -1                // index of first ConstDecl in the current group, or -1
-		var last *syntax.ConstDecl // last ConstDecl with init expressions, or nil
-		for index, decl := range file.DeclList {
-			if _, ok := decl.(*syntax.ConstDecl); !ok {
-				first = -1 // we're not in a constant declaration
-			}
+		for _, decl := range file.DeclList {
 
 			switch s := decl.(type) {
-			case *syntax.ImportDecl:
-				// import package
-				if s.Path == nil || s.Path.Bad {
-					continue // error reported during parsing
-				}
-				path, err := validatedImportPath(s.Path.Value)
-				if err != nil {
-					check.errorf(s.Path, "invalid import path (%s)", err)
-					continue
-				}
+			case *syntax.GenDecl:
+				var last *syntax.ConstSpec // last ConstDecl with init expressions, or nil
 
-				imp := check.importPackage(s.Path.Pos(), path, fileDir)
-				if imp == nil {
-					continue
-				}
+				for index, decl := range s.SpecList {
+					switch s := decl.(type) {
+					case *syntax.ImportSpec:
+						// import package
+						if s.Path == nil || s.Path.Bad {
+							continue // error reported during parsing
+						}
+						path, err := validatedImportPath(s.Path.Value)
+						if err != nil {
+							check.errorf(s.Path, "invalid import path (%s)", err)
+							continue
+						}
 
-				if imp == Unsafe {
-					// typecheck ignores imports of package unsafe for
-					// calculating height.
-					// TODO(mdempsky): Revisit this. This seems fine, but I
-					// don't remember explicitly considering this case.
-				} else if h := imp.height + 1; h > pkg.height {
-					pkg.height = h
-				}
+						imp := check.importPackage(s.Path.Pos(), path, fileDir)
+						if imp == nil {
+							continue
+						}
 
-				// local name overrides imported package name
-				name := imp.name
-				if s.LocalPkgName != nil {
-					name = s.LocalPkgName.Value
-					if path == "C" {
-						// match cmd/compile (not prescribed by spec)
-						check.error(s.LocalPkgName, `cannot rename import "C"`)
-						continue
-					}
-				}
+						if imp == Unsafe {
+							// typecheck ignores imports of package unsafe for
+							// calculating height.
+							// TODO(mdempsky): Revisit this. This seems fine, but I
+							// don't remember explicitly considering this case.
+						} else if h := imp.height + 1; h > pkg.height {
+							pkg.height = h
+						}
 
-				if name == "init" {
-					check.error(s, "cannot import package as init - init must be a func")
-					continue
-				}
-
-				// add package to list of explicit imports
-				// (this functionality is provided as a convenience
-				// for clients; it is not needed for type-checking)
-				if !pkgImports[imp] {
-					pkgImports[imp] = true
-					pkg.imports = append(pkg.imports, imp)
-				}
-
-				pkgName := NewPkgName(s.Pos(), pkg, name, imp)
-				if s.LocalPkgName != nil {
-					// in a dot-import, the dot represents the package
-					check.recordDef(s.LocalPkgName, pkgName)
-				} else {
-					check.recordImplicit(s, pkgName)
-				}
-
-				if path == "C" {
-					// match cmd/compile (not prescribed by spec)
-					pkgName.used = true
-				}
-
-				// add import to file scope
-				check.imports = append(check.imports, pkgName)
-				if name == "." {
-					// dot-import
-					if check.dotImportMap == nil {
-						check.dotImportMap = make(map[dotImportKey]*PkgName)
-					}
-					// merge imported scope with file scope
-					for name, obj := range imp.scope.elems {
-						// Note: Avoid eager resolve(name, obj) here, so we only
-						// resolve dot-imported objects as needed.
-
-						// A package scope may contain non-exported objects,
-						// do not import them!
-						if isExported(name) {
-							// declare dot-imported object
-							// (Do not use check.declare because it modifies the object
-							// via Object.setScopePos, which leads to a race condition;
-							// the object may be imported into more than one file scope
-							// concurrently. See issue #32154.)
-							if alt := fileScope.Lookup(name); alt != nil {
-								var err error_
-								err.errorf(s.LocalPkgName, "%s redeclared in this block", alt.Name())
-								err.recordAltDecl(alt)
-								check.report(&err)
-							} else {
-								fileScope.insert(name, obj)
-								check.dotImportMap[dotImportKey{fileScope, name}] = pkgName
+						// local name overrides imported package name
+						name := imp.name
+						if s.LocalPkgName != nil {
+							name = s.LocalPkgName.Value
+							if path == "C" {
+								// match cmd/compile (not prescribed by spec)
+								check.error(s.LocalPkgName, `cannot rename import "C"`)
+								continue
 							}
 						}
-					}
-				} else {
-					// declare imported package object in file scope
-					// (no need to provide s.LocalPkgName since we called check.recordDef earlier)
-					check.declare(fileScope, nil, pkgName, nopos)
-				}
 
-			case *syntax.ConstDecl:
-				// iota is the index of the current constDecl within the group
-				if first < 0 || file.DeclList[index-1].(*syntax.ConstDecl).Group != s.Group {
-					first = index
-					last = nil
-				}
-				iota := constant.MakeInt64(int64(index - first))
-
-				// determine which initialization expressions to use
-				inherited := true
-				switch {
-				case s.Type != nil || s.Values != nil:
-					last = s
-					inherited = false
-				case last == nil:
-					last = new(syntax.ConstDecl) // make sure last exists
-					inherited = false
-				}
-
-				// declare all constants
-				values := unpackExpr(last.Values)
-				for i, name := range s.NameList {
-					obj := NewConst(name.Pos(), pkg, name.Value, nil, iota)
-
-					var init syntax.Expr
-					if i < len(values) {
-						init = values[i]
-					}
-
-					d := &declInfo{file: fileScope, vtyp: last.Type, init: init, inherited: inherited}
-					check.declarePkgObj(name, obj, d)
-				}
-
-				// Constants must always have init values.
-				check.arity(s.Pos(), s.NameList, values, true, inherited)
-
-			case *syntax.VarDecl:
-				lhs := make([]*Var, len(s.NameList))
-				// If there's exactly one rhs initializer, use
-				// the same declInfo d1 for all lhs variables
-				// so that each lhs variable depends on the same
-				// rhs initializer (n:1 var declaration).
-				var d1 *declInfo
-				if _, ok := s.Values.(*syntax.ListExpr); !ok {
-					// The lhs elements are only set up after the for loop below,
-					// but that's ok because declarePkgObj only collects the declInfo
-					// for a later phase.
-					d1 = &declInfo{file: fileScope, lhs: lhs, vtyp: s.Type, init: s.Values}
-				}
-
-				// declare all variables
-				values := unpackExpr(s.Values)
-				for i, name := range s.NameList {
-					obj := NewVar(name.Pos(), pkg, name.Value, nil)
-					lhs[i] = obj
-
-					d := d1
-					if d == nil {
-						// individual assignments
-						var init syntax.Expr
-						if i < len(values) {
-							init = values[i]
+						if name == "init" {
+							check.error(s, "cannot import package as init - init must be a func")
+							continue
 						}
-						d = &declInfo{file: fileScope, vtyp: s.Type, init: init}
+
+						// add package to list of explicit imports
+						// (this functionality is provided as a convenience
+						// for clients; it is not needed for type-checking)
+						if !pkgImports[imp] {
+							pkgImports[imp] = true
+							pkg.imports = append(pkg.imports, imp)
+						}
+
+						pkgName := NewPkgName(s.Pos(), pkg, name, imp)
+						if s.LocalPkgName != nil {
+							// in a dot-import, the dot represents the package
+							check.recordDef(s.LocalPkgName, pkgName)
+						} else {
+							check.recordImplicit(s, pkgName)
+						}
+
+						if path == "C" {
+							// match cmd/compile (not prescribed by spec)
+							pkgName.used = true
+						}
+
+						// add import to file scope
+						check.imports = append(check.imports, pkgName)
+						if name == "." {
+							// dot-import
+							if check.dotImportMap == nil {
+								check.dotImportMap = make(map[dotImportKey]*PkgName)
+							}
+							// merge imported scope with file scope
+							for name, obj := range imp.scope.elems {
+								// Note: Avoid eager resolve(name, obj) here, so we only
+								// resolve dot-imported objects as needed.
+
+								// A package scope may contain non-exported objects,
+								// do not import them!
+								if isExported(name) {
+									// declare dot-imported object
+									// (Do not use check.declare because it modifies the object
+									// via Object.setScopePos, which leads to a race condition;
+									// the object may be imported into more than one file scope
+									// concurrently. See issue #32154.)
+									if alt := fileScope.Lookup(name); alt != nil {
+										var err error_
+										err.errorf(s.LocalPkgName, "%s redeclared in this block", alt.Name())
+										err.recordAltDecl(alt)
+										check.report(&err)
+									} else {
+										fileScope.insert(name, obj)
+										check.dotImportMap[dotImportKey{fileScope, name}] = pkgName
+									}
+								}
+							}
+						} else {
+							// declare imported package object in file scope
+							// (no need to provide s.LocalPkgName since we called check.recordDef earlier)
+							check.declare(fileScope, nil, pkgName, nopos)
+						}
+
+					case *syntax.ConstSpec:
+						// iota is the index of the current constDecl within the group
+						iota := constant.MakeInt64(int64(index))
+
+						// determine which initialization expressions to use
+						inherited := true
+						switch {
+						case s.Type != nil || s.Values != nil:
+							last = s
+							inherited = false
+						case last == nil:
+							last = new(syntax.ConstSpec) // make sure last exists
+							inherited = false
+						}
+
+						// declare all constants
+						values := unpackExpr(last.Values)
+						for i, name := range s.NameList {
+							obj := NewConst(name.Pos(), pkg, name.Value, nil, iota)
+
+							var init syntax.Expr
+							if i < len(values) {
+								init = values[i]
+							}
+
+							d := &declInfo{file: fileScope, vtyp: last.Type, init: init, inherited: inherited}
+							check.declarePkgObj(name, obj, d)
+						}
+
+						// Constants must always have init values.
+						check.arity(s.Pos(), s.NameList, values, true, inherited)
+
+					case *syntax.VarSpec:
+						lhs := make([]*Var, len(s.NameList))
+						// If there's exactly one rhs initializer, use
+						// the same declInfo d1 for all lhs variables
+						// so that each lhs variable depends on the same
+						// rhs initializer (n:1 var declaration).
+						var d1 *declInfo
+						if _, ok := s.Values.(*syntax.ListExpr); !ok {
+							// The lhs elements are only set up after the for loop below,
+							// but that's ok because declarePkgObj only collects the declInfo
+							// for a later phase.
+							d1 = &declInfo{file: fileScope, lhs: lhs, vtyp: s.Type, init: s.Values}
+						}
+
+						// declare all variables
+						values := unpackExpr(s.Values)
+						for i, name := range s.NameList {
+							obj := NewVar(name.Pos(), pkg, name.Value, nil)
+							lhs[i] = obj
+
+							d := d1
+							if d == nil {
+								// individual assignments
+								var init syntax.Expr
+								if i < len(values) {
+									init = values[i]
+								}
+								d = &declInfo{file: fileScope, vtyp: s.Type, init: init}
+							}
+
+							check.declarePkgObj(name, obj, d)
+						}
+
+						// If we have no type, we must have values.
+						if s.Type == nil || values != nil {
+							check.arity(s.Pos(), s.NameList, values, false, false)
+						}
+
+					case *syntax.TypeSpec:
+						if len(s.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) {
+							check.versionErrorf(s.TParamList[0], "go1.18", "type parameter")
+						}
+						obj := NewTypeName(s.Name.Pos(), pkg, s.Name.Value, nil)
+						check.declarePkgObj(s.Name, obj, &declInfo{file: fileScope, tdecl: s})
 					}
-
-					check.declarePkgObj(name, obj, d)
 				}
-
-				// If we have no type, we must have values.
-				if s.Type == nil || values != nil {
-					check.arity(s.Pos(), s.NameList, values, false, false)
-				}
-
-			case *syntax.TypeDecl:
-				if len(s.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) {
-					check.versionErrorf(s.TParamList[0], "go1.18", "type parameter")
-				}
-				obj := NewTypeName(s.Name.Pos(), pkg, s.Name.Value, nil)
-				check.declarePkgObj(s.Name, obj, &declInfo{file: fileScope, tdecl: s})
 
 			case *syntax.FuncDecl:
 				name := s.Name.Value

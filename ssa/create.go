@@ -113,24 +113,29 @@ func memberFromObject(pkg *Package, obj types.Object, syntax syntax.Node) {
 //
 func membersFromDecl(pkg *Package, decl syntax.Decl) {
 	switch decl := decl.(type) {
-	case *syntax.ConstDecl:
-		for _, id := range decl.NameList {
-			if !isBlankIdent(id) {
-				memberFromObject(pkg, pkg.info.Defs[id], nil)
-			}
-		}
+	case *syntax.GenDecl:
+		for _, spec := range decl.SpecList {
+			switch spec := spec.(type) {
+			case *syntax.ConstSpec:
+				for _, id := range spec.NameList {
+					if !isBlankIdent(id) {
+						memberFromObject(pkg, pkg.info.Defs[id], nil)
+					}
+				}
 
-	case *syntax.VarDecl:
-		for _, id := range decl.NameList {
-			if !isBlankIdent(id) {
-				memberFromObject(pkg, pkg.info.Defs[id], decl)
-			}
-		}
+			case *syntax.VarSpec:
+				for _, id := range spec.NameList {
+					if !isBlankIdent(id) {
+						memberFromObject(pkg, pkg.info.Defs[id], decl)
+					}
+				}
 
-	case *syntax.TypeDecl:
-		id := decl.Name
-		if !isBlankIdent(id) {
-			memberFromObject(pkg, pkg.info.Defs[id], nil)
+			case *syntax.TypeSpec:
+				id := spec.Name
+				if !isBlankIdent(id) {
+					memberFromObject(pkg, pkg.info.Defs[id], nil)
+				}
+			}
 		}
 
 	case *syntax.FuncDecl:

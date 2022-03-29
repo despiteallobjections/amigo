@@ -991,7 +991,7 @@ func (b *builder) assignOp(fn *Function, loc lvalue, val Value, op syntax.Operat
 // localValueSpec emits to fn code to define all of the vars in the
 // function-local ValueSpec, spec.
 //
-func (b *builder) localValueSpec(fn *Function, spec *syntax.VarDecl) {
+func (b *builder) localValueSpec(fn *Function, spec *syntax.VarSpec) {
 	values := unpackExprList(spec.Values)
 
 	switch {
@@ -1984,8 +1984,8 @@ start:
 		// ignore.  (Usually removed by gofmt.)
 
 	case *syntax.DeclStmt: // Con, Var or Typ
-		for _, d := range s.DeclList {
-			if d, ok := d.(*syntax.VarDecl); ok {
+		for _, d := range s.Decl.SpecList {
+			if d, ok := d.(*syntax.VarSpec); ok {
 				b.localValueSpec(fn, d)
 			}
 		}

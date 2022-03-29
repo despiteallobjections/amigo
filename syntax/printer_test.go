@@ -242,7 +242,7 @@ func TestShortString(t *testing.T) {
 			t.Errorf("%s: %s", test[0], err)
 			continue
 		}
-		x := ast.DeclList[0].(*VarDecl).Values
+		x := ast.DeclList[0].(*GenDecl).SpecList[0].(*VarSpec).Values
 		if got := String(x); got != test[1] {
 			t.Errorf("%s: got %s, want %s", test[0], got, test[1])
 		}

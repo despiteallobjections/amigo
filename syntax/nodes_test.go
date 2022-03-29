@@ -22,37 +22,37 @@ var decls = []test{
 	// The position of declarations is always the
 	// position of the first token of an individual
 	// declaration, independent of grouping.
-	{"ImportDecl", `import @"math"`},
-	{"ImportDecl", `import @mymath "math"`},
-	{"ImportDecl", `import @. "math"`},
-	{"ImportDecl", `import (@"math")`},
-	{"ImportDecl", `import (@mymath "math")`},
-	{"ImportDecl", `import (@. "math")`},
+	{"ImportSpec", `import @"math"`},
+	{"ImportSpec", `import @mymath "math"`},
+	{"ImportSpec", `import @. "math"`},
+	{"ImportSpec", `import (@"math")`},
+	{"ImportSpec", `import (@mymath "math")`},
+	{"ImportSpec", `import (@. "math")`},
 
-	{"ConstDecl", `const @x`},
-	{"ConstDecl", `const @x = 0`},
-	{"ConstDecl", `const @x, y, z = 0, 1, 2`},
-	{"ConstDecl", `const (@x)`},
-	{"ConstDecl", `const (@x = 0)`},
-	{"ConstDecl", `const (@x, y, z = 0, 1, 2)`},
+	{"ConstSpec", `const @x`},
+	{"ConstSpec", `const @x = 0`},
+	{"ConstSpec", `const @x, y, z = 0, 1, 2`},
+	{"ConstSpec", `const (@x)`},
+	{"ConstSpec", `const (@x = 0)`},
+	{"ConstSpec", `const (@x, y, z = 0, 1, 2)`},
 
-	{"TypeDecl", `type @T int`},
-	{"TypeDecl", `type @T = int`},
-	{"TypeDecl", `type (@T int)`},
-	{"TypeDecl", `type (@T = int)`},
+	{"TypeSpec", `type @T int`},
+	{"TypeSpec", `type @T = int`},
+	{"TypeSpec", `type (@T int)`},
+	{"TypeSpec", `type (@T = int)`},
 
-	{"VarDecl", `var @x int`},
-	{"VarDecl", `var @x, y, z int`},
-	{"VarDecl", `var @x int = 0`},
-	{"VarDecl", `var @x, y, z int = 1, 2, 3`},
-	{"VarDecl", `var @x = 0`},
-	{"VarDecl", `var @x, y, z = 1, 2, 3`},
-	{"VarDecl", `var (@x int)`},
-	{"VarDecl", `var (@x, y, z int)`},
-	{"VarDecl", `var (@x int = 0)`},
-	{"VarDecl", `var (@x, y, z int = 1, 2, 3)`},
-	{"VarDecl", `var (@x = 0)`},
-	{"VarDecl", `var (@x, y, z = 1, 2, 3)`},
+	{"VarSpec", `var @x int`},
+	{"VarSpec", `var @x, y, z int`},
+	{"VarSpec", `var @x int = 0`},
+	{"VarSpec", `var @x, y, z int = 1, 2, 3`},
+	{"VarSpec", `var @x = 0`},
+	{"VarSpec", `var @x, y, z = 1, 2, 3`},
+	{"VarSpec", `var (@x int)`},
+	{"VarSpec", `var (@x, y, z int)`},
+	{"VarSpec", `var (@x int = 0)`},
+	{"VarSpec", `var (@x, y, z int = 1, 2, 3)`},
+	{"VarSpec", `var (@x = 0)`},
+	{"VarSpec", `var (@x, y, z = 1, 2, 3)`},
 
 	{"FuncDecl", `func @f() {}`},
 	{"FuncDecl", `func @(T) f() {}`},
@@ -248,7 +248,9 @@ func TestPos(t *testing.T) {
 
 	// embed expressions in a composite literal so we can test key:value and naked composite literals
 	testPos(t, exprs, "package p; var _ = T{ ", " }",
-		func(f *File) Node { return f.DeclList[0].(*VarDecl).Values.(*CompositeLit).ElemList[0] },
+		func(f *File) Node {
+			return f.DeclList[0].(*GenDecl).SpecList[0].(*VarSpec).Values.(*CompositeLit).ElemList[0]
+		},
 	)
 
 	// embed types in a function  signature so we can test ... types
@@ -299,6 +301,12 @@ func testPos(t *testing.T, list []test, prefix, suffix string, extract func(*Fil
 
 		// extract desired node
 		node := extract(file)
+		if strings.HasSuffix(test.nodetyp, "Spec") {
+			if decl, ok := node.(*GenDecl); ok {
+				node = decl.SpecList[0]
+			}
+		}
+
 		if typ := typeOf(node); typ != test.nodetyp {
 			t.Errorf("type error: %s: type = %s, want %s", src, typ, test.nodetyp)
 			continue
