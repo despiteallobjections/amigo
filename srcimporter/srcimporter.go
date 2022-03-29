@@ -13,11 +13,10 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	_ "unsafe" // for go:linkname
 
 	"github.com/mdempsky/amigo/cgo"
 	"github.com/mdempsky/amigo/syntax"
-	types "github.com/mdempsky/amigo/types"
+	"github.com/mdempsky/amigo/types"
 )
 
 // An Importer provides the context for importing packages from source code.
@@ -120,7 +119,7 @@ func (p *Importer) Import(path, srcDir string) (*types.Package, error) {
 			// build.Context's VFS.
 			conf.FakeImportC = true
 		} else {
-			setUsesCgo(&conf)
+			conf.UsesCgo = true
 			file, err := p.cgo(bp)
 			if err != nil {
 				return nil, err
@@ -224,6 +223,3 @@ func (p *Importer) joinPath(elem ...string) string {
 	}
 	return filepath.Join(elem...)
 }
-
-//go:linkname setUsesCgo github.com/mdempsky/amigo/types.srcimporter_setUsesCgo
-func setUsesCgo(conf *types.Config)

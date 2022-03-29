@@ -303,7 +303,7 @@ func (check *Checker) Files(files []*syntax.File) error { return check.checkFile
 var errBadCgo = errors.New("cannot use FakeImportC and go115UsesCgo together")
 
 func (check *Checker) checkFiles(files []*syntax.File) (err error) {
-	if check.conf.FakeImportC && check.conf.go115UsesCgo {
+	if check.conf.FakeImportC && check.conf.UsesCgo {
 		return errBadCgo
 	}
 
