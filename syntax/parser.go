@@ -370,6 +370,7 @@ func (p *parser) appendGroup(list []Decl, f func(*Group) Decl) []Decl {
 	if p.tok == _Lparen {
 		g := new(Group)
 		p.clearPragma()
+		open := p.tapepos
 		p.next() // must consume "(" after calling clearPragma!
 		p.list(_Semi, _Rparen, func() bool {
 			if x := f(g); x != nil {
@@ -377,6 +378,8 @@ func (p *parser) appendGroup(list []Decl, f func(*Group) Decl) []Decl {
 			}
 			return false
 		})
+		close := p.tapepos - 1
+		p.checkLinks(open, close)
 	} else {
 		if x := f(nil); x != nil {
 			list = append(list, x)
@@ -457,6 +460,7 @@ func (p *parser) typeDecl(group *Group) Decl {
 		// d.Name "[" ...
 		// array/slice type or type parameter list
 		pos := p.pos()
+		open := p.tapepos
 		p.next()
 		switch p.tok {
 		case _Name:
@@ -526,19 +530,23 @@ func (p *parser) typeDecl(group *Group) Decl {
 				// d.Name "[" pname ptype ...
 				// d.Name "[" pname ptype "," ...
 				d.TParamList = p.paramList(pname, ptype, _Rbrack, true)
+				close := p.tapepos - 1
+				p.checkLinks(open, close)
 				d.Alias = p.gotAssign()
 				d.Type = p.typeOrNil()
 			} else {
 				// d.Name "[" x ...
-				d.Type = p.arrayType(pos, x)
+				d.Type = p.arrayType(open, pos, x)
 			}
 		case _Rbrack:
 			// d.Name "[" "]" ...
+			close := p.tapepos
 			p.next()
+			p.checkLinks(open, close)
 			d.Type = p.sliceType(pos)
 		default:
 			// d.Name "[" ...
-			d.Type = p.arrayType(pos, nil)
+			d.Type = p.arrayType(open, pos, nil)
 		}
 	} else {
 		d.Alias = p.gotAssign()
@@ -607,8 +615,11 @@ func (p *parser) funcDeclOrNil() *FuncDecl {
 	f.pos = p.pos()
 	f.Pragma = p.takePragma()
 
+	open := p.tapepos
 	if p.got(_Lparen) {
 		rcvr := p.paramList(nil, nil, _Rparen, false)
+		close := p.tapepos - 1
+		p.checkLinks(open, close)
 		switch len(rcvr) {
 		case 0:
 			p.error("method has no receiver")
@@ -1041,9 +1052,12 @@ loop:
 		case _Lparen:
 			t := new(CallExpr)
 			t.pos = pos
+			open := p.tapepos
 			p.next()
 			t.Fun = x
 			t.ArgList, t.HasDots = p.argList()
+			close := p.tapepos - 1
+			p.checkLinks(open, close)
 			x = t
 
 		case _Lbrace:
@@ -1125,6 +1139,7 @@ func (p *parser) complitexpr() *CompositeLit {
 	x.pos = p.pos()
 
 	p.xnest++
+	open := p.tapepos
 	p.want(_Lbrace)
 	x.Rbrace = p.list(_Comma, _Rbrace, func() bool {
 		// value
@@ -1142,7 +1157,10 @@ func (p *parser) complitexpr() *CompositeLit {
 		x.ElemList = append(x.ElemList, e)
 		return false
 	})
+	close := p.tapepos - 1
 	p.xnest--
+
+	p.checkLinks(open, close)
 
 	return x
 }
@@ -1211,11 +1229,14 @@ func (p *parser) typeOrNil() Expr {
 	case _Lbrack:
 		// '[' oexpr ']' ntype
 		// '[' _DotDotDot ']' ntype
+		open := p.tapepos
 		p.next()
 		if p.got(_Rbrack) {
+			close := p.tapepos - 1
+			p.checkLinks(open, close)
 			return p.sliceType(pos)
 		}
-		return p.arrayType(pos, nil)
+		return p.arrayType(open, pos, nil)
 
 	case _Chan:
 		// _Chan non_recvchantype
@@ -1289,6 +1310,7 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 	typ.pos = p.pos()
 
 	var tparamList []*Field
+	brackOpen := p.tapepos
 	if p.allowGenerics() && p.got(_Lbrack) {
 		if context != "" {
 			// accept but complain
@@ -1300,18 +1322,23 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 		} else {
 			tparamList = p.paramList(nil, nil, _Rbrack, true)
 		}
+		brackClose := p.tapepos - 1
+		p.checkLinks(brackOpen, brackClose)
 	}
 
+	parenOpen := p.tapepos
 	p.want(_Lparen)
 	typ.ParamList = p.paramList(nil, nil, _Rparen, false)
+	parenClose := p.tapepos - 1
+	p.checkLinks(parenOpen, parenClose)
 	typ.ResultList = p.funcResult()
 
 	return tparamList, typ
 }
 
-// "[" has already been consumed, and pos is its position.
+// "[" has already been consumed, and pos is its position, and open is its tape index.
 // If len != nil it is the already consumed array length.
-func (p *parser) arrayType(pos Pos, len Expr) Expr {
+func (p *parser) arrayType(open int, pos Pos, len Expr) Expr {
 	if trace {
 		defer p.trace("arrayType")()
 	}
@@ -1328,7 +1355,9 @@ func (p *parser) arrayType(pos Pos, len Expr) Expr {
 		p.syntaxError("unexpected comma; expecting ]")
 		p.next()
 	}
+	close := p.tapepos
 	p.want(_Rbrack)
+	p.checkLinks(open, close)
 	t := new(ArrayType)
 	t.pos = pos
 	t.Len = len
@@ -1369,11 +1398,15 @@ func (p *parser) structType() *StructType {
 	typ.pos = p.pos()
 
 	p.want(_Struct)
+	open := p.tapepos
 	p.want(_Lbrace)
 	p.list(_Semi, _Rbrace, func() bool {
 		p.fieldDecl(typ)
 		return false
 	})
+	close := p.tapepos - 1
+
+	p.checkLinks(open, close)
 
 	return typ
 }
@@ -1390,6 +1423,7 @@ func (p *parser) interfaceType() *InterfaceType {
 	typ.pos = p.pos()
 
 	p.want(_Interface)
+	open := p.tapepos
 	p.want(_Lbrace)
 	p.list(_Semi, _Rbrace, func() bool {
 		switch p.tok {
@@ -1441,6 +1475,9 @@ func (p *parser) interfaceType() *InterfaceType {
 		p.advance(_Semi, _Rbrace)
 		return false
 	})
+	close := p.tapepos - 1
+
+	p.checkLinks(open, close)
 
 	return typ
 }
@@ -1451,8 +1488,12 @@ func (p *parser) funcResult() []*Field {
 		defer p.trace("funcResult")()
 	}
 
+	open := p.tapepos
 	if p.got(_Lparen) {
-		return p.paramList(nil, nil, _Rparen, false)
+		res := p.paramList(nil, nil, _Rparen, false)
+		close := p.tapepos - 1
+		p.checkLinks(open, close)
+		return res
 	}
 
 	pos := p.pos()
@@ -2151,6 +2192,7 @@ func (p *parser) blockStmt(context string) *BlockStmt {
 		defer p.trace("blockStmt")()
 	}
 
+	open := p.tapepos
 	s := new(BlockStmt)
 	s.pos = p.pos()
 
@@ -2165,10 +2207,27 @@ func (p *parser) blockStmt(context string) *BlockStmt {
 	}
 
 	s.List = p.stmtList()
+
+	close := p.tapepos
 	s.Rbrace = p.pos()
 	p.want(_Rbrace)
 
+	p.checkLinks(open, close)
+
 	return s
+}
+
+func (p *parser) checkLinks(open, close int) {
+	// if there are syntax errors, then don't expect links to match up
+	if p.errcnt != 0 {
+		return
+	}
+
+	if p.tape[open].link != close || p.tape[close].link != open {
+		panic(fmt.Errorf("checkLinks(%v, %v):\n\ttape[%v] = %#v\n\ttape[%v] = %#v", open, close, open, p.tape[open], close, p.tape[close]))
+	}
+
+	// TODO(mdempsky): Check that p.tape[open].tok and p.tape[close].tok match?
 }
 
 func (p *parser) declStmt(f func(*Group) Decl) *DeclStmt {
@@ -2340,6 +2399,7 @@ func (p *parser) switchStmt() *SwitchStmt {
 
 	s.Init, s.Tag, _ = p.header(_Switch)
 
+	open := p.tapepos
 	if !p.got(_Lbrace) {
 		p.syntaxError("missing { after switch clause")
 		p.advance(_Case, _Default, _Rbrace)
@@ -2347,8 +2407,11 @@ func (p *parser) switchStmt() *SwitchStmt {
 	for p.tok != _EOF && p.tok != _Rbrace {
 		s.Body = append(s.Body, p.caseClause())
 	}
+	close := p.tapepos
 	s.Rbrace = p.pos()
 	p.want(_Rbrace)
+
+	p.checkLinks(open, close)
 
 	return s
 }
@@ -2362,6 +2425,7 @@ func (p *parser) selectStmt() *SelectStmt {
 	s.pos = p.pos()
 
 	p.want(_Select)
+	open := p.tapepos
 	if !p.got(_Lbrace) {
 		p.syntaxError("missing { after select clause")
 		p.advance(_Case, _Default, _Rbrace)
@@ -2369,8 +2433,11 @@ func (p *parser) selectStmt() *SelectStmt {
 	for p.tok != _EOF && p.tok != _Rbrace {
 		s.Body = append(s.Body, p.commClause())
 	}
+	close := p.tapepos
 	s.Rbrace = p.pos()
 	p.want(_Rbrace)
+
+	p.checkLinks(open, close)
 
 	return s
 }

@@ -18,11 +18,20 @@ type tapeelem struct {
 	kind  LitKind  // valid if tok is _Literal
 	bad   bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be malformed
 	blank bool     // line is blank up to col
+
+	// if tok is an opening (_Lparen, _Lbrack, _Lbrace) or closing
+	// (_Rparen, _Rbrack, _Rbrace) punctuation, then link is the index
+	// of the corresponding token, if valid.
+	//
+	// TODO(mdempsky): Is it the tape producer or tape consumer's
+	// responsibility to make sure the linked tokens are properly
+	// matched (i.e., _Lparen with _Rparen)?
+	link int
 }
 
 type tapescanner struct {
 	tape    []tapeelem
-	tapepos int
+	tapepos int // index of tapeelem within tape
 
 	tapeelem
 
@@ -38,15 +47,31 @@ type tapescanner struct {
 
 func (s *tapescanner) init(src string, mode uint) {
 	s.tape = nil
-	s.tapepos = 0
+	s.tapepos = -1
 
 	var old scanner
 	old.init(src, func(pos spos, msg string) {
 		s.tape = append(s.tape, tapeelem{spos: pos, tok: _Error, lit: msg})
 	}, mode)
 
+	var stack []int // stack of open punctuation token indices
 	for {
+		old.tapeelem = tapeelem{} // minimize tape garbage
 		old.next()
+		old.link = -1
+
+		switch old.tok {
+		case _Lparen, _Lbrack, _Lbrace:
+			stack = append(stack, len(s.tape))
+		case _Rparen, _Rbrack, _Rbrace:
+			if i := len(stack) - 1; i >= 0 {
+				open, close := stack[i], len(s.tape)
+				s.tape[open].link = close // forward link
+				old.link = open           // backward link
+				stack = stack[:i]
+			}
+		}
+
 		s.tape = append(s.tape, old.tapeelem)
 		if old.tok == _EOF {
 			break
@@ -56,8 +81,8 @@ func (s *tapescanner) init(src string, mode uint) {
 
 func (s *tapescanner) next() {
 again:
-	s.tapeelem = s.tape[s.tapepos]
 	s.tapepos++
+	s.tapeelem = s.tape[s.tapepos]
 
 	if s.tok == _Error {
 		s.errh0(s.spos, s.lit)
