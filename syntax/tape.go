@@ -60,6 +60,13 @@ func (s *tapescanner) init(src string, mode uint) {
 		old.next()
 		old.link = -1
 
+		// Record links between opening and closing punctuation, so we can
+		// efficiently skip over delimited regions and parse them later.
+		//
+		// TODO(mdempsky): Record additional links for _Semi, _Comma, and
+		// (maybe) _Colon too, to allow asynchronous parsing of the
+		// individual elements within a delimited region too?
+
 		switch old.tok {
 		case _Lparen, _Lbrack, _Lbrace:
 			stack = append(stack, len(s.tape))
