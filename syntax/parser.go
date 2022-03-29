@@ -369,17 +369,16 @@ func (p *parser) list(sep, close token, f func() bool) Pos {
 func (p *parser) appendGroup(list []Decl, f func(*Group) Decl) []Decl {
 	if p.tok == _Lparen {
 		g := new(Group)
-		p.clearPragma()
-		open := p.tapepos
-		p.next() // must consume "(" after calling clearPragma!
-		p.list(_Semi, _Rparen, func() bool {
-			if x := f(g); x != nil {
-				list = append(list, x)
-			}
-			return false
+		p.clearPragma() // must clearPragma before consuming "("!
+		p.async(func() {
+			p.next()
+			p.list(_Semi, _Rparen, func() bool {
+				if x := f(g); x != nil {
+					list = append(list, x)
+				}
+				return false
+			})
 		})
-		close := p.tapepos - 1
-		p.checkLinks(open, close)
 	} else {
 		if x := f(nil); x != nil {
 			list = append(list, x)
@@ -615,20 +614,20 @@ func (p *parser) funcDeclOrNil() *FuncDecl {
 	f.pos = p.pos()
 	f.Pragma = p.takePragma()
 
-	open := p.tapepos
-	if p.got(_Lparen) {
-		rcvr := p.paramList(nil, nil, _Rparen, false)
-		close := p.tapepos - 1
-		p.checkLinks(open, close)
-		switch len(rcvr) {
-		case 0:
-			p.error("method has no receiver")
-		default:
-			p.error("method has multiple receivers")
-			fallthrough
-		case 1:
-			f.Recv = rcvr[0]
-		}
+	if p.tok == _Lparen {
+		p.async(func() {
+			p.next()
+			rcvr := p.paramList(nil, nil, _Rparen, false)
+			switch len(rcvr) {
+			case 0:
+				p.error("method has no receiver")
+			default:
+				p.error("method has multiple receivers")
+				fallthrough
+			case 1:
+				f.Recv = rcvr[0]
+			}
+		})
 	}
 
 	if p.tok != _Name {
@@ -1052,12 +1051,11 @@ loop:
 		case _Lparen:
 			t := new(CallExpr)
 			t.pos = pos
-			open := p.tapepos
-			p.next()
-			t.Fun = x
-			t.ArgList, t.HasDots = p.argList()
-			close := p.tapepos - 1
-			p.checkLinks(open, close)
+			p.async(func() {
+				p.next()
+				t.Fun = x
+				t.ArgList, t.HasDots = p.argList()
+			})
 			x = t
 
 		case _Lbrace:
@@ -1138,29 +1136,27 @@ func (p *parser) complitexpr() *CompositeLit {
 	x := new(CompositeLit)
 	x.pos = p.pos()
 
-	p.xnest++
-	open := p.tapepos
-	p.want(_Lbrace)
-	x.Rbrace = p.list(_Comma, _Rbrace, func() bool {
-		// value
-		e := p.bare_complitexpr()
-		if p.tok == _Colon {
-			// key ':' value
-			l := new(KeyValueExpr)
-			l.pos = p.pos()
-			p.next()
-			l.Key = e
-			l.Value = p.bare_complitexpr()
-			e = l
-			x.NKeys++
-		}
-		x.ElemList = append(x.ElemList, e)
-		return false
+	p.async(func() {
+		p.xnest++
+		p.want(_Lbrace)
+		x.Rbrace = p.list(_Comma, _Rbrace, func() bool {
+			// value
+			e := p.bare_complitexpr()
+			if p.tok == _Colon {
+				// key ':' value
+				l := new(KeyValueExpr)
+				l.pos = p.pos()
+				p.next()
+				l.Key = e
+				l.Value = p.bare_complitexpr()
+				e = l
+				x.NKeys++
+			}
+			x.ElemList = append(x.ElemList, e)
+			return false
+		})
+		p.xnest--
 	})
-	close := p.tapepos - 1
-	p.xnest--
-
-	p.checkLinks(open, close)
 
 	return x
 }
@@ -1310,27 +1306,26 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 	typ.pos = p.pos()
 
 	var tparamList []*Field
-	brackOpen := p.tapepos
-	if p.allowGenerics() && p.got(_Lbrack) {
-		if context != "" {
-			// accept but complain
-			p.syntaxErrorAt(typ.pos, context+" must have no type parameters")
-		}
-		if p.tok == _Rbrack {
-			p.syntaxError("empty type parameter list")
+	if p.allowGenerics() && p.tok == _Lbrack {
+		p.async(func() {
 			p.next()
-		} else {
-			tparamList = p.paramList(nil, nil, _Rbrack, true)
-		}
-		brackClose := p.tapepos - 1
-		p.checkLinks(brackOpen, brackClose)
+			if context != "" {
+				// accept but complain
+				p.syntaxErrorAt(typ.pos, context+" must have no type parameters")
+			}
+			if p.tok == _Rbrack {
+				p.syntaxError("empty type parameter list")
+				p.next()
+			} else {
+				tparamList = p.paramList(nil, nil, _Rbrack, true)
+			}
+		})
 	}
 
-	parenOpen := p.tapepos
-	p.want(_Lparen)
-	typ.ParamList = p.paramList(nil, nil, _Rparen, false)
-	parenClose := p.tapepos - 1
-	p.checkLinks(parenOpen, parenClose)
+	p.async(func() {
+		p.want(_Lparen)
+		typ.ParamList = p.paramList(nil, nil, _Rparen, false)
+	})
 	typ.ResultList = p.funcResult()
 
 	return tparamList, typ
@@ -1398,15 +1393,13 @@ func (p *parser) structType() *StructType {
 	typ.pos = p.pos()
 
 	p.want(_Struct)
-	open := p.tapepos
-	p.want(_Lbrace)
-	p.list(_Semi, _Rbrace, func() bool {
-		p.fieldDecl(typ)
-		return false
+	p.async(func() {
+		p.want(_Lbrace)
+		p.list(_Semi, _Rbrace, func() bool {
+			p.fieldDecl(typ)
+			return false
+		})
 	})
-	close := p.tapepos - 1
-
-	p.checkLinks(open, close)
 
 	return typ
 }
@@ -1423,61 +1416,59 @@ func (p *parser) interfaceType() *InterfaceType {
 	typ.pos = p.pos()
 
 	p.want(_Interface)
-	open := p.tapepos
-	p.want(_Lbrace)
-	p.list(_Semi, _Rbrace, func() bool {
-		switch p.tok {
-		case _Name:
-			f := p.methodDecl()
-			if f.Name == nil && p.allowGenerics() {
-				f = p.embeddedElem(f)
+	p.async(func() {
+		p.want(_Lbrace)
+		p.list(_Semi, _Rbrace, func() bool {
+			switch p.tok {
+			case _Name:
+				f := p.methodDecl()
+				if f.Name == nil && p.allowGenerics() {
+					f = p.embeddedElem(f)
+				}
+				typ.MethodList = append(typ.MethodList, f)
+				return false
+
+			case _Lparen:
+				// TODO(gri) Need to decide how to adjust this restriction.
+				p.syntaxError("cannot parenthesize embedded type")
+				f := new(Field)
+				f.pos = p.pos()
+				p.next()
+				f.Type = p.qualifiedName(nil)
+				p.want(_Rparen)
+				typ.MethodList = append(typ.MethodList, f)
+				return false
+
+			case _Operator:
+				if p.op == Tilde && p.allowGenerics() {
+					typ.MethodList = append(typ.MethodList, p.embeddedElem(nil))
+					return false
+				}
+
+			default:
+				if p.allowGenerics() {
+					pos := p.pos()
+					if t := p.typeOrNil(); t != nil {
+						f := new(Field)
+						f.pos = pos
+						f.Type = t
+						typ.MethodList = append(typ.MethodList, p.embeddedElem(f))
+						return false
+					}
+				}
 			}
-			typ.MethodList = append(typ.MethodList, f)
-			return false
 
-		case _Lparen:
-			// TODO(gri) Need to decide how to adjust this restriction.
-			p.syntaxError("cannot parenthesize embedded type")
-			f := new(Field)
-			f.pos = p.pos()
-			p.next()
-			f.Type = p.qualifiedName(nil)
-			p.want(_Rparen)
-			typ.MethodList = append(typ.MethodList, f)
-			return false
-
-		case _Operator:
-			if p.op == Tilde && p.allowGenerics() {
-				typ.MethodList = append(typ.MethodList, p.embeddedElem(nil))
+			if p.allowGenerics() {
+				p.syntaxError("expecting method or embedded element")
+				p.advance(_Semi, _Rbrace)
 				return false
 			}
 
-		default:
-			if p.allowGenerics() {
-				pos := p.pos()
-				if t := p.typeOrNil(); t != nil {
-					f := new(Field)
-					f.pos = pos
-					f.Type = t
-					typ.MethodList = append(typ.MethodList, p.embeddedElem(f))
-					return false
-				}
-			}
-		}
-
-		if p.allowGenerics() {
-			p.syntaxError("expecting method or embedded element")
+			p.syntaxError("expecting method or interface name")
 			p.advance(_Semi, _Rbrace)
 			return false
-		}
-
-		p.syntaxError("expecting method or interface name")
-		p.advance(_Semi, _Rbrace)
-		return false
+		})
 	})
-	close := p.tapepos - 1
-
-	p.checkLinks(open, close)
 
 	return typ
 }
@@ -2192,12 +2183,11 @@ func (p *parser) blockStmt(context string) *BlockStmt {
 		defer p.trace("blockStmt")()
 	}
 
-	open := p.tapepos
 	s := new(BlockStmt)
 	s.pos = p.pos()
 
 	// people coming from C may forget that braces are mandatory in Go
-	if !p.got(_Lbrace) {
+	if p.tok != _Lbrace {
 		p.syntaxError("expecting { after " + context)
 		p.advance(_Name, _Rbrace)
 		s.Rbrace = p.pos() // in case we found "}"
@@ -2206,28 +2196,15 @@ func (p *parser) blockStmt(context string) *BlockStmt {
 		}
 	}
 
-	s.List = p.stmtList()
+	p.async(func() {
+		p.next()
+		s.List = p.stmtList()
 
-	close := p.tapepos
-	s.Rbrace = p.pos()
-	p.want(_Rbrace)
-
-	p.checkLinks(open, close)
+		s.Rbrace = p.pos()
+		p.want(_Rbrace)
+	})
 
 	return s
-}
-
-func (p *parser) checkLinks(open, close int) {
-	// if there are syntax errors, then don't expect links to match up
-	if p.errcnt != 0 {
-		return
-	}
-
-	if p.tape[open].link != close || p.tape[close].link != open {
-		panic(fmt.Errorf("checkLinks(%v, %v):\n\ttape[%v] = %#v\n\ttape[%v] = %#v", open, close, open, p.tape[open], close, p.tape[close]))
-	}
-
-	// TODO(mdempsky): Check that p.tape[open].tok and p.tape[close].tok match?
 }
 
 func (p *parser) declStmt(f func(*Group) Decl) *DeclStmt {
@@ -2399,19 +2376,17 @@ func (p *parser) switchStmt() *SwitchStmt {
 
 	s.Init, s.Tag, _ = p.header(_Switch)
 
-	open := p.tapepos
-	if !p.got(_Lbrace) {
-		p.syntaxError("missing { after switch clause")
-		p.advance(_Case, _Default, _Rbrace)
-	}
-	for p.tok != _EOF && p.tok != _Rbrace {
-		s.Body = append(s.Body, p.caseClause())
-	}
-	close := p.tapepos
-	s.Rbrace = p.pos()
-	p.want(_Rbrace)
-
-	p.checkLinks(open, close)
+	p.async(func() {
+		if !p.got(_Lbrace) {
+			p.syntaxError("missing { after switch clause")
+			p.advance(_Case, _Default, _Rbrace)
+		}
+		for p.tok != _EOF && p.tok != _Rbrace {
+			s.Body = append(s.Body, p.caseClause())
+		}
+		s.Rbrace = p.pos()
+		p.want(_Rbrace)
+	})
 
 	return s
 }
@@ -2425,19 +2400,17 @@ func (p *parser) selectStmt() *SelectStmt {
 	s.pos = p.pos()
 
 	p.want(_Select)
-	open := p.tapepos
-	if !p.got(_Lbrace) {
-		p.syntaxError("missing { after select clause")
-		p.advance(_Case, _Default, _Rbrace)
-	}
-	for p.tok != _EOF && p.tok != _Rbrace {
-		s.Body = append(s.Body, p.commClause())
-	}
-	close := p.tapepos
-	s.Rbrace = p.pos()
-	p.want(_Rbrace)
-
-	p.checkLinks(open, close)
+	p.async(func() {
+		if !p.got(_Lbrace) {
+			p.syntaxError("missing { after select clause")
+			p.advance(_Case, _Default, _Rbrace)
+		}
+		for p.tok != _EOF && p.tok != _Rbrace {
+			s.Body = append(s.Body, p.commClause())
+		}
+		s.Rbrace = p.pos()
+		p.want(_Rbrace)
+	})
 
 	return s
 }
@@ -2785,6 +2758,39 @@ func (p *parser) typeList() (x Expr, comma bool) {
 	}
 	p.xnest--
 	return
+}
+
+func (p *parser) async(fn func()) {
+	// TODO(mdempsky): Eventually, we want to actually be able to call
+	// fn asynchronously. There's some work to do before that:
+	//
+	// 1. Identify what state needs to be preserved/restored. At least
+	// tapepos and pragma. Probably fnest and xnest too.
+	//
+	// 2. What to do about error reporting? Should we push more of that
+	// up into the error handler, and punt responsibilities to users?
+	//
+	// 3. Line directive handling needs to be pushed down into the early
+	// tape scanning, because we need to be able to seek past any line
+	// directives and still have later position information correct.
+
+	open := p.tapepos
+	fn()
+	close := p.tapepos - 1
+	p.checkLinks(open, close)
+}
+
+func (p *parser) checkLinks(open, close int) {
+	// if there are syntax errors, then don't expect links to match up
+	if p.errcnt != 0 {
+		return
+	}
+
+	if p.tape[open].link != close || p.tape[close].link != open {
+		panic(fmt.Errorf("checkLinks(%v, %v):\n\ttape[%v] = %#v\n\ttape[%v] = %#v", open, close, open, p.tape[open], close, p.tape[close]))
+	}
+
+	// TODO(mdempsky): Check that p.tape[open].tok and p.tape[close].tok match?
 }
 
 // unparen removes all parentheses around an expression.
