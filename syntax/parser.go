@@ -20,6 +20,52 @@ type parser struct {
 	fnest  int    // function nesting level (for error handling)
 	xnest  int    // expression nesting level (for complit ambiguity resolution)
 	indent []byte // tracing support
+
+	asyncCalls []asyncCall
+}
+
+type asyncCall struct {
+	fn   func() // parser function
+	open int    // index of open punctuation token
+
+	// saved parser state
+	base   *PosBase
+	fnest  int
+	xnest  int
+	indent []byte
+}
+
+func (p *parser) capture(fn func()) asyncCall {
+	if p.pragma != nil {
+		panic("pending pragma before async call")
+	}
+
+	return asyncCall{
+		fn:     fn,
+		open:   p.tapepos,
+		base:   p.base,
+		fnest:  p.fnest,
+		xnest:  p.xnest,
+		indent: p.indent,
+	}
+}
+
+func (call asyncCall) do(p *parser) {
+	p.tapepos = call.open
+	p.tapeelem = p.tape[call.open]
+
+	p.base = call.base
+	p.fnest = call.fnest
+	p.xnest = call.xnest
+	p.indent = call.indent
+
+	call.fn()
+
+	if p.pragma != nil {
+		panic("pending pragma after async call")
+	}
+
+	p.checkLinks(call.open)
 }
 
 func (p *parser) init(file *PosBase, src string, errh ErrorHandler, pragh PragmaHandler, mode Mode) {
@@ -39,6 +85,13 @@ func (p *parser) init(file *PosBase, src string, errh ErrorHandler, pragh Pragma
 	p.indent = nil
 
 	p.next()
+}
+
+func (p *parser) fini() error {
+	for i := 0; i < len(p.asyncCalls); i++ {
+		p.asyncCalls[i].do(p)
+	}
+	return p.first
 }
 
 // Deprecated: Use init instead.
@@ -370,7 +423,12 @@ func (p *parser) appendGroup(list []Decl, f func(*Group) Decl) []Decl {
 	if p.tok == _Lparen {
 		g := new(Group)
 		p.clearPragma() // must clearPragma before consuming "("!
-		p.async(func() {
+
+		// TODO(mdempsky): Could allow async here, but we need to know how
+		// many _Semi's are present to reserve space in list. Also, need
+		// to worry about latter calls appending to list and growing it
+		// further.
+		p.asyncTODO(func() {
 			p.next()
 			p.list(_Semi, _Rparen, func() bool {
 				if x := f(g); x != nil {
@@ -1049,7 +1107,12 @@ loop:
 		case _Lparen:
 			t := new(CallExpr)
 			t.pos = pos
-			p.async(func() {
+			// TODO(mdempsky): This can't be async yet, because
+			// parser.typeDecl introspects the AST from parsing `type
+			// T[F(X)` to recognize that "F(X)" (the CallExpr constructed
+			// here) could actually be "F (X)" (i.e., a type parameter F of
+			// parenthesized type X).
+			p.asyncTODO(func() {
 				p.next()
 				t.Fun = x
 				t.ArgList, t.HasDots = p.argList()
@@ -1304,7 +1367,9 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 
 	var tparamList []*Field
 	if p.allowGenerics() && p.tok == _Lbrack {
-		p.async(func() {
+		// TODO(mdempsky): Have caller provide a pointer to the
+		// destination tparamList, and then this can be made async.
+		p.asyncTODO(func() {
 			p.next()
 			if context != "" {
 				// accept but complain
@@ -2755,23 +2820,29 @@ func (p *parser) typeList() (x Expr, comma bool) {
 	return
 }
 
-func (p *parser) async(fn func()) {
-	// TODO(mdempsky): Eventually, we want to actually be able to call
-	// fn asynchronously. There's some work to do before that:
-	//
-	// 1. Identify what state needs to be preserved/restored. At least
-	// tapepos and pragma. Probably fnest and xnest too.
-	//
-	// 2. What to do about error reporting? Should we push more of that
-	// up into the error handler, and punt responsibilities to users?
-	//
-	// 3. Line directive handling needs to be pushed down into the early
-	// tape scanning, because we need to be able to seek past any line
-	// directives and still have later position information correct.
+func (p *parser) async(fn func())     { p.asyncOK(true, fn) }
+func (p *parser) asyncTODO(fn func()) { p.asyncOK(false, fn) }
 
-	open := p.tapepos
-	fn()
-	p.checkLinks(open)
+func (p *parser) asyncOK(allowAsync bool, fn func()) {
+	call := p.capture(fn)
+	close := p.link
+
+	if close < 0 || !allowAsync {
+		// Source syntax is not properly nested, so we don't know where to
+		// seek to. Just parse eagerly instead.
+		call.do(p)
+		return
+	}
+
+	p.asyncCalls = append(p.asyncCalls, call)
+
+	// Seek past closing token.
+	//
+	// TODO(mdempsky): Handle line directives during initial scan, so
+	// that seeking takes O(1) time.
+	for p.tapepos <= close {
+		p.next()
+	}
 }
 
 func (p *parser) checkLinks(open int) {

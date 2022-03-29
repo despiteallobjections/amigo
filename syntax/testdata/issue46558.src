@@ -11,4 +11,4 @@ func F(s string) {
 		case 'b':
 		}
 	}
-} // ERROR non-declaration statement
+}

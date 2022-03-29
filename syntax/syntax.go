@@ -81,7 +81,7 @@ func Parse(base *PosBase, src io.Reader, errh ErrorHandler, pragh PragmaHandler,
 
 	var p parser
 	p.initReader(base, src, errh, pragh, mode)
-	return p.fileOrNil(), p.first
+	return p.fileOrNil(), p.fini()
 }
 
 // ParseFile behaves like Parse but it reads the source from the named file.
@@ -110,7 +110,7 @@ func ParseExpr(base *PosBase, src io.Reader, errh ErrorHandler, pragh PragmaHand
 
 	var p parser
 	p.initReader(base, src, errh, pragh, mode)
-	return p.expr(), p.first
+	return p.expr(), p.fini()
 }
 
 // Convenience functions.
