@@ -1117,7 +1117,17 @@ loop:
 			p.asyncTODO(func() {
 				p.next()
 				t.Fun = x
-				t.ArgList, t.HasDots = p.argList()
+
+				p.xnest++
+				p.list(_Comma, _Rparen, func() bool {
+					t.ArgList = append(t.ArgList, p.expr())
+					if p.got(_DotDotDot) {
+						t.HasDots = true
+						return true
+					}
+					return false
+				})
+				p.xnest--
 			})
 			x = t
 
@@ -2663,27 +2673,6 @@ func (p *parser) stmtList() (l []Stmt) {
 			p.got(_Semi) // avoid spurious empty statement
 		}
 	}
-	return
-}
-
-// argList parses a possibly empty, comma-separated list of arguments,
-// optionally followed by a comma (if not empty), and closed by ")".
-// The last argument may be followed by "...".
-//
-// argList = [ arg { "," arg } [ "..." ] [ "," ] ] ")" .
-func (p *parser) argList() (list []Expr, hasDots bool) {
-	if trace {
-		defer p.trace("argList")()
-	}
-
-	p.xnest++
-	p.list(_Comma, _Rparen, func() bool {
-		list = append(list, p.expr())
-		hasDots = p.got(_DotDotDot)
-		return hasDots
-	})
-	p.xnest--
-
 	return
 }
 
