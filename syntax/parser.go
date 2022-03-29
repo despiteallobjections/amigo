@@ -529,8 +529,7 @@ func (p *parser) typeDecl(group *Group) Decl {
 				// d.Name "[" pname ptype ...
 				// d.Name "[" pname ptype "," ...
 				d.TParamList = p.paramList(pname, ptype, _Rbrack, true)
-				close := p.tapepos - 1
-				p.checkLinks(open, close)
+				p.checkLinks(open)
 				d.Alias = p.gotAssign()
 				d.Type = p.typeOrNil()
 			} else {
@@ -539,9 +538,8 @@ func (p *parser) typeDecl(group *Group) Decl {
 			}
 		case _Rbrack:
 			// d.Name "[" "]" ...
-			close := p.tapepos
 			p.next()
-			p.checkLinks(open, close)
+			p.checkLinks(open)
 			d.Type = p.sliceType(pos)
 		default:
 			// d.Name "[" ...
@@ -1228,8 +1226,7 @@ func (p *parser) typeOrNil() Expr {
 		open := p.tapepos
 		p.next()
 		if p.got(_Rbrack) {
-			close := p.tapepos - 1
-			p.checkLinks(open, close)
+			p.checkLinks(open)
 			return p.sliceType(pos)
 		}
 		return p.arrayType(open, pos, nil)
@@ -1350,9 +1347,8 @@ func (p *parser) arrayType(open int, pos Pos, len Expr) Expr {
 		p.syntaxError("unexpected comma; expecting ]")
 		p.next()
 	}
-	close := p.tapepos
 	p.want(_Rbrack)
-	p.checkLinks(open, close)
+	p.checkLinks(open)
 	t := new(ArrayType)
 	t.pos = pos
 	t.Len = len
@@ -1482,8 +1478,7 @@ func (p *parser) funcResult() []*Field {
 	open := p.tapepos
 	if p.got(_Lparen) {
 		res := p.paramList(nil, nil, _Rparen, false)
-		close := p.tapepos - 1
-		p.checkLinks(open, close)
+		p.checkLinks(open)
 		return res
 	}
 
@@ -2776,14 +2771,20 @@ func (p *parser) async(fn func()) {
 
 	open := p.tapepos
 	fn()
-	close := p.tapepos - 1
-	p.checkLinks(open, close)
+	p.checkLinks(open)
 }
 
-func (p *parser) checkLinks(open, close int) {
+func (p *parser) checkLinks(open int) {
 	// if there are syntax errors, then don't expect links to match up
 	if p.errcnt != 0 {
 		return
+	}
+
+	close := p.tapepos - 1
+
+	// Rewind past any trailing comments.
+	for p.tape[close].tok == _Error {
+		close--
 	}
 
 	if p.tape[open].link != close || p.tape[close].link != open {
