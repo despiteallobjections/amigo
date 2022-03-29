@@ -700,7 +700,7 @@ func (p *parser) funcDeclOrNil() *FuncDecl {
 	if f.Recv != nil && p.mode&AllowMethodTypeParams == 0 {
 		context = "method" // don't permit (method) type parameters in funcType
 	}
-	f.TParamList, f.Type = p.funcType(context)
+	f.Type = p.funcType(context, &f.TParamList)
 
 	if p.tok == _Lbrace {
 		f.Body = p.funcBody()
@@ -933,7 +933,7 @@ func (p *parser) operand(keep_parens bool) Expr {
 	case _Func:
 		pos := p.pos()
 		p.next()
-		_, ftyp := p.funcType("function literal")
+		ftyp := p.funcType("function literal", nil)
 		if p.tok == _Lbrace {
 			p.xnest++
 
@@ -1282,8 +1282,7 @@ func (p *parser) typeOrNil() Expr {
 	case _Func:
 		// fntype
 		p.next()
-		_, t := p.funcType("function type")
-		return t
+		return p.funcType("function type", nil)
 
 	case _Lbrack:
 		// '[' oexpr ']' ntype
@@ -1359,7 +1358,7 @@ func (p *parser) typeInstance(typ Expr) Expr {
 }
 
 // If context != "", type parameters are not permitted.
-func (p *parser) funcType(context string) ([]*Field, *FuncType) {
+func (p *parser) funcType(context string, tparamList *[]*Field) *FuncType {
 	if trace {
 		defer p.trace("funcType")()
 	}
@@ -1367,11 +1366,8 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 	typ := new(FuncType)
 	typ.pos = p.pos()
 
-	var tparamList []*Field
 	if p.allowGenerics() && p.tok == _Lbrack {
-		// TODO(mdempsky): Have caller provide a pointer to the
-		// destination tparamList, and then this can be made async.
-		p.asyncTODO(func() {
+		p.async(func() {
 			p.next()
 			if context != "" {
 				// accept but complain
@@ -1381,7 +1377,10 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 				p.syntaxError("empty type parameter list")
 				p.next()
 			} else {
-				tparamList = p.paramList(nil, nil, _Rbrack, true)
+				list := p.paramList(nil, nil, _Rbrack, true)
+				if tparamList != nil {
+					*tparamList = list
+				}
 			}
 		})
 	}
@@ -1392,7 +1391,7 @@ func (p *parser) funcType(context string) ([]*Field, *FuncType) {
 	})
 	typ.ResultList = p.funcResult()
 
-	return tparamList, typ
+	return typ
 }
 
 // "[" has already been consumed, and pos is its position, and open is its tape index.
@@ -1742,7 +1741,7 @@ func (p *parser) methodDecl() *Field {
 	case _Lparen:
 		// method
 		f.Name = name
-		_, f.Type = p.funcType(context)
+		f.Type = p.funcType(context, nil)
 
 	case _Lbrack:
 		if p.allowGenerics() {
@@ -1762,7 +1761,7 @@ func (p *parser) methodDecl() *Field {
 					// name[](
 					p.errorAt(pos, "empty type parameter list")
 					f.Name = name
-					_, f.Type = p.funcType(context)
+					f.Type = p.funcType(context, nil)
 				} else {
 					p.errorAt(pos, "empty type argument list")
 					f.Type = name
@@ -1779,7 +1778,7 @@ func (p *parser) methodDecl() *Field {
 				// as if [] were absent.
 				if p.tok == _Lparen {
 					f.Name = name
-					_, f.Type = p.funcType(context)
+					f.Type = p.funcType(context, nil)
 				} else {
 					f.Type = name
 				}
@@ -1790,7 +1789,7 @@ func (p *parser) methodDecl() *Field {
 			if list[0].Name != nil {
 				// generic method
 				f.Name = name
-				_, f.Type = p.funcType(context)
+				f.Type = p.funcType(context, nil)
 				// TODO(gri) Record list as type parameter list with f.Type
 				//           if we want to type-check the generic method.
 				//           For now, report an error so this is not a silent event.
