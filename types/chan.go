@@ -4,6 +4,8 @@
 
 package types
 
+import "github.com/mdempsky/amigo/syntax"
+
 // A Chan represents a channel type.
 type Chan struct {
 	dir  ChanDir
@@ -11,13 +13,13 @@ type Chan struct {
 }
 
 // A ChanDir value indicates a channel direction.
-type ChanDir int
+type ChanDir = syntax.ChanDir
 
 // The direction of a channel is indicated by one of these constants.
 const (
-	SendRecv ChanDir = iota
-	SendOnly
-	RecvOnly
+	SendRecv = syntax.SendRecv
+	SendOnly = syntax.SendOnly
+	RecvOnly = syntax.RecvOnly
 )
 
 // NewChan returns a new channel type for the given direction and element type.

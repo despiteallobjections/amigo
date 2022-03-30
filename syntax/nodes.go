@@ -325,7 +325,7 @@ func (*expr) aExpr() {}
 type ChanDir uint
 
 const (
-	_ ChanDir = iota
+	SendRecv ChanDir = iota
 	SendOnly
 	RecvOnly
 )
