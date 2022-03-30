@@ -166,27 +166,20 @@ func (f *Function) labelledBlock(label *Name) *lblock {
 	return lb
 }
 
-// addParam adds a (non-escaping) parameter to f.Params of the
-// specified name, type and source position.
+// addParamObj adds a (non-escaping) parameter to f.Params for the
+// specified Var.
 //
-func (f *Function) addParam(name string, typ Type, pos Pos) *Parameter {
-	v := &Parameter{
-		name:   name,
-		typ:    typ,
-		pos:    pos,
-		parent: f,
-	}
-	f.Params = append(f.Params, v)
-	return v
-}
-
 func (f *Function) addParamObj(obj *Var) *Parameter {
 	name := obj.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Params))
 	}
-	param := f.addParam(name, obj.Type(), obj.Pos())
-	param.object = obj
+	param := &Parameter{
+		name:   name,
+		object: obj,
+		parent: f,
+	}
+	f.Params = append(f.Params, param)
 	return param
 }
 

@@ -379,9 +379,7 @@ type FreeVar struct {
 //
 type Parameter struct {
 	name      string
-	object    Object // a *types.Var; nil for non-source locals
-	typ       Type
-	pos       Pos
+	object    *Var
 	parent    *Function
 	referrers []Instruction
 }
@@ -418,10 +416,8 @@ type SSAConst struct {
 // identifier.
 //
 type Global struct {
-	name   string
-	object Object // a *types.Var; may be nil for synthetics e.g. init$guard
-	typ    Type
-	pos    Pos
+	object *Var
+	typ    Type // NewPointer(object.Type())
 }
 
 // A SSABuiltin represents a specific use of a built-in function, e.g. len.
@@ -1415,9 +1411,9 @@ func (v *FreeVar) Pos() Pos                  { return v.pos }
 func (v *FreeVar) Parent() *Function         { return v.parent }
 
 func (v *Global) Type() Type                     { return v.typ }
-func (v *Global) Name() string                   { return v.name }
+func (v *Global) Name() string                   { return v.object.Name() }
 func (v *Global) Parent() *Function              { return nil }
-func (v *Global) Pos() Pos                       { return v.pos }
+func (v *Global) Pos() Pos                       { return v.object.Pos() }
 func (v *Global) Referrers() *[]Instruction      { return nil }
 func (v *Global) Object() Object                 { return v.object }
 func (v *Global) String() string                 { return v.RelString(nil) }
@@ -1436,11 +1432,11 @@ func (v *Function) Referrers() *[]Instruction {
 	return nil
 }
 
-func (v *Parameter) Type() Type                { return v.typ }
+func (v *Parameter) Type() Type                { return v.object.Type() }
 func (v *Parameter) Name() string              { return v.name }
 func (v *Parameter) Object() Object            { return v.object }
 func (v *Parameter) Referrers() *[]Instruction { return &v.referrers }
-func (v *Parameter) Pos() Pos                  { return v.pos }
+func (v *Parameter) Pos() Pos                  { return v.object.Pos() }
 func (v *Parameter) Parent() *Function         { return v.parent }
 
 func (v *Alloc) Type() Type                { return v.typ }

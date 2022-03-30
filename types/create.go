@@ -68,10 +68,8 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 
 	case *Var:
 		g := &Global{
-			name:   name,
 			object: obj,
 			typ:    NewPointer(obj.Type()), // address
-			pos:    obj.Pos(),
 		}
 		obj.member = g
 		pkg.values[obj] = g
@@ -212,10 +210,8 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		// Add initializer guard variable.
 		obj := NewVar(NoPos, pkg, "init$guard", tBool)
 		initguard := &Global{
-			name:   obj.Name(),
 			object: obj,
 			typ:    NewPointer(obj.Type()), // address
-			pos:    obj.Pos(),
 		}
 		obj.member = initguard
 		p.Members[initguard.Name()] = initguard
