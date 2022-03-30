@@ -307,7 +307,10 @@ func (a nodeQueue) Less(i, j int) bool {
 	x, y := a[i], a[j]
 	// nodes are prioritized by number of incoming dependencies (1st key)
 	// and source order (2nd key)
-	return x.ndeps < y.ndeps || x.ndeps == y.ndeps && x.obj.order() < y.obj.order()
+	if x.ndeps != y.ndeps {
+		return x.ndeps < y.ndeps
+	}
+	return x.obj.order() < y.obj.order()
 }
 
 func (a *nodeQueue) Push(x interface{}) {
