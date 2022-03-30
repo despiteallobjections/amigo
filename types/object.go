@@ -217,9 +217,6 @@ func (a *object) less(b *object) bool {
 		return a.name < b.name
 	}
 	if !ea {
-		if a.pkg.height != b.pkg.height {
-			return a.pkg.height < b.pkg.height
-		}
 		return a.pkg.path < b.pkg.path
 	}
 
