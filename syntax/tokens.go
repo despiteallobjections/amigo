@@ -81,6 +81,12 @@ const (
 	// for CallStmt
 	Go    = _Go
 	Defer = _Defer
+
+	// for GenDecl
+	Import = _Import
+	Const  = _Const
+	Type   = _Type
+	Var    = _Var
 )
 
 // Make sure we have at most 64 tokens so we can use them in a set.

@@ -99,7 +99,7 @@ type (
 	}
 
 	GenDecl struct {
-		Tok      token // _Import, _Const, _Type, or _Var
+		Tok      token // Import, Const, Type, or Var
 		Lparen   Pos   // position of '(', if any
 		SpecList []Spec
 		Rparen   Pos // position of ')', if any
@@ -371,7 +371,7 @@ type (
 	}
 
 	DeclStmt struct {
-		Decl *GenDecl // Decl.Tok is _Const, _Type, or _Var
+		Decl *GenDecl // Decl.Tok is Const, Type, or Var
 		stmt
 	}
 
