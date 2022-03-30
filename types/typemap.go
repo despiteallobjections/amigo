@@ -4,14 +4,12 @@
 
 // Package typeutil defines various utilities for types, such as Map,
 // a mapping from types.Type to interface{} values.
-package typeutil // import "github.com/mdempsky/amigo/typeutil"
+package types // import "github.com/mdempsky/amigo/typeutil"
 
 import (
 	"bytes"
 	"fmt"
 	"reflect"
-
-	. "github.com/mdempsky/amigo/types"
 )
 
 // TypeMap is a hash-table-based mapping from types (types.Type) to

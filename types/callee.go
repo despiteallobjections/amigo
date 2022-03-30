@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil
+package types
 
 import (
 	"github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // Callee returns the named target of a function call, if any:

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil_test
+package types_test
 
 import (
 	"fmt"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 func TestIntuitiveMethodSet(t *testing.T) {
@@ -50,7 +49,7 @@ func (*A) g()
 			t.Errorf("Eval(%s) failed: %v", test.expr, err)
 		}
 		var names []string
-		for _, m := range typeutil.IntuitiveMethodSet(tv.Type, nil) {
+		for _, m := range IntuitiveMethodSet(tv.Type, nil) {
 			name := fmt.Sprintf("(%s).%s", TypeString(m.Recv(), qual), m.Obj().Name())
 			names = append(names, name)
 		}

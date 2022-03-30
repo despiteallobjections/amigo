@@ -36,15 +36,15 @@ package interp
 import (
 	"bytes"
 	"fmt"
-	"github.com/mdempsky/amigo/types"
 	"io"
 	"reflect"
 	"strings"
 	"sync"
 	"unsafe"
 
+	"github.com/mdempsky/amigo/types"
+
 	"github.com/mdempsky/amigo/ssa"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 type value interface{}
@@ -92,7 +92,7 @@ func hashString(s string) int {
 
 var (
 	mu     sync.Mutex
-	hasher = typeutil.MakeHasher()
+	hasher = types.MakeHasher()
 )
 
 // hashType returns a hash for t such that

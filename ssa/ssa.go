@@ -15,7 +15,6 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 // A Program is a partial or complete Go program converted to SSA form.
@@ -23,12 +22,12 @@ type Program struct {
 	imported   map[string]*Package         // all importable Packages, keyed by import path
 	packages   map[*types.Package]*Package // all loaded Packages, keyed by object
 	mode       BuilderMode                 // set of mode bits for SSA construction
-	MethodSets typeutil.MethodSetCache     // cache of type-checker's method-sets
+	MethodSets types.MethodSetCache        // cache of type-checker's method-sets
 
 	methodsMu    sync.Mutex                 // guards the following maps:
-	methodSets   typeutil.TypeMap           // maps type to its concrete methodSet
-	runtimeTypes typeutil.TypeMap           // types for which rtypes are needed
-	canon        typeutil.TypeMap           // type canonicalization map
+	methodSets   types.TypeMap              // maps type to its concrete methodSet
+	runtimeTypes types.TypeMap              // types for which rtypes are needed
+	canon        types.TypeMap              // type canonicalization map
 	bounds       map[*types.Func]*Function  // bounds for curried x.Method closures
 	thunks       map[selectionKey]*Function // thunks for T.Method expressions
 }

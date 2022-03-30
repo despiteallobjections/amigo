@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil
+package types
 
 // This file defines utilities for user interfaces that display types.
-
-import . "github.com/mdempsky/amigo/types"
 
 // IntuitiveMethodSet returns the intuitive method set of a type T,
 // which is the set of methods you can call on an addressable value of

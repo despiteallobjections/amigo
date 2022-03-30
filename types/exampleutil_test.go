@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil_test
+package types_test
 
 import (
 	"fmt"
@@ -10,8 +10,6 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/types"
-
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 func ExampleMap() {
@@ -39,7 +37,7 @@ func g(rune) (uint8, bool)
 	scope := pkg.Scope()
 
 	// Group names of package-level objects by their type.
-	var namesByType typeutil.TypeMap // value is []string
+	var namesByType TypeMap // value is []string
 	for _, name := range scope.Names() {
 		T := scope.Lookup(name).Type()
 

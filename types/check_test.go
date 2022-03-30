@@ -35,7 +35,6 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
-
 	. "github.com/mdempsky/amigo/types"
 )
 

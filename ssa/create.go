@@ -14,7 +14,6 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 // NewProgram returns a new SSA Program.
@@ -30,7 +29,7 @@ func NewProgram(mode BuilderMode) *Program {
 		mode:     mode,
 	}
 
-	h := typeutil.MakeHasher() // protected by methodsMu, in effect
+	h := types.MakeHasher() // protected by methodsMu, in effect
 	prog.methodSets.SetHasher(h)
 	prog.canon.SetHasher(h)
 

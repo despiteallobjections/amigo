@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil_test
+package types_test
 
 import (
 	"go/build"
@@ -12,7 +12,6 @@ import (
 	"github.com/mdempsky/amigo/srcimporter"
 	"github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 func TestStaticCallee(t *testing.T) {
@@ -71,7 +70,7 @@ func noncalls() {
 			wantCallee := decl.Name.Value == "calls" // false within func noncalls()
 			syntax.Inspect(decl.Body, func(n syntax.Node) bool {
 				if call, ok := n.(*syntax.CallExpr); ok {
-					fn := typeutil.StaticCallee(info, call)
+					fn := StaticCallee(info, call)
 					if fn == nil && wantCallee {
 						t.Errorf("%s: StaticCallee returned nil", call.Pos())
 					} else if fn != nil && !wantCallee {

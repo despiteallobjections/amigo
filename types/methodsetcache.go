@@ -4,12 +4,10 @@
 
 // This file implements a cache of method sets.
 
-package typeutil
+package types
 
 import (
 	"sync"
-
-	. "github.com/mdempsky/amigo/types"
 )
 
 // A MethodSetCache records the method set of each type T for which

@@ -15,7 +15,6 @@ import (
 	"sort"
 
 	"github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 // relName returns the name of v relative to i.
@@ -411,7 +410,7 @@ func WritePackage(buf *bytes.Buffer, p *Package) {
 		case *Type:
 			fmt.Fprintf(buf, "  type  %-*s %s\n",
 				maxname, name, relType(mem.Type().Underlying(), from))
-			for _, meth := range typeutil.IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {
+			for _, meth := range types.IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {
 				fmt.Fprintf(buf, "    %s\n", types.SelectionString(meth, types.RelativeTo(from)))
 			}
 

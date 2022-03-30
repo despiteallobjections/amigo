@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil_test
+package types_test
 
 // TODO(adonovan):
 // - test use of explicit hasher across two maps.
@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	. "github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 var (
@@ -39,8 +38,8 @@ func TestAxioms(t *testing.T) {
 	checkEqualButNotIdentical(t, tChanInt1, tChanInt2, "tChanInt{1,2}")
 }
 
-func TestMap(t *testing.T) {
-	var tmap *typeutil.TypeMap
+func TestTypeMap(t *testing.T) {
+	var tmap *TypeMap
 
 	// All methods but Set are safe on on (*T)(nil).
 	tmap.Len()
@@ -49,7 +48,7 @@ func TestMap(t *testing.T) {
 	tmap.KeysString()
 	_ = tmap.String()
 
-	tmap = new(typeutil.TypeMap)
+	tmap = new(TypeMap)
 
 	// Length of empty map.
 	if l := tmap.Len(); l != 0 {

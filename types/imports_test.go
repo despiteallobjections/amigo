@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package typeutil_test
+package types_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/types"
 	. "github.com/mdempsky/amigo/types"
-	"github.com/mdempsky/amigo/typeutil"
 )
 
 type closure map[string]*Package
@@ -67,7 +67,7 @@ func TestDependencies(t *testing.T) {
 			pkgs = append(pkgs, packages[string(r)])
 		}
 		var got string
-		for _, p := range typeutil.Dependencies(pkgs...) {
+		for _, p := range types.Dependencies(pkgs...) {
 			got += p.Path()
 		}
 		if got != test.want {
