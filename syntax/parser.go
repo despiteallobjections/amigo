@@ -780,7 +780,7 @@ func (p *parser) unaryExpr() Expr {
 			p.next()
 			// unaryExpr may have returned a parenthesized composite literal
 			// (see comment in operand) - remove parentheses if any
-			x.X = unparen(p.unaryExpr())
+			x.X = Unparen(p.unaryExpr())
 			return x
 		}
 
@@ -860,7 +860,7 @@ func (p *parser) callStmt() *CallStmt {
 	p.next()
 
 	x := p.pexpr(nil, p.tok == _Lparen) // keep_parens so we can report error below
-	if t := unparen(x); t != x {
+	if t := Unparen(x); t != x {
 		p.errorAt(x.Pos(), fmt.Sprintf("expression in %s must not be parenthesized", s.Tok))
 		// already progressed, no need to advance
 		x = t
@@ -1130,7 +1130,7 @@ loop:
 		case _Lbrace:
 			// operand may have returned a parenthesized complit
 			// type; accept it but complain if we have a complit
-			t := unparen(x)
+			t := Unparen(x)
 			// determine if '{' belongs to a composite literal or a block statement
 			complit_ok := false
 			switch t.(type) {
@@ -2853,8 +2853,8 @@ func (p *parser) checkLinks(open int) {
 	// TODO(mdempsky): Check that p.tape[open].tok and p.tape[close].tok match?
 }
 
-// unparen removes all parentheses around an expression.
-func unparen(x Expr) Expr {
+// Unparen removes all parentheses around an expression.
+func Unparen(x Expr) Expr {
 	for {
 		p, ok := x.(*ParenExpr)
 		if !ok {

@@ -155,7 +155,7 @@ func findNamedFunc(pkg *Package, pos syntax.Pos) *Function {
 //
 func (f *Function) ValueForExpr(e syntax.Expr) (value Value, isAddr bool) {
 	if f.debugInfo() { // (opt)
-		e = unparen(e)
+		e = syntax.Unparen(e)
 		for _, b := range f.Blocks {
 			for _, instr := range b.Instrs {
 				if ref, ok := instr.(*DebugRef); ok {

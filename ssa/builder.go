@@ -455,7 +455,7 @@ func (sb *storebuf) emit(fn *Function) {
 //
 func (b *builder) assign(fn *Function, loc lvalue, e syntax.Expr, isZero bool, sb *storebuf) {
 	// Can we initialize it in place?
-	if e, ok := unparen(e).(*syntax.CompositeLit); ok {
+	if e, ok := syntax.Unparen(e).(*syntax.CompositeLit); ok {
 		// A CompositeLit never evaluates to a pointer,
 		// so if the type of the location is a pointer,
 		// an &-operation is implied.
@@ -513,7 +513,7 @@ func (b *builder) assign(fn *Function, loc lvalue, e syntax.Expr, isZero bool, s
 // to fn and returning the Value defined by the expression.
 //
 func (b *builder) expr(fn *Function, e syntax.Expr) Value {
-	e = unparen(e)
+	e = syntax.Unparen(e)
 
 	tv := fn.Pkg.info.Types[e]
 
@@ -588,7 +588,7 @@ func (b *builder) expr0(fn *Function, e syntax.Expr, tv types.TypeAndValue) Valu
 			return y
 		}
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
-		if id, ok := unparen(e.Fun).(*syntax.Name); ok {
+		if id, ok := syntax.Unparen(e.Fun).(*syntax.Name); ok {
 			if obj, ok := fn.Pkg.info.Uses[id].(*types.Builtin); ok {
 				if v := b.builtin(fn, obj, e.ArgList, tv.Type, e.Pos() /*Lparen*/); v != nil {
 					return v
@@ -606,7 +606,7 @@ func (b *builder) expr0(fn *Function, e syntax.Expr, tv types.TypeAndValue) Valu
 			switch e.Op {
 			case syntax.And: // &X --- potentially escaping.
 				addr := b.addr(fn, e.X, true)
-				if x, ok := unparen(e.X).(*syntax.Operation); ok && x.Op == syntax.Mul {
+				if x, ok := syntax.Unparen(e.X).(*syntax.Operation); ok && x.Op == syntax.Mul {
 					// &*p must panic if p is nil (http://golang.org/s/go12nil).
 					// For simplicity, we'll just (suboptimally) rely
 					// on the side effects of a load.
@@ -839,7 +839,7 @@ func (b *builder) setCallFunc(fn *Function, e *syntax.CallExpr, c *CallCommon) {
 	c.pos = e.Pos() /*Lparen*/
 
 	// Is this a method call?
-	if selector, ok := unparen(e.Fun).(*syntax.SelectorExpr); ok {
+	if selector, ok := syntax.Unparen(e.Fun).(*syntax.SelectorExpr); ok {
 		sel, ok := fn.Pkg.info.Selections[selector]
 		if ok && sel.Kind() == types.MethodVal {
 			obj := sel.Obj().(*types.Func)
@@ -1216,7 +1216,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *syntax.CompositeLit, isZe
 			// An &-operation may be implied:
 			//	map[*struct{}]bool{&struct{}{}: true}
 			var key Value
-			if _, ok := unparen(e.Key).(*syntax.CompositeLit); ok && isPointer(t.Key()) {
+			if _, ok := syntax.Unparen(e.Key).(*syntax.CompositeLit); ok && isPointer(t.Key()) {
 				// A CompositeLit never evaluates to a pointer,
 				// so if the type of the location is a pointer,
 				// an &-operation is implied.
@@ -1506,7 +1506,7 @@ func (b *builder) selectStmt(fn *Function, s *syntax.SelectStmt, label *lblock) 
 			}
 
 		case *syntax.AssignStmt: // x := <-ch
-			recv := unparen(comm.Rhs).(*syntax.Operation)
+			recv := syntax.Unparen(comm.Rhs).(*syntax.Operation)
 			st = &SelectState{
 				Dir:  types.RecvOnly,
 				Chan: b.expr(fn, recv.X),
@@ -1517,7 +1517,7 @@ func (b *builder) selectStmt(fn *Function, s *syntax.SelectStmt, label *lblock) 
 			}
 
 		case *syntax.ExprStmt: // <-ch
-			recv := unparen(comm.X).(*syntax.Operation)
+			recv := syntax.Unparen(comm.X).(*syntax.Operation)
 			st = &SelectState{
 				Dir:  types.RecvOnly,
 				Chan: b.expr(fn, recv.X),

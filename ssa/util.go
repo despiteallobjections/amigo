@@ -11,14 +11,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/mdempsky/amigo/astutil"
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
 
 //// AST utilities
-
-func unparen(e syntax.Expr) syntax.Expr { return astutil.Unparen(e) }
 
 // isBlankIdent returns true iff e is an Ident with name "_".
 // They have no associated types.Object, and thus no type.

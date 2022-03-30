@@ -176,7 +176,7 @@ func (check *Checker) assignVar(lhs syntax.Expr, x *operand) Type {
 	}
 
 	// Determine if the lhs is a (possibly parenthesized) identifier.
-	ident, _ := unparen(lhs).(*syntax.Name)
+	ident, _ := syntax.Unparen(lhs).(*syntax.Name)
 
 	// Don't evaluate lhs if it is the blank identifier.
 	if ident != nil && ident.Value == "_" {
@@ -308,7 +308,7 @@ func (check *Checker) assignError(rhs []syntax.Expr, nvars, nvals int) {
 	rhs0 := rhs[0]
 
 	if len(rhs) == 1 {
-		if call, _ := unparen(rhs0).(*syntax.CallExpr); call != nil {
+		if call, _ := syntax.Unparen(rhs0).(*syntax.CallExpr); call != nil {
 			check.errorf(rhs0, "assignment mismatch: %s but %s returns %s", vars, call.Fun, vals)
 			return
 		}
@@ -427,7 +427,7 @@ func (check *Checker) assignVars(lhs, orig_rhs []syntax.Expr) {
 	if !ok {
 		// don't call check.use to avoid re-evaluation of the lhs expressions
 		for _, lhs := range lhs {
-			if name, _ := unparen(lhs).(*syntax.Name); name != nil {
+			if name, _ := syntax.Unparen(lhs).(*syntax.Name); name != nil {
 				if obj := check.lookup(name.Value); obj != nil {
 					// see comment in assignVar
 					if v, _ := obj.(*Var); v != nil && v.pkg == check.pkg {

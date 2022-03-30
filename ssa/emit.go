@@ -45,7 +45,7 @@ func emitDebugRef(f *Function, e syntax.Expr, v Value, isAddr bool) {
 		panic("nil")
 	}
 	var obj types.Object
-	e = unparen(e)
+	e = syntax.Unparen(e)
 	if id, ok := e.(*syntax.Name); ok {
 		if isBlankIdent(id) {
 			return

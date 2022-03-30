@@ -585,7 +585,7 @@ func (check *Checker) resolveBaseTypeName(seenPtr bool, typ syntax.Expr) (ptr bo
 	ptr = seenPtr
 	var seen map[*TypeName]bool
 	for {
-		typ = unparen(typ)
+		typ = syntax.Unparen(typ)
 
 		// check if we have a pointer type
 		// if pexpr, _ := typ.(*ast.StarExpr); pexpr != nil {
@@ -595,7 +595,7 @@ func (check *Checker) resolveBaseTypeName(seenPtr bool, typ syntax.Expr) (ptr bo
 				return false, nil
 			}
 			ptr = true
-			typ = unparen(pexpr.X) // continue with pointer base type
+			typ = syntax.Unparen(pexpr.X) // continue with pointer base type
 		}
 
 		// typ must be a name

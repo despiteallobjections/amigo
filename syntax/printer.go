@@ -843,7 +843,7 @@ func (p *printer) printParameterList(list []*Field, types bool) {
 			}
 			p.print(blank)
 		}
-		p.printNode(unparen(f.Type)) // no need for (extra) parentheses around parameter types
+		p.printNode(Unparen(f.Type)) // no need for (extra) parentheses around parameter types
 	}
 	// A type parameter list [P *T] where T is not a type literal requires a comma as in [P *T,]
 	// so that it's not parsed as [P*T].

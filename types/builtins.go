@@ -641,7 +641,7 @@ func (check *Checker) builtin(x *operand, call *syntax.CallExpr, id builtinId) (
 		// unsafe.Offsetof(x T) uintptr, where x must be a selector
 		// (no argument evaluated yet)
 		arg0 := call.ArgList[0]
-		selx, _ := unparen(arg0).(*syntax.SelectorExpr)
+		selx, _ := syntax.Unparen(arg0).(*syntax.SelectorExpr)
 		if selx == nil {
 			check.errorf(arg0, invalidArg+"%s is not a selector expression", arg0)
 			check.use(arg0)
@@ -878,15 +878,4 @@ func arrayPtrDeref(typ Type) Type {
 		}
 	}
 	return typ
-}
-
-// unparen returns e with any enclosing parentheses stripped.
-func unparen(e syntax.Expr) syntax.Expr {
-	for {
-		p, ok := e.(*syntax.ParenExpr)
-		if !ok {
-			return e
-		}
-		e = p.X
-	}
 }

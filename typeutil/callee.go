@@ -6,8 +6,6 @@ package typeutil
 
 import (
 	"github.com/mdempsky/amigo/syntax"
-
-	"github.com/mdempsky/amigo/astutil"
 	"github.com/mdempsky/amigo/types"
 )
 
@@ -15,7 +13,7 @@ import (
 // a function, method, builtin, or variable.
 func Callee(info *types.Info, call *syntax.CallExpr) types.Object {
 	var obj types.Object
-	switch fun := astutil.Unparen(call.Fun).(type) {
+	switch fun := syntax.Unparen(call.Fun).(type) {
 	case *syntax.Name:
 		obj = info.Uses[fun] // type, var, builtin, or declared func
 	case *syntax.SelectorExpr:
