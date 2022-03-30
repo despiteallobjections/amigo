@@ -251,8 +251,6 @@ func TestRuntimeTypes(t *testing.T) {
 // and to simplify the analysis whereby it deduces which stores to globals
 // can be lowered to global initializers.
 func TestInit(t *testing.T) {
-	t.Skip("TODO")
-
 	tests := []struct {
 		mode        types.BuilderMode
 		input, want string
@@ -301,8 +299,7 @@ func init():
 			continue
 		}
 		prog := ssautil.CreateProgram(lprog, test.mode)
-		panic("TODO: lprog.Created[0].Pkg is not an amigo/types.Package")
-		mainPkg := prog.Package(nil /*lprog.Created[0].Pkg*/)
+		mainPkg := prog.Package(lprog.Created[0].Pkg)
 		prog.Build()
 		initFunc := mainPkg.Func("init")
 		if initFunc == nil {
@@ -326,8 +323,6 @@ func init():
 // TestSyntheticFuncs checks that the expected synthetic functions are
 // created, reachable, and not duplicated.
 func TestSyntheticFuncs(t *testing.T) {
-	t.Skip("TODO")
-
 	const input = `package P
 type T int
 func (T) f() int

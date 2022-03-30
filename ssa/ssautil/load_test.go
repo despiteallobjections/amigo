@@ -52,8 +52,6 @@ func TestBuildPackage(t *testing.T) {
 }
 
 func TestPackages(t *testing.T) {
-	t.Skip("ssautil.Packages doesn't work with amigo yet")
-
 	testenv.NeedsGoPackages(t)
 
 	cfg := &packages.Config{Mode: packages.LoadSyntax}
@@ -108,8 +106,6 @@ func TestBuildPackage_MissingImport(t *testing.T) {
 }
 
 func TestIssue28106(t *testing.T) {
-	t.Skip("ssautil.Packages doesn't work with amigo yet")
-
 	testenv.NeedsGoPackages(t)
 
 	// In go1.10, go/packages loads all packages from source, not
