@@ -146,7 +146,7 @@ func emitCompare(f *Function, op Operator, x, y Value, pos Pos) Value {
 //
 func isValuePreserving(ut_src, ut_dst Type) bool {
 	// Identical underlying types?
-	if structTypesIdentical(ut_dst, ut_src) {
+	if IdenticalIgnoreTags(ut_dst, ut_src) {
 		return true
 	}
 
