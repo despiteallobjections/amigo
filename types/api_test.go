@@ -2270,9 +2270,9 @@ func TestInstantiateErrors(t *testing.T) {
 func TestArgumentErrorUnwrapping(t *testing.T) {
 	var err error = &ArgumentError{
 		Index: 1,
-		Err:   Error{Msg: "test"},
+		Err:   TypeError{Msg: "test"},
 	}
-	var e Error
+	var e TypeError
 	if !errors.As(err, &e) {
 		t.Fatalf("error %v does not wrap types.Error", err)
 	}

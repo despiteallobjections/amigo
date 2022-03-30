@@ -32,11 +32,11 @@ import (
 	"github.com/mdempsky/amigo/syntax"
 )
 
-// An Error describes a type-checking error; it implements the error interface.
+// An TypeError describes a type-checking error; it implements the error interface.
 // A "soft" error is an error that still permits a valid interpretation of a
 // package (such as "unused variable"); "hard" errors may lead to unpredictable
 // behavior if ignored.
-type Error struct {
+type TypeError struct {
 	Pos  syntax.Pos // error position
 	Msg  string     // default error message, user-friendly
 	Full string     // full error message, for debugging (may contain internal details)
@@ -45,14 +45,14 @@ type Error struct {
 
 // Error returns an error string formatted as follows:
 // filename:line:column: message
-func (err Error) Error() string {
+func (err TypeError) Error() string {
 	return fmt.Sprintf("%s: %s", err.Pos, err.Msg)
 }
 
 // FullError returns an error string like Error, buy it may contain
 // type-checker internal details such as subscript indices for type
 // parameters and more. Useful for debugging.
-func (err Error) FullError() string {
+func (err TypeError) FullError() string {
 	return fmt.Sprintf("%s: %s", err.Pos, err.Full)
 }
 

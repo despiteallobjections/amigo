@@ -231,7 +231,7 @@ func (check *Checker) err(at poser, msg string, soft bool) {
 		pos = check.errpos
 	}
 
-	err := Error{pos, stripAnnotations(msg), msg, soft}
+	err := TypeError{pos, stripAnnotations(msg), msg, soft}
 	if check.firstErr == nil {
 		check.firstErr = err
 	}

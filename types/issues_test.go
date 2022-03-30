@@ -317,7 +317,7 @@ func TestIssue25627(t *testing.T) {
 		info := &Info{Types: make(map[syntax.Expr]TypeAndValue)}
 		_, err := conf.Check(f.PkgName.Value, []*syntax.File{f}, info)
 		if err != nil {
-			if _, ok := err.(Error); !ok {
+			if _, ok := err.(TypeError); !ok {
 				t.Fatal(err)
 			}
 		}

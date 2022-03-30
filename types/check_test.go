@@ -62,7 +62,7 @@ func unpackError(err error) syntax.Error {
 	switch err := err.(type) {
 	case syntax.Error:
 		return err
-	case Error:
+	case TypeError:
 		return syntax.Error{Pos: err.Pos, Msg: err.Msg}
 	default:
 		return syntax.Error{Msg: err.Error()}

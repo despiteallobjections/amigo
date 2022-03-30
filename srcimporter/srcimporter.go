@@ -106,7 +106,7 @@ func (p *Importer) Import(path, srcDir string) (*types.Package, error) {
 		IgnoreFuncBodies: true,
 		// continue type-checking after the first error
 		Error: func(err error) {
-			if firstHardErr == nil && !err.(types.Error).Soft {
+			if firstHardErr == nil && !err.(types.TypeError).Soft {
 				firstHardErr = err
 			}
 		},
