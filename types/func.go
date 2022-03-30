@@ -180,7 +180,7 @@ func (f *Function) addParam(name string, typ Type, pos Pos) *Parameter {
 	return v
 }
 
-func (f *Function) addParamObj(obj Object) *Parameter {
+func (f *Function) addParamObj(obj *Var) *Parameter {
 	name := obj.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Params))
@@ -194,7 +194,7 @@ func (f *Function) addParamObj(obj Object) *Parameter {
 // stack; the function body will load/store the spilled location.
 // Subsequent lifting will eliminate spills where possible.
 //
-func (f *Function) addSpilledParam(obj Object) {
+func (f *Function) addSpilledParam(obj *Var) {
 	param := f.addParamObj(obj)
 	spill := &Alloc{Comment: obj.Name()}
 	spill.setType(NewPointer(obj.Type()))
@@ -225,7 +225,7 @@ func (f *Function) startBody() {
 func (f *Function) createSyntacticParams(recv *Field, functype *FuncType) {
 	if recv != nil {
 		if recv.Name != nil {
-			f.addSpilledParam(f.Pkg.info.Defs[recv.Name])
+			f.addSpilledParam(f.Pkg.info.Defs[recv.Name].(*Var))
 		} else {
 			// Anonymous receiver?  No need to spill.
 			f.addParamObj(f.Signature.Recv())
@@ -237,7 +237,7 @@ func (f *Function) createSyntacticParams(recv *Field, functype *FuncType) {
 		n := len(f.Params) // 1 if has recv, 0 otherwise
 		for _, field := range functype.ParamList {
 			if field.Name != nil {
-				f.addSpilledParam(f.Pkg.info.Defs[field.Name])
+				f.addSpilledParam(f.Pkg.info.Defs[field.Name].(*Var))
 			} else {
 				// Anonymous parameter?  No need to spill.
 				f.addParamObj(f.Signature.Params().At(len(f.Params) - n))
@@ -389,7 +389,7 @@ func (f *Function) debugInfo() bool {
 // returns it.  Its name and type are taken from obj.  Subsequent
 // calls to f.lookup(obj) will return the same local.
 //
-func (f *Function) addNamedLocal(obj Object) *Alloc {
+func (f *Function) addNamedLocal(obj *Var) *Alloc {
 	l := f.addLocal(obj.Type(), obj.Pos())
 	l.Comment = obj.Name()
 	f.objects[obj] = l
@@ -397,7 +397,7 @@ func (f *Function) addNamedLocal(obj Object) *Alloc {
 }
 
 func (f *Function) addLocalForIdent(id *Name) *Alloc {
-	return f.addNamedLocal(f.Pkg.info.Defs[id])
+	return f.addNamedLocal(f.Pkg.info.Defs[id].(*Var))
 }
 
 // addLocal creates an anonymous local variable of type typ, adds it

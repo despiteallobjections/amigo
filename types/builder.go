@@ -991,7 +991,7 @@ func (b *builder) assignOp(fn *Function, loc lvalue, val Value, op Operator, pos
 // function-local ValueSpec, spec.
 //
 func (b *builder) localValueSpec(fn *Function, spec *VarSpec) {
-	values := unpackExprList(spec.Values)
+	values := unpackExpr(spec.Values)
 
 	switch {
 	case len(values) == len(spec.NameList):
@@ -1044,7 +1044,7 @@ func (b *builder) assignStmt(fn *Function, lhss, rhss []Expr, isDef bool) {
 		if !isBlankIdent(lhs) {
 			if isDef {
 				if obj := fn.Pkg.info.Defs[lhs.(*Name)]; obj != nil {
-					fn.addNamedLocal(obj)
+					fn.addNamedLocal(obj.(*Var))
 					isZero[i] = true
 				}
 			}
@@ -1295,7 +1295,7 @@ func (b *builder) switchStmt(fn *Function, s *SwitchStmt, label *lblock) {
 		}
 
 		var nextCond *BasicBlock
-		for _, cond := range unpackExprList(cc.Cases) {
+		for _, cond := range unpackExpr(cc.Cases) {
 			nextCond = fn.newBasicBlock("switch.next")
 			// TODO(adonovan): opt: when tag==vTrue, we'd
 			// get better code if we use b.cond(cond)
@@ -1404,7 +1404,7 @@ func (b *builder) typeSwitchStmt(fn *Function, s *SwitchStmt, label *lblock) {
 		var next *BasicBlock
 		var casetype Type
 		var ti Value // ti, ok := typeassert,ok x <Ti>
-		for _, cond := range unpackExprList(cc.Cases) {
+		for _, cond := range unpackExpr(cc.Cases) {
 			next = fn.newBasicBlock("typeswitch.next")
 			casetype = fn.Pkg.typeOf(cond)
 			var condv Value
@@ -1419,7 +1419,7 @@ func (b *builder) typeSwitchStmt(fn *Function, s *SwitchStmt, label *lblock) {
 			emitIf(fn, condv, body, next)
 			fn.currentBlock = next
 		}
-		if len(unpackExprList(cc.Cases)) != 1 {
+		if len(unpackExpr(cc.Cases)) != 1 {
 			ti = x
 		}
 		fn.currentBlock = body
@@ -1441,7 +1441,7 @@ func (b *builder) typeCaseBody(fn *Function, cc *CaseClause, x Value, done *Basi
 		// In a single-type case, y has that type.
 		// In multi-type cases, 'case nil' and default,
 		// y has the same type as the interface operand.
-		emitStore(fn, fn.addNamedLocal(obj), x, obj.Pos())
+		emitStore(fn, fn.addNamedLocal(obj.(*Var)), x, obj.Pos())
 	}
 	fn.targets = &targets{
 		tail:   fn.targets,
@@ -1590,7 +1590,7 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 			r++
 
 		case *AssignStmt:
-			lhs := unpackExprList(comm.Lhs)
+			lhs := unpackExpr(comm.Lhs)
 
 			if comm.Op == Def {
 				fn.addLocalForIdent(lhs[0].(*Name))
@@ -1896,7 +1896,7 @@ func (b *builder) rangeChan(fn *Function, x Value, tk Type, pos Pos) (k Value, l
 //
 func (b *builder) rangeStmt(fn *Function, s *ForStmt, label *lblock) {
 	clause := s.Init.(*RangeClause)
-	lhs := unpackExprList(clause.Lhs)
+	lhs := unpackExpr(clause.Lhs)
 
 	var tk, tv Type
 	if len(lhs) >= 1 && !isBlankIdent(lhs[0]) {
@@ -2014,7 +2014,7 @@ start:
 		} else { // AssignStmt
 			switch s.Op {
 			case 0, Def:
-				b.assignStmt(fn, unpackExprList(s.Lhs), unpackExprList(s.Rhs), s.Op == Def)
+				b.assignStmt(fn, unpackExpr(s.Lhs), unpackExpr(s.Rhs), s.Op == Def)
 			default: // +=, etc.
 				b.assignOp(fn, b.addr(fn, s.Lhs, false), b.expr(fn, s.Rhs), s.Op, s.Pos())
 			}
@@ -2046,7 +2046,7 @@ start:
 
 	case *ReturnStmt:
 		var results []Value
-		if len(unpackExprList(s.Results)) == 1 && fn.Signature.Results().Len() > 1 {
+		if len(unpackExpr(s.Results)) == 1 && fn.Signature.Results().Len() > 1 {
 			// Return of one expression in a multi-valued function.
 			tuple := b.exprN(fn, s.Results)
 			ttuple := tuple.Type().(*Tuple)
@@ -2057,7 +2057,7 @@ start:
 			}
 		} else {
 			// 1:1 return, or no-arg return in non-void function.
-			for i, r := range unpackExprList(s.Results) {
+			for i, r := range unpackExpr(s.Results) {
 				v := emitConv(fn, b.expr(fn, r), fn.Signature.Results().At(i).Type())
 				results = append(results, v)
 			}
@@ -2394,15 +2394,4 @@ func (p *SSAPackage) typeOf(e Expr) Type {
 	}
 	panic(fmt.Sprintf("no type for %T @ %s",
 		e, e.Pos()))
-}
-
-func unpackExprList(e Expr) []Expr {
-	switch e := e.(type) {
-	case nil:
-		return nil
-	case *ListExpr:
-		return e.ElemList
-	default:
-		return []Expr{e}
-	}
 }
