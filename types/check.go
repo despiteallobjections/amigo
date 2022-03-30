@@ -359,6 +359,11 @@ func (check *Checker) checkFiles(files []*File) (err error) {
 	check.unionTypeSets = nil
 	check.ctxt = nil
 
+	if prog := check.conf.Prog; prog != nil {
+		pkg := prog.CreatePackage(check.pkg, files, check.Info, false)
+		pkg.Build()
+	}
+
 	// TODO(gri) There's more memory we should release at this point.
 
 	return

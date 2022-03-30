@@ -180,11 +180,24 @@ func (check *Checker) importPackage(pos Pos, path, dir string) *Package {
 		if check.pkgPathMap != nil {
 			check.markImports(imp)
 		}
+		check.importSSA(imp)
 		return imp
 	}
 
 	// something went wrong (importer may have returned incomplete package without error)
 	return nil
+}
+
+func (check *Checker) importSSA(pkg *Package) {
+	prog := check.conf.Prog
+	if prog == nil || prog.Package(pkg) != nil {
+		return
+	}
+
+	for _, imp := range pkg.Imports() {
+		check.importSSA(imp)
+	}
+	prog.CreatePackage(pkg, nil, nil, true)
 }
 
 // collectObjects collects all file and package objects and inserts them

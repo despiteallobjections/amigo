@@ -176,6 +176,9 @@ func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mo
 		panic("package has no import path")
 	}
 
+	prog := types.NewProgram(mode)
+	tc.Prog = prog // TODO(mdempsky): Caller should handle this.
+
 	info := &types.Info{
 		Types:      make(map[syntax.Expr]types.TypeAndValue),
 		Defs:       make(map[*syntax.Name]types.Object),
@@ -188,16 +191,6 @@ func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mo
 		return nil, nil, err
 	}
 
-	prog := types.NewProgram(mode)
-
-	// Create SSA packages for all imports.
-	// Order is not significant.
-	for _, imp := range types.Dependencies(pkg.Imports()...) {
-		prog.CreatePackage(imp, nil, nil, true)
-	}
-
-	// Create and build the primary package.
-	ssapkg := prog.CreatePackage(pkg, files, info, false)
-	ssapkg.Build()
-	return ssapkg, info, nil
+	// Return the primary package, created/built by the type checker.
+	return prog.Package(pkg), info, nil
 }

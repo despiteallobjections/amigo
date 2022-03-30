@@ -85,6 +85,10 @@ type Config struct {
 	// type checker will initialize this field with a newly created context.
 	Context *Context
 
+	// Prog is the SSA program to use for creating SSA packages.
+	// If nil, then SSA packages are not created.
+	Prog *Program
+
 	// GoVersion describes the accepted Go language version. The string
 	// must follow the format "go%d.%d" (e.g. "go1.12") or ist must be
 	// empty; an empty string indicates the latest language version.
