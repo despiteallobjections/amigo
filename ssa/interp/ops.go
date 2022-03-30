@@ -33,7 +33,7 @@ type exitPanic int
 
 // constValue returns the value of the constant with the
 // dynamic type tag appropriate for c.Type().
-func constValue(c *ssa.Const) value {
+func constValue(c *ssa.SSAConst) value {
 	if c.IsNil() {
 		return zero(c.Type()) // typed nil
 	}
@@ -934,7 +934,7 @@ func print(b []byte) (int, error) {
 
 // callBuiltin interprets a call to builtin fn with arguments args,
 // returning its result.
-func callBuiltin(caller *frame, callpos syntax.Pos, fn *ssa.Builtin, args []value) value {
+func callBuiltin(caller *frame, callpos syntax.Pos, fn *ssa.SSABuiltin, args []value) value {
 	switch fn.Name() {
 	case "append":
 		if len(args) == 1 {

@@ -141,11 +141,11 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 			}
 		}
 
-	case *Defer:
+	case *SSADefer:
 	case *Extract:
-	case *Field:
+	case *SSAField:
 	case *FieldAddr:
-	case *Go:
+	case *SSAGo:
 	case *Index:
 	case *IndexAddr:
 	case *Lookup:
@@ -171,7 +171,7 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 	case *RunDefers:
 	case *Select:
 	case *Send:
-	case *Slice:
+	case *SSASlice:
 	case *Store:
 	case *TypeAssert:
 	case *UnOp:
@@ -342,7 +342,7 @@ func (s *sanity) checkBlock(b *BasicBlock, index int) {
 			}
 
 			// Check that "untyped" types only appear on constant operands.
-			if _, ok := (*op).(*Const); !ok {
+			if _, ok := (*op).(*SSAConst); !ok {
 				if basic, ok := (*op).Type().(*types.Basic); ok {
 					if basic.Info()&types.IsUntyped != 0 {
 						s.errorf("operand #%d of %s is untyped: %s", i, instr, basic)
@@ -363,7 +363,7 @@ func (s *sanity) checkBlock(b *BasicBlock, index int) {
 			// Check that each function-local operand of
 			// instr refers back to instr.  (NB: quadratic)
 			switch val := val.(type) {
-			case *Const, *Global, *Builtin:
+			case *SSAConst, *Global, *SSABuiltin:
 				continue // not local
 			case *Function:
 				if val.parent == nil {
@@ -497,7 +497,7 @@ func (s *sanity) checkFunction(fn *Function) bool {
 // sanityCheckPackage checks invariants of packages upon creation.
 // It does not require that the package is built.
 // Unlike sanityCheck (for functions), it just panics at the first error.
-func sanityCheckPackage(pkg *Package) {
+func sanityCheckPackage(pkg *SSAPackage) {
 	if pkg.Pkg == nil {
 		panic(fmt.Sprintf("Package %s has no Object", pkg))
 	}

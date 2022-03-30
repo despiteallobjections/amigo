@@ -123,9 +123,9 @@ func emitCompare(f *Function, op syntax.Operator, x, y Value, pos syntax.Pos) Va
 		y = emitConv(f, y, x.Type())
 	} else if _, ok := yt.(*types.Interface); ok {
 		x = emitConv(f, x, y.Type())
-	} else if _, ok := x.(*Const); ok {
+	} else if _, ok := x.(*SSAConst); ok {
 		x = emitConv(f, x, y.Type())
-	} else if _, ok := y.(*Const); ok {
+	} else if _, ok := y.(*SSAConst); ok {
 		y = emitConv(f, y, x.Type())
 	} else {
 		// other cases, e.g. channels.  No-op.
@@ -214,14 +214,14 @@ func emitConv(f *Function, val Value, typ types.Type) Value {
 	}
 
 	// Conversion of a compile-time constant value?
-	if c, ok := val.(*Const); ok {
+	if c, ok := val.(*SSAConst); ok {
 		if _, ok := ut_dst.(*types.Basic); ok || c.IsNil() {
 			// Conversion of a compile-time constant to
 			// another constant type results in a new
 			// constant of the destination type and
 			// (initially) the same abstract value.
 			// We don't truncate the value yet.
-			return NewConst(c.Value, typ)
+			return NewSSAConst(c.Value, typ)
 		}
 
 		// We're converting from constant to non-constant type,
@@ -382,7 +382,7 @@ func emitImplicitSelections(f *Function, v Value, indices []int) Value {
 				v = emitLoad(f, v)
 			}
 		} else {
-			instr := &Field{
+			instr := &SSAField{
 				X:     v,
 				Field: index,
 			}
@@ -415,7 +415,7 @@ func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *synt
 			v = emitLoad(f, v)
 		}
 	} else {
-		instr := &Field{
+		instr := &SSAField{
 			X:     v,
 			Field: index,
 		}

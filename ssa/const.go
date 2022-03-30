@@ -15,45 +15,45 @@ import (
 	"github.com/mdempsky/amigo/types"
 )
 
-// NewConst returns a new constant of the specified value and type.
+// NewSSAConst returns a new constant of the specified value and type.
 // val must be valid according to the specification of Const.Value.
 //
-func NewConst(val constant.Value, typ types.Type) *Const {
-	return &Const{typ, val}
+func NewSSAConst(val constant.Value, typ types.Type) *SSAConst {
+	return &SSAConst{typ, val}
 }
 
 // intConst returns an 'int' constant that evaluates to i.
 // (i is an int64 in case the host is narrower than the target.)
-func intConst(i int64) *Const {
-	return NewConst(constant.MakeInt64(i), tInt)
+func intConst(i int64) *SSAConst {
+	return NewSSAConst(constant.MakeInt64(i), tInt)
 }
 
 // nilConst returns a nil constant of the specified type, which may
 // be any reference type, including interfaces.
 //
-func nilConst(typ types.Type) *Const {
-	return NewConst(nil, typ)
+func nilConst(typ types.Type) *SSAConst {
+	return NewSSAConst(nil, typ)
 }
 
 // stringConst returns a 'string' constant that evaluates to s.
-func stringConst(s string) *Const {
-	return NewConst(constant.MakeString(s), tString)
+func stringConst(s string) *SSAConst {
+	return NewSSAConst(constant.MakeString(s), tString)
 }
 
 // zeroConst returns a new "zero" constant of the specified type,
 // which must not be an array or struct type: the zero values of
 // aggregates are well-defined but cannot be represented by Const.
 //
-func zeroConst(t types.Type) *Const {
+func zeroConst(t types.Type) *SSAConst {
 	switch t := t.(type) {
 	case *types.Basic:
 		switch {
 		case t.Info()&types.IsBoolean != 0:
-			return NewConst(constant.MakeBool(false), t)
+			return NewSSAConst(constant.MakeBool(false), t)
 		case t.Info()&types.IsNumeric != 0:
-			return NewConst(constant.MakeInt64(0), t)
+			return NewSSAConst(constant.MakeInt64(0), t)
 		case t.Info()&types.IsString != 0:
-			return NewConst(constant.MakeString(""), t)
+			return NewSSAConst(constant.MakeString(""), t)
 		case t.Kind() == types.UnsafePointer:
 			fallthrough
 		case t.Kind() == types.UntypedNil:
@@ -64,14 +64,14 @@ func zeroConst(t types.Type) *Const {
 	case *types.Pointer, *types.Slice, *types.Interface, *types.Chan, *types.Map, *types.Signature:
 		return nilConst(t)
 	case *types.Named:
-		return NewConst(zeroConst(t.Underlying()).Value, t)
+		return NewSSAConst(zeroConst(t.Underlying()).Value, t)
 	case *types.Array, *types.Struct, *types.Tuple:
 		panic(fmt.Sprint("zeroConst applied to aggregate:", t))
 	}
 	panic(fmt.Sprint("zeroConst: unexpected ", t))
 }
 
-func (c *Const) RelString(from *types.Package) string {
+func (c *SSAConst) RelString(from *types.Package) string {
 	var s string
 	if c.Value == nil {
 		s = "nil"
@@ -89,30 +89,30 @@ func (c *Const) RelString(from *types.Package) string {
 	return s + ":" + relType(c.Type(), from)
 }
 
-func (c *Const) Name() string {
+func (c *SSAConst) Name() string {
 	return c.RelString(nil)
 }
 
-func (c *Const) String() string {
+func (c *SSAConst) String() string {
 	return c.Name()
 }
 
-func (c *Const) Type() types.Type {
+func (c *SSAConst) Type() types.Type {
 	return c.typ
 }
 
-func (c *Const) Referrers() *[]Instruction {
+func (c *SSAConst) Referrers() *[]Instruction {
 	return nil
 }
 
-func (c *Const) Parent() *Function { return nil }
+func (c *SSAConst) Parent() *Function { return nil }
 
-func (c *Const) Pos() syntax.Pos {
+func (c *SSAConst) Pos() syntax.Pos {
 	return syntax.NoPos
 }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.
-func (c *Const) IsNil() bool {
+func (c *SSAConst) IsNil() bool {
 	return c.Value == nil
 }
 
@@ -121,7 +121,7 @@ func (c *Const) IsNil() bool {
 // Int64 returns the numeric value of this constant truncated to fit
 // a signed 64-bit integer.
 //
-func (c *Const) Int64() int64 {
+func (c *SSAConst) Int64() int64 {
 	switch x := constant.ToInt(c.Value); x.Kind() {
 	case constant.Int:
 		if i, ok := constant.Int64Val(x); ok {
@@ -138,7 +138,7 @@ func (c *Const) Int64() int64 {
 // Uint64 returns the numeric value of this constant truncated to fit
 // an unsigned 64-bit integer.
 //
-func (c *Const) Uint64() uint64 {
+func (c *SSAConst) Uint64() uint64 {
 	switch x := constant.ToInt(c.Value); x.Kind() {
 	case constant.Int:
 		if u, ok := constant.Uint64Val(x); ok {
@@ -155,7 +155,7 @@ func (c *Const) Uint64() uint64 {
 // Float64 returns the numeric value of this constant truncated to fit
 // a float64.
 //
-func (c *Const) Float64() float64 {
+func (c *SSAConst) Float64() float64 {
 	f, _ := constant.Float64Val(c.Value)
 	return f
 }
@@ -163,7 +163,7 @@ func (c *Const) Float64() float64 {
 // Complex128 returns the complex value of this constant truncated to
 // fit a complex128.
 //
-func (c *Const) Complex128() complex128 {
+func (c *SSAConst) Complex128() complex128 {
 	re, _ := constant.Float64Val(constant.Real(c.Value))
 	im, _ := constant.Float64Val(constant.Imag(c.Value))
 	return complex(re, im)

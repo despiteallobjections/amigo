@@ -32,7 +32,7 @@ func relName(v Value, i Instruction) string {
 	switch v := v.(type) {
 	case Member: // *Function or *Global
 		return v.RelString(from)
-	case *Const:
+	case *SSAConst:
 		return v.RelString(from)
 	}
 	return v.Name()
@@ -66,7 +66,7 @@ func (v *FreeVar) String() string {
 	return fmt.Sprintf("freevar %s : %s", v.Name(), relType(v.Type(), from))
 }
 
-func (v *Builtin) String() string {
+func (v *SSABuiltin) String() string {
 	return fmt.Sprintf("builtin %s", v.Name())
 }
 
@@ -189,7 +189,7 @@ func (v *MakeSlice) String() string {
 		relName(v.Cap, v))
 }
 
-func (v *Slice) String() string {
+func (v *SSASlice) String() string {
 	var b bytes.Buffer
 	b.WriteString("slice ")
 	b.WriteString(relName(v.X, v))
@@ -233,7 +233,7 @@ func (v *FieldAddr) String() string {
 	return fmt.Sprintf("&%s.%s [#%d]", relName(v.X, v), name, v.Field)
 }
 
-func (v *Field) String() string {
+func (v *SSAField) String() string {
 	st := v.X.Type().Underlying().(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
@@ -291,7 +291,7 @@ func (s *If) String() string {
 	return fmt.Sprintf("if %s goto %d else %d", relName(s.Cond, s), tblock, fblock)
 }
 
-func (s *Go) String() string {
+func (s *SSAGo) String() string {
 	return printCall(&s.Call, "go ", s)
 }
 
@@ -321,7 +321,7 @@ func (s *Send) String() string {
 	return fmt.Sprintf("send %s <- %s", relName(s.Chan, s), relName(s.X, s))
 }
 
-func (s *Defer) String() string {
+func (s *SSADefer) String() string {
 	return printCall(&s.Call, "defer ", s)
 }
 
@@ -370,13 +370,13 @@ func (s *DebugRef) String() string {
 	return fmt.Sprintf("; %s%s @ %d:%d is %s", addr, descr, p.RelLine(), p.RelCol(), s.X.Name())
 }
 
-func (p *Package) String() string {
+func (p *SSAPackage) String() string {
 	return "package " + p.Pkg.Path()
 }
 
-var _ io.WriterTo = (*Package)(nil) // *Package implements io.Writer
+var _ io.WriterTo = (*SSAPackage)(nil) // *Package implements io.Writer
 
-func (p *Package) WriteTo(w io.Writer) (int64, error) {
+func (p *SSAPackage) WriteTo(w io.Writer) (int64, error) {
 	var buf bytes.Buffer
 	WritePackage(&buf, p)
 	n, err := w.Write(buf.Bytes())
@@ -384,7 +384,7 @@ func (p *Package) WriteTo(w io.Writer) (int64, error) {
 }
 
 // WritePackage writes to buf a human-readable summary of p.
-func WritePackage(buf *bytes.Buffer, p *Package) {
+func WritePackage(buf *bytes.Buffer, p *SSAPackage) {
 	fmt.Fprintf(buf, "%s:\n", p)
 
 	var names []string
@@ -408,7 +408,7 @@ func WritePackage(buf *bytes.Buffer, p *Package) {
 			fmt.Fprintf(buf, "  func  %-*s %s\n",
 				maxname, name, relType(mem.Type(), from))
 
-		case *Type:
+		case *SSAType:
 			fmt.Fprintf(buf, "  type  %-*s %s\n",
 				maxname, name, relType(mem.Type().Underlying(), from))
 			for _, meth := range types.IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {

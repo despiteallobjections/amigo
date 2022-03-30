@@ -439,7 +439,7 @@ func writeValue(buf *bytes.Buffer, v value) {
 		}
 		buf.WriteString("]")
 
-	case *ssa.Function, *ssa.Builtin, *closure:
+	case *ssa.Function, *ssa.SSABuiltin, *closure:
 		fmt.Fprintf(buf, "%p", v) // (an address)
 
 	case rtype:

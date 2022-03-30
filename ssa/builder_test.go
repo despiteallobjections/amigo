@@ -102,7 +102,7 @@ func main() {
 					t.Errorf("function %s is empty", mem)
 				}
 
-			case *ssa.Type:
+			case *ssa.SSAType:
 				// Methods of named types T.
 				// (In this test, all exported methods belong to *T not T.)
 				if !isExt {

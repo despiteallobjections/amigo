@@ -17,7 +17,7 @@ import (
 	"github.com/mdempsky/amigo/ssa/ssautil"
 )
 
-func create(t *testing.T, content string) *ssa.Package {
+func create(t *testing.T, content string) *ssa.SSAPackage {
 	var conf loader.Config
 	f, err := conf.ParseFile("foo_test.go", content)
 	if err != nil {

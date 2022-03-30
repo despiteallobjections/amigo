@@ -472,7 +472,7 @@ func ext۰reflect۰Value۰IsNil(fr *frame, args []value) value {
 		return x == nil
 	case *ssa.Function:
 		return x == nil
-	case *ssa.Builtin:
+	case *ssa.SSABuiltin:
 		return x == nil
 	case *closure:
 		return x == nil
@@ -502,7 +502,7 @@ func ext۰reflect۰error۰Error(fr *frame, args []value) value {
 }
 
 // newMethod creates a new method of the specified name, package and receiver type.
-func newMethod(pkg *ssa.Package, recvType types.Type, name string) *ssa.Function {
+func newMethod(pkg *ssa.SSAPackage, recvType types.Type, name string) *ssa.Function {
 	// TODO(adonovan): fix: hack: currently the only part of Signature
 	// that is needed is the "pointerness" of Recv.Type, and for
 	// now, we'll set it to always be false since we're only
@@ -514,7 +514,7 @@ func newMethod(pkg *ssa.Package, recvType types.Type, name string) *ssa.Function
 }
 
 func initReflect(i *interpreter) {
-	i.reflectPackage = &ssa.Package{
+	i.reflectPackage = &ssa.SSAPackage{
 		Prog:    i.prog,
 		Pkg:     reflectTypesPackage,
 		Members: make(map[string]ssa.Member),

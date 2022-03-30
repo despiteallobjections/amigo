@@ -27,7 +27,7 @@ import (
 //      its SSA function has not been created yet
 //      (pkg.Build() has not yet been called).
 //
-func EnclosingFunction(pkg *Package, path []syntax.Node) *Function {
+func EnclosingFunction(pkg *SSAPackage, path []syntax.Node) *Function {
 	// Start with package-level function...
 	fn := findEnclosingPackageLevelFunction(pkg, path)
 	if fn == nil {
@@ -65,14 +65,14 @@ outer:
 // used to quickly reject check inputs that will cause
 // EnclosingFunction to fail, prior to SSA building.
 //
-func HasEnclosingFunction(pkg *Package, path []syntax.Node) bool {
+func HasEnclosingFunction(pkg *SSAPackage, path []syntax.Node) bool {
 	return findEnclosingPackageLevelFunction(pkg, path) != nil
 }
 
 // findEnclosingPackageLevelFunction returns the Function
 // corresponding to the package-level function enclosing path.
 //
-func findEnclosingPackageLevelFunction(pkg *Package, path []syntax.Node) *Function {
+func findEnclosingPackageLevelFunction(pkg *SSAPackage, path []syntax.Node) *Function {
 	if n := len(path); n >= 2 { // [... {Gen,Func}Decl File]
 		switch decl := path[n-2].(type) {
 		case *syntax.VarSpec:
@@ -107,7 +107,7 @@ func findEnclosingPackageLevelFunction(pkg *Package, path []syntax.Node) *Functi
 // findNamedFunc returns the named function whose FuncDecl.Ident is at
 // position pos.
 //
-func findNamedFunc(pkg *Package, pos syntax.Pos) *Function {
+func findNamedFunc(pkg *SSAPackage, pos syntax.Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
 	for _, mem := range pkg.Members {
@@ -116,7 +116,7 @@ func findNamedFunc(pkg *Package, pos syntax.Pos) *Function {
 			if mem.Pos() == pos {
 				return mem
 			}
-		case *Type:
+		case *SSAType:
 			mset := pkg.Prog.MethodSets.MethodSet(types.NewPointer(mem.Type()))
 			for i, n := 0, mset.Len(); i < n; i++ {
 				// Don't call Program.Method: avoid creating wrappers.
@@ -175,7 +175,7 @@ func (f *Function) ValueForExpr(e syntax.Expr) (value Value, isAddr bool) {
 // type-checker package object.
 // It returns nil if no such SSA package has been created.
 //
-func (prog *Program) Package(obj *types.Package) *Package {
+func (prog *Program) Package(obj *types.Package) *SSAPackage {
 	return prog.packages[obj]
 }
 
@@ -205,19 +205,19 @@ func (prog *Program) FuncValue(obj *types.Func) *Function {
 // ConstValue returns the SSA Value denoted by the source-level named
 // constant obj.
 //
-func (prog *Program) ConstValue(obj *types.Const) *Const {
+func (prog *Program) ConstValue(obj *types.Const) *SSAConst {
 	// TODO(adonovan): opt: share (don't reallocate)
 	// Consts for const objects and constant syntax.Exprs.
 
 	// Universal constant? {true,false,nil}
 	if obj.Parent() == types.Universe {
-		return NewConst(obj.Val(), obj.Type())
+		return NewSSAConst(obj.Val(), obj.Type())
 	}
 	// Package-level named constant?
 	if v := prog.packageLevelValue(obj); v != nil {
-		return v.(*Const)
+		return v.(*SSAConst)
 	}
-	return NewConst(obj.Val(), obj.Type())
+	return NewSSAConst(obj.Val(), obj.Type())
 }
 
 // VarValue returns the SSA Value that corresponds to a specific
@@ -254,7 +254,7 @@ func (prog *Program) ConstValue(obj *types.Const) *Const {
 // during SSA code generation, such as registerization, constant
 // folding, avoidance of materialization of subexpressions, etc.
 //
-func (prog *Program) VarValue(obj *types.Var, pkg *Package, ref []syntax.Node) (value Value, isAddr bool) {
+func (prog *Program) VarValue(obj *types.Var, pkg *SSAPackage, ref []syntax.Node) (value Value, isAddr bool) {
 	// All references to a var are local to some function, possibly init.
 	fn := EnclosingFunction(pkg, ref)
 	if fn == nil {

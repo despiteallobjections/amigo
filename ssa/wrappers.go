@@ -87,7 +87,7 @@ func makeWrapper(prog *Program, sel *types.Selection) *Function {
 		// "value method (T).f called using nil *T pointer"
 		if len(indices) == 1 && !isPointer(recvType(obj)) {
 			var c Call
-			c.Call.Value = &Builtin{
+			c.Call.Value = &SSABuiltin{
 				name: "ssa:wrapnilchk",
 				sig: types.NewSignatureType(nil, nil, nil,
 					types.NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),

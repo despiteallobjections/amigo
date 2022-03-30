@@ -19,10 +19,10 @@ import (
 
 // A Program is a partial or complete Go program converted to SSA form.
 type Program struct {
-	imported   map[string]*Package         // all importable Packages, keyed by import path
-	packages   map[*types.Package]*Package // all loaded Packages, keyed by object
-	mode       BuilderMode                 // set of mode bits for SSA construction
-	MethodSets types.MethodSetCache        // cache of type-checker's method-sets
+	imported   map[string]*SSAPackage         // all importable Packages, keyed by import path
+	packages   map[*types.Package]*SSAPackage // all loaded Packages, keyed by object
+	mode       BuilderMode                    // set of mode bits for SSA construction
+	MethodSets types.MethodSetCache           // cache of type-checker's method-sets
 
 	methodsMu    sync.Mutex                 // guards the following maps:
 	methodSets   types.TypeMap              // maps type to its concrete methodSet
@@ -32,7 +32,7 @@ type Program struct {
 	thunks       map[selectionKey]*Function // thunks for T.Method expressions
 }
 
-// A Package is a single analyzed Go package containing Members for
+// A SSAPackage is a single analyzed Go package containing Members for
 // all package-level functions, variables, constants and types it
 // declares.  These may be accessed directly via Members, or via the
 // type-specific accessor methods Func, Type, Var and Const.
@@ -41,7 +41,7 @@ type Program struct {
 // initializer) and "init#%d", the nth declared init function,
 // and unspecified other things too.
 //
-type Package struct {
+type SSAPackage struct {
 	Prog    *Program               // the owning program
 	Pkg     *types.Package         // the corresponding github.com/mdempsky/amigo/types.Package
 	Members map[string]Member      // all package members keyed by name (incl. init and init#%d)
@@ -69,13 +69,13 @@ type Member interface {
 	Pos() syntax.Pos                 // position of member's declaration, if known
 	Type() types.Type                // type of the package member
 	Token() token.Token              // token.{VAR,FUNC,CONST,TYPE}
-	Package() *Package               // the containing package
+	Package() *SSAPackage            // the containing package
 }
 
-// A Type is a Member of a Package representing a package-level named type.
-type Type struct {
+// A SSAType is a Member of a Package representing a package-level named type.
+type SSAType struct {
 	object *types.TypeName
-	pkg    *Package
+	pkg    *SSAPackage
 }
 
 // A NamedConst is a Member of a Package representing a package-level
@@ -89,8 +89,8 @@ type Type struct {
 //
 type NamedConst struct {
 	object *types.Const
-	Value  *Const
-	pkg    *Package
+	Value  *SSAConst
+	pkg    *SSAPackage
 }
 
 // A Value is an SSA value that can be referenced by an instruction.
@@ -229,18 +229,18 @@ type Instruction interface {
 	Pos() syntax.Pos
 }
 
-// A Node is a node in the SSA value graph.  Every concrete type that
-// implements Node is also either a Value, an Instruction, or both.
+// A SSANode is a node in the SSA value graph.  Every concrete type that
+// implements SSANode is also either a Value, an Instruction, or both.
 //
-// Node contains the methods common to Value and Instruction, plus the
+// SSANode contains the methods common to Value and Instruction, plus the
 // Operands and Referrers methods generalized to return nil for
 // non-Instructions and non-Values, respectively.
 //
-// Node is provided to simplify SSA graph algorithms.  Clients should
+// SSANode is provided to simplify SSA graph algorithms.  Clients should
 // use the more specific and informative Value or Instruction
 // interfaces where appropriate.
 //
-type Node interface {
+type SSANode interface {
 	// Common methods:
 	String() string
 	Pos() syntax.Pos
@@ -301,7 +301,7 @@ type Function struct {
 	Synthetic string        // provenance of synthetic function; "" for true source functions
 	syntax    syntax.Node   // *syntax.Func{Decl,Lit}; replaced with simple syntax.Node after build, unless debug mode
 	parent    *Function     // enclosing function if anon; nil if global
-	Pkg       *Package      // enclosing package; nil for shared funcs (wrappers and error.Error)
+	Pkg       *SSAPackage   // enclosing package; nil for shared funcs (wrappers and error.Error)
 	Prog      *Program      // enclosing program
 	Params    []*Parameter  // function parameters; for methods, includes receiver
 	FreeVars  []*FreeVar    // free variables whose values must be supplied by closure
@@ -392,14 +392,14 @@ type Parameter struct {
 	referrers []Instruction
 }
 
-// A Const represents the value of a constant expression.
+// A SSAConst represents the value of a constant expression.
 //
 // The underlying type of a constant may be any boolean, numeric, or
-// string type.  In addition, a Const may represent the nil value of
+// string type.  In addition, a SSAConst may represent the nil value of
 // any reference type---interface, map, channel, pointer, slice, or
 // function---but not "untyped nil".
 //
-// All source-level constant expressions are represented by a Const
+// All source-level constant expressions are represented by a SSAConst
 // of the same type and value.
 //
 // Value holds the value of the constant, independent of its Type(),
@@ -412,7 +412,7 @@ type Parameter struct {
 //	"hello":untyped string
 //	3+4i:MyComplex
 //
-type Const struct {
+type SSAConst struct {
 	typ   types.Type
 	Value constant.Value
 }
@@ -429,10 +429,10 @@ type Global struct {
 	typ    types.Type
 	pos    syntax.Pos
 
-	Pkg *Package
+	Pkg *SSAPackage
 }
 
-// A Builtin represents a specific use of a built-in function, e.g. len.
+// A SSABuiltin represents a specific use of a built-in function, e.g. len.
 //
 // Builtins are immutable values.  Builtins do not have addresses.
 // Builtins can only appear in CallCommon.Value.
@@ -445,13 +445,13 @@ type Global struct {
 //   // (For use in indirection wrappers.)
 //   func ssa:wrapnilchk(ptr *T, recvType, methodName string) *T
 //
-// Object() returns a *types.Builtin for built-ins defined by the spec,
+// Object() returns a *types.SSABuiltin for built-ins defined by the spec,
 // nil for others.
 //
 // Type() returns a *types.Signature representing the effective
 // signature of the built-in for this call.
 //
-type Builtin struct {
+type SSABuiltin struct {
 	name string
 	sig  *types.Signature
 }
@@ -758,14 +758,14 @@ type MakeSlice struct {
 	Cap Value
 }
 
-// The Slice instruction yields a slice of an existing string, slice
+// The SSASlice instruction yields a slice of an existing string, slice
 // or *array X between optional integer bounds Low and High.
 //
 // Dynamically, this instruction panics if X evaluates to a nil *array
 // pointer.
 //
 // Type() returns string if the type of X was string, otherwise a
-// *types.Slice with the same element type as X.
+// *types.SSASlice with the same element type as X.
 //
 // Pos() returns the syntax.SliceExpr.Lbrack if created by a x[:] slice
 // operation, the syntax.CompositeLit.Lbrace if created by a literal, or
@@ -774,7 +774,7 @@ type MakeSlice struct {
 // Example printed form:
 // 	t1 = slice t0[1:]
 //
-type Slice struct {
+type SSASlice struct {
 	register
 	X              Value // slice, string, or *array
 	Low, High, Max Value // each may be nil
@@ -802,7 +802,7 @@ type FieldAddr struct {
 	Field int   // field is X.Type().Underlying().(*types.Pointer).Elem().Underlying().(*types.Struct).Field(Field)
 }
 
-// The Field instruction yields the Field of struct X.
+// The SSAField instruction yields the SSAField of struct X.
 //
 // The field is identified by its index within the field list of the
 // struct type of X; by using numeric indices we avoid ambiguity of
@@ -814,7 +814,7 @@ type FieldAddr struct {
 // Example printed form:
 // 	t1 = t0.name [#1]
 //
-type Field struct {
+type SSAField struct {
 	register
 	X     Value // struct
 	Field int   // index into X.Type().(*types.Struct).Fields
@@ -1125,37 +1125,37 @@ type Panic struct {
 	pos syntax.Pos
 }
 
-// The Go instruction creates a new goroutine and calls the specified
+// The SSAGo instruction creates a new goroutine and calls the specified
 // function within it.
 //
 // See CallCommon for generic function call documentation.
 //
-// Pos() returns the syntax.GoStmt.Go.
+// Pos() returns the syntax.GoStmt.SSAGo.
 //
 // Example printed form:
 // 	go println(t0, t1)
 // 	go t3()
 // 	go invoke t5.Println(...t6)
 //
-type Go struct {
+type SSAGo struct {
 	anInstruction
 	Call CallCommon
 	pos  syntax.Pos
 }
 
-// The Defer instruction pushes the specified call onto a stack of
+// The SSADefer instruction pushes the specified call onto a stack of
 // functions to be called by a RunDefers instruction or by a panic.
 //
 // See CallCommon for generic function call documentation.
 //
-// Pos() returns the syntax.DeferStmt.Defer.
+// Pos() returns the syntax.DeferStmt.SSADefer.
 //
 // Example printed form:
 // 	defer println(t0, t1)
 // 	defer t3()
 // 	defer invoke t5.Println(...t6)
 //
-type Defer struct {
+type SSADefer struct {
 	anInstruction
 	Call CallCommon
 	pos  syntax.Pos
@@ -1375,7 +1375,7 @@ func (c *CallCommon) StaticCallee() *Function {
 // for a user interface, e.g., "static method call".
 func (c *CallCommon) Description() string {
 	switch fn := c.Value.(type) {
-	case *Builtin:
+	case *SSABuiltin:
 		return "built-in function call"
 	case *MakeClosure:
 		return "static function closure call"
@@ -1401,20 +1401,20 @@ type CallInstruction interface {
 	Value() *Call        // returns the result value of the call (*Call) or nil (*Go, *Defer)
 }
 
-func (s *Call) Common() *CallCommon  { return &s.Call }
-func (s *Defer) Common() *CallCommon { return &s.Call }
-func (s *Go) Common() *CallCommon    { return &s.Call }
+func (s *Call) Common() *CallCommon     { return &s.Call }
+func (s *SSADefer) Common() *CallCommon { return &s.Call }
+func (s *SSAGo) Common() *CallCommon    { return &s.Call }
 
-func (s *Call) Value() *Call  { return s }
-func (s *Defer) Value() *Call { return nil }
-func (s *Go) Value() *Call    { return nil }
+func (s *Call) Value() *Call     { return s }
+func (s *SSADefer) Value() *Call { return nil }
+func (s *SSAGo) Value() *Call    { return nil }
 
-func (v *Builtin) Type() types.Type        { return v.sig }
-func (v *Builtin) Name() string            { return v.name }
-func (*Builtin) Referrers() *[]Instruction { return nil }
-func (v *Builtin) Pos() syntax.Pos         { return syntax.NoPos }
-func (v *Builtin) Object() types.Object    { return types.Universe.Lookup(v.name) }
-func (v *Builtin) Parent() *Function       { return nil }
+func (v *SSABuiltin) Type() types.Type        { return v.sig }
+func (v *SSABuiltin) Name() string            { return v.name }
+func (*SSABuiltin) Referrers() *[]Instruction { return nil }
+func (v *SSABuiltin) Pos() syntax.Pos         { return syntax.NoPos }
+func (v *SSABuiltin) Object() types.Object    { return types.Universe.Lookup(v.name) }
+func (v *SSABuiltin) Parent() *Function       { return nil }
 
 func (v *FreeVar) Type() types.Type          { return v.typ }
 func (v *FreeVar) Name() string              { return v.name }
@@ -1430,7 +1430,7 @@ func (v *Global) Referrers() *[]Instruction            { return nil }
 func (v *Global) Token() token.Token                   { return token.VAR }
 func (v *Global) Object() types.Object                 { return v.object }
 func (v *Global) String() string                       { return v.RelString(nil) }
-func (v *Global) Package() *Package                    { return v.Pkg }
+func (v *Global) Package() *SSAPackage                 { return v.Pkg }
 func (v *Global) RelString(from *types.Package) string { return relString(v, from) }
 
 func (v *Function) Name() string         { return v.name }
@@ -1439,7 +1439,7 @@ func (v *Function) Pos() syntax.Pos      { return v.pos }
 func (v *Function) Token() token.Token   { return token.FUNC }
 func (v *Function) Object() types.Object { return v.object }
 func (v *Function) String() string       { return v.RelString(nil) }
-func (v *Function) Package() *Package    { return v.Pkg }
+func (v *Function) Package() *SSAPackage { return v.Pkg }
 func (v *Function) Parent() *Function    { return v.parent }
 func (v *Function) Referrers() *[]Instruction {
 	if v.parent != nil {
@@ -1472,14 +1472,14 @@ func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
-func (t *Type) Name() string                         { return t.object.Name() }
-func (t *Type) Pos() syntax.Pos                      { return t.object.Pos() }
-func (t *Type) Type() types.Type                     { return t.object.Type() }
-func (t *Type) Token() token.Token                   { return token.TYPE }
-func (t *Type) Object() types.Object                 { return t.object }
-func (t *Type) String() string                       { return t.RelString(nil) }
-func (t *Type) Package() *Package                    { return t.pkg }
-func (t *Type) RelString(from *types.Package) string { return relString(t, from) }
+func (t *SSAType) Name() string                         { return t.object.Name() }
+func (t *SSAType) Pos() syntax.Pos                      { return t.object.Pos() }
+func (t *SSAType) Type() types.Type                     { return t.object.Type() }
+func (t *SSAType) Token() token.Token                   { return token.TYPE }
+func (t *SSAType) Object() types.Object                 { return t.object }
+func (t *SSAType) String() string                       { return t.RelString(nil) }
+func (t *SSAType) Package() *SSAPackage                 { return t.pkg }
+func (t *SSAType) RelString(from *types.Package) string { return relString(t, from) }
 
 func (c *NamedConst) Name() string                         { return c.object.Name() }
 func (c *NamedConst) Pos() syntax.Pos                      { return c.object.Pos() }
@@ -1487,7 +1487,7 @@ func (c *NamedConst) String() string                       { return c.RelString(
 func (c *NamedConst) Type() types.Type                     { return c.object.Type() }
 func (c *NamedConst) Token() token.Token                   { return token.CONST }
 func (c *NamedConst) Object() types.Object                 { return c.object }
-func (c *NamedConst) Package() *Package                    { return c.pkg }
+func (c *NamedConst) Package() *SSAPackage                 { return c.pkg }
 func (c *NamedConst) RelString(from *types.Package) string { return relString(c, from) }
 
 func (d *DebugRef) Object() types.Object { return d.object }
@@ -1495,7 +1495,7 @@ func (d *DebugRef) Object() types.Object { return d.object }
 // Func returns the package-level function of the specified name,
 // or nil if not found.
 //
-func (p *Package) Func(name string) (f *Function) {
+func (p *SSAPackage) Func(name string) (f *Function) {
 	f, _ = p.Members[name].(*Function)
 	return
 }
@@ -1503,7 +1503,7 @@ func (p *Package) Func(name string) (f *Function) {
 // Var returns the package-level variable of the specified name,
 // or nil if not found.
 //
-func (p *Package) Var(name string) (g *Global) {
+func (p *SSAPackage) Var(name string) (g *Global) {
 	g, _ = p.Members[name].(*Global)
 	return
 }
@@ -1511,7 +1511,7 @@ func (p *Package) Var(name string) (g *Global) {
 // Const returns the package-level constant of the specified name,
 // or nil if not found.
 //
-func (p *Package) Const(name string) (c *NamedConst) {
+func (p *SSAPackage) Const(name string) (c *NamedConst) {
 	c, _ = p.Members[name].(*NamedConst)
 	return
 }
@@ -1519,14 +1519,14 @@ func (p *Package) Const(name string) (c *NamedConst) {
 // Type returns the package-level type of the specified name,
 // or nil if not found.
 //
-func (p *Package) Type(name string) (t *Type) {
-	t, _ = p.Members[name].(*Type)
+func (p *SSAPackage) Type(name string) (t *SSAType) {
+	t, _ = p.Members[name].(*SSAType)
 	return
 }
 
 func (v *Call) Pos() syntax.Pos      { return v.Call.pos }
-func (s *Defer) Pos() syntax.Pos     { return s.pos }
-func (s *Go) Pos() syntax.Pos        { return s.pos }
+func (s *SSADefer) Pos() syntax.Pos  { return s.pos }
+func (s *SSAGo) Pos() syntax.Pos     { return s.pos }
 func (s *MapUpdate) Pos() syntax.Pos { return s.pos }
 func (s *Panic) Pos() syntax.Pos     { return s.pos }
 func (s *Return) Pos() syntax.Pos    { return s.pos }
@@ -1555,7 +1555,7 @@ func (c *CallCommon) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-func (s *Go) Operands(rands []*Value) []*Value {
+func (s *SSAGo) Operands(rands []*Value) []*Value {
 	return s.Call.Operands(rands)
 }
 
@@ -1563,7 +1563,7 @@ func (s *Call) Operands(rands []*Value) []*Value {
 	return s.Call.Operands(rands)
 }
 
-func (s *Defer) Operands(rands []*Value) []*Value {
+func (s *SSADefer) Operands(rands []*Value) []*Value {
 	return s.Call.Operands(rands)
 }
 
@@ -1591,7 +1591,7 @@ func (v *Extract) Operands(rands []*Value) []*Value {
 	return append(rands, &v.Tuple)
 }
 
-func (v *Field) Operands(rands []*Value) []*Value {
+func (v *SSAField) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X)
 }
 
@@ -1688,7 +1688,7 @@ func (s *Send) Operands(rands []*Value) []*Value {
 	return append(rands, &s.Chan, &s.X)
 }
 
-func (v *Slice) Operands(rands []*Value) []*Value {
+func (v *SSASlice) Operands(rands []*Value) []*Value {
 	return append(rands, &v.X, &v.Low, &v.High, &v.Max)
 }
 
@@ -1705,9 +1705,9 @@ func (v *UnOp) Operands(rands []*Value) []*Value {
 }
 
 // Non-Instruction Values:
-func (v *Builtin) Operands(rands []*Value) []*Value   { return rands }
-func (v *FreeVar) Operands(rands []*Value) []*Value   { return rands }
-func (v *Const) Operands(rands []*Value) []*Value     { return rands }
-func (v *Function) Operands(rands []*Value) []*Value  { return rands }
-func (v *Global) Operands(rands []*Value) []*Value    { return rands }
-func (v *Parameter) Operands(rands []*Value) []*Value { return rands }
+func (v *SSABuiltin) Operands(rands []*Value) []*Value { return rands }
+func (v *FreeVar) Operands(rands []*Value) []*Value    { return rands }
+func (v *SSAConst) Operands(rands []*Value) []*Value   { return rands }
+func (v *Function) Operands(rands []*Value) []*Value   { return rands }
+func (v *Global) Operands(rands []*Value) []*Value     { return rands }
+func (v *Parameter) Operands(rands []*Value) []*Value  { return rands }

@@ -30,7 +30,7 @@ import (
 //
 // Deprecated: Use golang.org/x/tools/go/packages to access synthetic
 // testmain packages.
-func FindTests(pkg *Package) (tests, benchmarks, examples []*Function, main *Function) {
+func FindTests(pkg *SSAPackage) (tests, benchmarks, examples []*Function, main *Function) {
 	prog := pkg.Prog
 
 	// The first two of these may be nil: if the program doesn't import "testing",
@@ -116,14 +116,14 @@ func isTest(name, prefix string) bool {
 //
 // Deprecated: Use golang.org/x/tools/go/packages to access synthetic
 // testmain packages.
-func (prog *Program) CreateTestMainPackage(pkg *Package) *Package {
+func (prog *Program) CreateTestMainPackage(pkg *SSAPackage) *SSAPackage {
 	if pkg.Prog != prog {
 		log.Fatal("Package does not belong to Program")
 	}
 
 	// Template data
 	var data struct {
-		Pkg                         *Package
+		Pkg                         *SSAPackage
 		Tests, Benchmarks, Examples []*Function
 		Main                        *Function
 		Go18                        bool
@@ -197,7 +197,7 @@ func (prog *Program) CreateTestMainPackage(pkg *Package) *Package {
 
 // An implementation of types.Importer for an already loaded SSA program.
 type importer struct {
-	pkg *Package // package under test; may be non-importable
+	pkg *SSAPackage // package under test; may be non-importable
 }
 
 func (imp importer) Import(path, srcDir string) (*types.Package, error) {

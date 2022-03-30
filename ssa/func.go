@@ -376,7 +376,7 @@ func (f *Function) removeNilBlocks() {
 // size of the instruction stream, and causes Functions to depend upon
 // the ASTs, potentially keeping them live in memory for longer.
 //
-func (pkg *Package) SetDebugMode(debug bool) {
+func (pkg *SSAPackage) SetDebugMode(debug bool) {
 	// TODO(adonovan): do we want syntax.File granularity?
 	pkg.debug = debug
 }

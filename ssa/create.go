@@ -22,8 +22,8 @@ import (
 //
 func NewProgram(mode BuilderMode) *Program {
 	prog := &Program{
-		imported: make(map[string]*Package),
-		packages: make(map[*types.Package]*Package),
+		imported: make(map[string]*SSAPackage),
+		packages: make(map[*types.Package]*SSAPackage),
 		thunks:   make(map[selectionKey]*Function),
 		bounds:   make(map[*types.Func]*Function),
 		mode:     mode,
@@ -43,7 +43,7 @@ func NewProgram(mode BuilderMode) *Program {
 // tree (for funcs and vars only); it will be used during the build
 // phase.
 //
-func memberFromObject(pkg *Package, obj types.Object, syntax syntax.Node) {
+func memberFromObject(pkg *SSAPackage, obj types.Object, syntax syntax.Node) {
 	name := obj.Name()
 	switch obj := obj.(type) {
 	case *types.Builtin:
@@ -52,7 +52,7 @@ func memberFromObject(pkg *Package, obj types.Object, syntax syntax.Node) {
 		}
 
 	case *types.TypeName:
-		pkg.Members[name] = &Type{
+		pkg.Members[name] = &SSAType{
 			object: obj,
 			pkg:    pkg,
 		}
@@ -60,7 +60,7 @@ func memberFromObject(pkg *Package, obj types.Object, syntax syntax.Node) {
 	case *types.Const:
 		c := &NamedConst{
 			object: obj,
-			Value:  NewConst(obj.Val(), obj.Type()),
+			Value:  NewSSAConst(obj.Val(), obj.Type()),
 			pkg:    pkg,
 		}
 		pkg.values[obj] = c.Value
@@ -110,7 +110,7 @@ func memberFromObject(pkg *Package, obj types.Object, syntax syntax.Node) {
 // typechecker object (var, func, const or type) associated with the
 // specified decl.
 //
-func membersFromDecl(pkg *Package, decl syntax.Decl) {
+func membersFromDecl(pkg *SSAPackage, decl syntax.Decl) {
 	switch decl := decl.(type) {
 	case *syntax.GenDecl:
 		for _, spec := range decl.SpecList {
@@ -155,8 +155,8 @@ func membersFromDecl(pkg *Package, decl syntax.Decl) {
 // The real work of building SSA form for each function is not done
 // until a subsequent call to Package.Build().
 //
-func (prog *Program) CreatePackage(pkg *types.Package, files []*syntax.File, info *types.Info, importable bool) *Package {
-	p := &Package{
+func (prog *Program) CreatePackage(pkg *types.Package, files []*syntax.File, info *types.Info, importable bool) *SSAPackage {
+	p := &SSAPackage{
 		Prog:    prog,
 		Members: make(map[string]Member),
 		values:  make(map[types.Object]Value),
@@ -236,8 +236,8 @@ var printMu sync.Mutex
 // AllPackages returns a new slice containing all packages in the
 // program prog in unspecified order.
 //
-func (prog *Program) AllPackages() []*Package {
-	pkgs := make([]*Package, 0, len(prog.packages))
+func (prog *Program) AllPackages() []*SSAPackage {
+	pkgs := make([]*SSAPackage, 0, len(prog.packages))
 	for _, pkg := range prog.packages {
 		pkgs = append(pkgs, pkg)
 	}
@@ -258,6 +258,6 @@ func (prog *Program) AllPackages() []*Package {
 // Clients should use (*Program).Package instead where possible.
 // SSA doesn't really need a string-keyed map of packages.
 //
-func (prog *Program) ImportedPackage(path string) *Package {
+func (prog *Program) ImportedPackage(path string) *SSAPackage {
 	return prog.imported[path]
 }

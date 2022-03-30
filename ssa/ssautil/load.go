@@ -33,7 +33,7 @@ import (
 //
 // The mode parameter controls diagnostics and checking during SSA construction.
 //
-func Packages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, []*ssa.Package) {
+func Packages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, []*ssa.SSAPackage) {
 	return doPackages(initial, mode, false)
 }
 
@@ -55,11 +55,11 @@ func Packages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, 
 //
 // The mode parameter controls diagnostics and checking during SSA construction.
 //
-func AllPackages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, []*ssa.Package) {
+func AllPackages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, []*ssa.SSAPackage) {
 	return doPackages(initial, mode, true)
 }
 
-func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*ssa.Program, []*ssa.Package) {
+func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*ssa.Program, []*ssa.SSAPackage) {
 
 	prog := ssa.NewProgram(mode)
 
@@ -68,7 +68,7 @@ func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*
 		isInitial[p] = true
 	}
 
-	ssamap := make(map[*packages.Package]*ssa.Package)
+	ssamap := make(map[*packages.Package]*ssa.SSAPackage)
 	packages.Visit(initial, nil, func(p *packages.Package) {
 		panic("TODO: need to manually parse and type check packages ourselves")
 		/*
@@ -82,7 +82,7 @@ func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*
 		*/
 	})
 
-	var ssapkgs []*ssa.Package
+	var ssapkgs []*ssa.SSAPackage
 	for _, p := range initial {
 		ssapkgs = append(ssapkgs, ssamap[p]) // may be nil
 	}
@@ -128,7 +128,7 @@ func CreateProgram(lprog *loader.Program, mode ssa.BuilderMode) *ssa.Program {
 //
 // See ../example_test.go for an example.
 //
-func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mode ssa.BuilderMode) (*ssa.Package, *types.Info, error) {
+func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mode ssa.BuilderMode) (*ssa.SSAPackage, *types.Info, error) {
 	if pkg.Path() == "" {
 		panic("package has no import path")
 	}

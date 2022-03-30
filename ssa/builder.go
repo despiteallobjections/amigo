@@ -64,7 +64,7 @@ var (
 	// SSA Value constants.
 	vZero = intConst(0)
 	vOne  = intConst(1)
-	vTrue = NewConst(constant.MakeBool(true), tBool)
+	vTrue = NewSSAConst(constant.MakeBool(true), tBool)
 )
 
 // builder holds state associated with the package currently being built.
@@ -133,11 +133,11 @@ func (b *builder) logicalBinop(fn *Function, e *syntax.Operation) Value {
 	switch e.Op {
 	case syntax.AndAnd:
 		b.cond(fn, e.X, rhs, done)
-		short = NewConst(constant.MakeBool(false), t)
+		short = NewSSAConst(constant.MakeBool(false), t)
 
 	case syntax.OrOr:
 		b.cond(fn, e.X, done, rhs)
-		short = NewConst(constant.MakeBool(true), t)
+		short = NewSSAConst(constant.MakeBool(true), t)
 	}
 
 	// Is rhs unreachable?
@@ -241,13 +241,13 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []syntax.Expr, 
 			if len(args) == 3 {
 				m = b.expr(fn, args[2])
 			}
-			if m, ok := m.(*Const); ok {
+			if m, ok := m.(*SSAConst); ok {
 				// treat make([]T, n, m) as new([m]T)[:n]
 				cap := m.Int64()
 				at := types.NewArray(typ.Underlying().(*types.Slice).Elem(), cap)
 				alloc := emitNew(fn, at, pos)
 				alloc.Comment = "makeslice"
-				v := &Slice{
+				v := &SSASlice{
 					X:    alloc,
 					High: n,
 				}
@@ -519,7 +519,7 @@ func (b *builder) expr(fn *Function, e syntax.Expr) Value {
 
 	// Is expression a constant?
 	if tv.Value != nil {
-		return NewConst(tv.Value, tv.Type)
+		return NewSSAConst(tv.Value, tv.Type)
 	}
 
 	var v Value
@@ -670,7 +670,7 @@ func (b *builder) expr0(fn *Function, e syntax.Expr, tv types.TypeAndValue) Valu
 		if e.Index[2] != nil {
 			max = b.expr(fn, e.Index[2])
 		}
-		v := &Slice{
+		v := &SSASlice{
 			X:    x,
 			Low:  low,
 			High: high,
@@ -685,7 +685,7 @@ func (b *builder) expr0(fn *Function, e syntax.Expr, tv types.TypeAndValue) Valu
 		// Universal built-in or nil?
 		switch obj := obj.(type) {
 		case *types.Builtin:
-			return &Builtin{name: obj.Name(), sig: tv.Type.(*types.Signature)}
+			return &SSABuiltin{name: obj.Name(), sig: tv.Type.(*types.Signature)}
 		case *types.Nil:
 			return nilConst(tv.Type)
 		}
@@ -704,7 +704,7 @@ func (b *builder) expr0(fn *Function, e syntax.Expr, tv types.TypeAndValue) Valu
 		if !ok {
 			// builtin unsafe.{Add,Slice}
 			if obj, ok := fn.Pkg.info.Uses[e.Sel].(*types.Builtin); ok {
-				return &Builtin{name: obj.Name(), sig: tv.Type.(*types.Signature)}
+				return &SSABuiltin{name: obj.Name(), sig: tv.Type.(*types.Signature)}
 			}
 			// qualified identifier
 			return b.expr(fn, e.Sel)
@@ -958,7 +958,7 @@ func (b *builder) emitCallArgs(fn *Function, sig *types.Signature, e *syntax.Cal
 				fn.emit(iaddr)
 				emitStore(fn, iaddr, arg, arg.Pos())
 			}
-			s := &Slice{X: a}
+			s := &SSASlice{X: a}
 			s.setType(st)
 			args[offset+np] = fn.emit(s)
 			args = args[:offset+np+1]
@@ -1081,7 +1081,7 @@ func (b *builder) arrayLen(fn *Function, elts []syntax.Expr) int64 {
 	var i int64 = -1
 	for _, e := range elts {
 		if kv, ok := e.(*syntax.KeyValueExpr); ok {
-			i = b.expr(fn, kv.Key).(*Const).Int64()
+			i = b.expr(fn, kv.Key).(*SSAConst).Int64()
 		} else {
 			i++
 		}
@@ -1166,11 +1166,11 @@ func (b *builder) compLit(fn *Function, addr Value, e *syntax.CompositeLit, isZe
 			}
 		}
 
-		var idx *Const
+		var idx *SSAConst
 		for _, e := range e.ElemList {
 			pos := e.Pos()
 			if kv, ok := e.(*syntax.KeyValueExpr); ok {
-				idx = b.expr(fn, kv.Key).(*Const)
+				idx = b.expr(fn, kv.Key).(*SSAConst)
 				pos = kv.Pos() /*Colon*/
 				e = kv.Value
 			} else {
@@ -1195,7 +1195,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *syntax.CompositeLit, isZe
 		}
 
 		if t != at { // slice
-			s := &Slice{X: array}
+			s := &SSASlice{X: array}
 			s.setPos(e.Pos() /*Lbrace*/)
 			s.setType(typ)
 			sb.store(&address{addr: addr, pos: e.Pos() /*Lbrace*/, expr: e}, fn.emit(s))
@@ -2011,7 +2011,7 @@ start:
 	case *syntax.AssignStmt:
 		if s.Rhs == nil { // IncDecStmt
 			loc := b.addr(fn, s.Lhs, false)
-			b.assignOp(fn, loc, NewConst(constant.MakeInt64(1), loc.typ()), s.Op, s.Pos())
+			b.assignOp(fn, loc, NewSSAConst(constant.MakeInt64(1), loc.typ()), s.Op, s.Pos())
 		} else { // AssignStmt
 			switch s.Op {
 			case 0, syntax.Def:
@@ -2026,14 +2026,14 @@ start:
 		case syntax.Go:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
-			v := Go{pos: s.Pos() /*Go*/}
+			v := SSAGo{pos: s.Pos() /*Go*/}
 			b.setCall(fn, s.Call, &v.Call)
 			fn.emit(&v)
 
 		case syntax.Defer:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
-			v := Defer{pos: s.Pos() /*Defer*/}
+			v := SSADefer{pos: s.Pos() /*Defer*/}
 			b.setCall(fn, s.Call, &v.Call)
 			fn.emit(&v)
 
@@ -2229,7 +2229,7 @@ func (b *builder) buildFunction(fn *Function) {
 // buildFuncDecl builds SSA code for the function or method declared
 // by decl in package pkg.
 //
-func (b *builder) buildFuncDecl(pkg *Package, decl *syntax.FuncDecl) {
+func (b *builder) buildFuncDecl(pkg *SSAPackage, decl *syntax.FuncDecl) {
 	id := decl.Name
 	if isBlankIdent(id) {
 		return // discard
@@ -2259,7 +2259,7 @@ func (prog *Program) Build() {
 			p.Build()
 		} else {
 			wg.Add(1)
-			go func(p *Package) {
+			go func(p *SSAPackage) {
 				p.Build()
 				wg.Done()
 			}(p)
@@ -2276,9 +2276,9 @@ func (prog *Program) Build() {
 //
 // Build is idempotent and thread-safe.
 //
-func (p *Package) Build() { p.buildOnce.Do(p.build) }
+func (p *SSAPackage) Build() { p.buildOnce.Do(p.build) }
 
-func (p *Package) build() {
+func (p *SSAPackage) build() {
 	if p.info == nil {
 		return // synthetic package, e.g. "testmain"
 	}
@@ -2379,7 +2379,7 @@ func (p *Package) build() {
 
 // Like ObjectOf, but panics instead of returning nil.
 // Only valid during p's create and build phases.
-func (p *Package) objectOf(id *syntax.Name) types.Object {
+func (p *SSAPackage) objectOf(id *syntax.Name) types.Object {
 	if o := p.info.ObjectOf(id); o != nil {
 		return o
 	}
@@ -2389,7 +2389,7 @@ func (p *Package) objectOf(id *syntax.Name) types.Object {
 
 // Like TypeOf, but panics instead of returning nil.
 // Only valid during p's create and build phases.
-func (p *Package) typeOf(e syntax.Expr) types.Type {
+func (p *SSAPackage) typeOf(e syntax.Expr) types.Type {
 	if T := p.info.TypeOf(e); T != nil {
 		return T
 	}

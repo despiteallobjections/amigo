@@ -68,8 +68,8 @@ func (visit *visitor) function(fn *ssa.Function) {
 // MainPackages returns the subset of the specified packages
 // named "main" that define a main function.
 // The result may include synthetic "testmain" packages.
-func MainPackages(pkgs []*ssa.Package) []*ssa.Package {
-	var mains []*ssa.Package
+func MainPackages(pkgs []*ssa.SSAPackage) []*ssa.SSAPackage {
+	var mains []*ssa.SSAPackage
 	for _, pkg := range pkgs {
 		if pkg.Pkg.Name() == "main" && pkg.Func("main") != nil {
 			mains = append(mains, pkg)

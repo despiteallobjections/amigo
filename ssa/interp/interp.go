@@ -80,7 +80,7 @@ type interpreter struct {
 	prog               *ssa.Program         // the SSA program
 	globals            map[ssa.Value]*value // addresses of global variables (immutable)
 	mode               Mode                 // interpreter options
-	reflectPackage     *ssa.Package         // the fake reflect package
+	reflectPackage     *ssa.SSAPackage      // the fake reflect package
 	errorMethods       methodSet            // the method set of reflect.error, which implements the error interface.
 	rtypeMethods       methodSet            // the method set of rtype, which implements the reflect.Type interface.
 	runtimeErrorString types.Type           // the runtime.errorString type
@@ -91,7 +91,7 @@ type interpreter struct {
 type deferred struct {
 	fn    value
 	args  []value
-	instr *ssa.Defer
+	instr *ssa.SSADefer
 	tail  *deferred
 }
 
@@ -114,9 +114,9 @@ func (fr *frame) get(key ssa.Value) value {
 		// Hack; simplifies handling of optional attributes
 		// such as ssa.Slice.{Low,High}.
 		return nil
-	case *ssa.Function, *ssa.Builtin:
+	case *ssa.Function, *ssa.SSABuiltin:
 		return key
-	case *ssa.Const:
+	case *ssa.SSAConst:
 		return constValue(key)
 	case *ssa.Global:
 		if r, ok := fr.i.globals[key]; ok {
@@ -218,7 +218,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 	case *ssa.Extract:
 		fr.env[instr] = fr.get(instr.Tuple).(tuple)[instr.Index]
 
-	case *ssa.Slice:
+	case *ssa.SSASlice:
 		fr.env[instr] = slice(fr.get(instr.X), fr.get(instr.Low), fr.get(instr.High), fr.get(instr.Max))
 
 	case *ssa.Return:
@@ -260,7 +260,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		fr.prevBlock, fr.block = fr.block, fr.block.Succs[0]
 		return kJump
 
-	case *ssa.Defer:
+	case *ssa.SSADefer:
 		fn, args := prepareCall(fr, &instr.Call)
 		fr.defers = &deferred{
 			fn:    fn,
@@ -269,7 +269,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			tail:  fr.defers,
 		}
 
-	case *ssa.Go:
+	case *ssa.SSAGo:
 		fn, args := prepareCall(fr, &instr.Call)
 		atomic.AddInt32(&fr.i.goroutines, 1)
 		go func() {
@@ -316,7 +316,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 	case *ssa.FieldAddr:
 		fr.env[instr] = &(*fr.get(instr.X).(*value)).(structure)[instr.Field]
 
-	case *ssa.Field:
+	case *ssa.SSAField:
 		fr.env[instr] = fr.get(instr.X).(structure)[instr.Field]
 
 	case *ssa.IndexAddr:
@@ -464,7 +464,7 @@ func call(i *interpreter, caller *frame, callpos syntax.Pos, fn value, args []va
 		return callSSA(i, caller, callpos, fn, args, nil)
 	case *closure:
 		return callSSA(i, caller, callpos, fn.Fn, args, fn.Env)
-	case *ssa.Builtin:
+	case *ssa.SSABuiltin:
 		return callBuiltin(caller, callpos, fn, args)
 	}
 	panic(fmt.Sprintf("cannot call %T", fn))
@@ -621,7 +621,7 @@ func doRecover(caller *frame) value {
 }
 
 // setGlobal sets the value of a system-initialized global variable.
-func setGlobal(i *interpreter, pkg *ssa.Package, name string, v value) {
+func setGlobal(i *interpreter, pkg *ssa.SSAPackage, name string, v value) {
 	if g, ok := i.globals[pkg.Var(name)]; ok {
 		*g = v
 		return
@@ -639,7 +639,7 @@ func setGlobal(i *interpreter, pkg *ssa.Package, name string, v value) {
 //
 // The SSA program must include the "runtime" package.
 //
-func Interpret(mainpkg *ssa.Package, mode Mode, sizes types.Sizes, filename string, args []string) (exitCode int) {
+func Interpret(mainpkg *ssa.SSAPackage, mode Mode, sizes types.Sizes, filename string, args []string) (exitCode int) {
 	i := &interpreter{
 		prog:       mainpkg.Prog,
 		globals:    make(map[ssa.Value]*value),

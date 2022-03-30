@@ -32,7 +32,7 @@ import (
 type ConstCase struct {
 	Block *ssa.BasicBlock // block performing the comparison
 	Body  *ssa.BasicBlock // body of the case
-	Value *ssa.Const      // case comparand
+	Value *ssa.SSAConst   // case comparand
 }
 
 // A TypeCase represents a single type assertion.
@@ -131,7 +131,7 @@ func Switches(fn *ssa.Function) []Switch {
 	return switches
 }
 
-func valueSwitch(sw *Switch, k *ssa.Const, seen map[*ssa.BasicBlock]bool) {
+func valueSwitch(sw *Switch, k *ssa.SSAConst, seen map[*ssa.BasicBlock]bool) {
 	b := sw.Start
 	x := sw.X
 	for x == sw.X {
@@ -198,14 +198,14 @@ func typeSwitch(sw *Switch, y ssa.Value, T types.Type, seen map[*ssa.BasicBlock]
 // isComparisonBlock returns the operands (v, k) if a block ends with
 // a comparison v==k, where k is a compile-time constant.
 //
-func isComparisonBlock(b *ssa.BasicBlock) (v ssa.Value, k *ssa.Const) {
+func isComparisonBlock(b *ssa.BasicBlock) (v ssa.Value, k *ssa.SSAConst) {
 	if n := len(b.Instrs); n >= 2 {
 		if i, ok := b.Instrs[n-1].(*ssa.If); ok {
 			if binop, ok := i.Cond.(*ssa.BinOp); ok && binop.Block() == b && binop.Op == syntax.Eql {
-				if k, ok := binop.Y.(*ssa.Const); ok {
+				if k, ok := binop.Y.(*ssa.SSAConst); ok {
 					return binop.X, k
 				}
-				if k, ok := binop.X.(*ssa.Const); ok {
+				if k, ok := binop.X.(*ssa.SSAConst); ok {
 					return binop.Y, k
 				}
 			}

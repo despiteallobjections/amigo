@@ -196,7 +196,7 @@ func lift(fn *Function) {
 					numAllocs++
 				}
 				instr.index = index
-			case *Defer:
+			case *SSADefer:
 				usesDefer = true
 			case *RunDefers:
 				b.rundefers++

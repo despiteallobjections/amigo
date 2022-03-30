@@ -76,9 +76,9 @@ func anonVar(typ types.Type) *types.Var {
 var lenResults = types.NewTuple(anonVar(tInt))
 
 // makeLen returns the len builtin specialized to type func(T)int.
-func makeLen(T types.Type) *Builtin {
+func makeLen(T types.Type) *SSABuiltin {
 	lenParams := types.NewTuple(anonVar(T))
-	return &Builtin{
+	return &SSABuiltin{
 		name: "len",
 		sig:  types.NewSignatureType(nil, nil, nil, lenParams, lenResults, false),
 	}
