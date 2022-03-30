@@ -6,13 +6,13 @@ package typeutil
 
 import (
 	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // Callee returns the named target of a function call, if any:
 // a function, method, builtin, or variable.
-func Callee(info *types.Info, call *syntax.CallExpr) types.Object {
-	var obj types.Object
+func Callee(info *Info, call *syntax.CallExpr) Object {
+	var obj Object
 	switch fun := syntax.Unparen(call.Fun).(type) {
 	case *syntax.Name:
 		obj = info.Uses[fun] // type, var, builtin, or declared func
@@ -23,7 +23,7 @@ func Callee(info *types.Info, call *syntax.CallExpr) types.Object {
 			obj = info.Uses[fun.Sel] // qualified identifier?
 		}
 	}
-	if _, ok := obj.(*types.TypeName); ok {
+	if _, ok := obj.(*TypeName); ok {
 		return nil // T(x) is a conversion, not a call
 	}
 	return obj
@@ -31,14 +31,14 @@ func Callee(info *types.Info, call *syntax.CallExpr) types.Object {
 
 // StaticCallee returns the target (function or method) of a static
 // function call, if any. It returns nil for calls to builtins.
-func StaticCallee(info *types.Info, call *syntax.CallExpr) *types.Func {
-	if f, ok := Callee(info, call).(*types.Func); ok && !interfaceMethod(f) {
+func StaticCallee(info *Info, call *syntax.CallExpr) *Func {
+	if f, ok := Callee(info, call).(*Func); ok && !interfaceMethod(f) {
 		return f
 	}
 	return nil
 }
 
-func interfaceMethod(f *types.Func) bool {
-	recv := f.Type().(*types.Signature).Recv()
-	return recv != nil && types.IsInterface(recv.Type())
+func interfaceMethod(f *Func) bool {
+	recv := f.Type().(*Signature).Recv()
+	return recv != nil && IsInterface(recv.Type())
 }

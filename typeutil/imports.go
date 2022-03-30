@@ -4,7 +4,7 @@
 
 package typeutil
 
-import "github.com/mdempsky/amigo/types"
+import . "github.com/mdempsky/amigo/types"
 
 // Dependencies returns all dependencies of the specified packages.
 //
@@ -13,11 +13,11 @@ import "github.com/mdempsky/amigo/types"
 // The algorithm follows import statements in the order they
 // appear in the source code, so the result is a total order.
 //
-func Dependencies(pkgs ...*types.Package) []*types.Package {
-	var result []*types.Package
-	seen := make(map[*types.Package]bool)
-	var visit func(pkgs []*types.Package)
-	visit = func(pkgs []*types.Package) {
+func Dependencies(pkgs ...*Package) []*Package {
+	var result []*Package
+	seen := make(map[*Package]bool)
+	var visit func(pkgs []*Package)
+	visit = func(pkgs []*Package) {
 		for _, p := range pkgs {
 			if !seen[p] {
 				seen[p] = true

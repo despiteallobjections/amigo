@@ -6,7 +6,7 @@ package typeutil
 
 // This file defines utilities for user interfaces that display types.
 
-import "github.com/mdempsky/amigo/types"
+import . "github.com/mdempsky/amigo/types"
 
 // IntuitiveMethodSet returns the intuitive method set of a type T,
 // which is the set of methods you can call on an addressable value of
@@ -23,22 +23,22 @@ import "github.com/mdempsky/amigo/types"
 //
 // The order of the result is as for types.MethodSet(T).
 //
-func IntuitiveMethodSet(T types.Type, msets *MethodSetCache) []*types.Selection {
-	isPointerToConcrete := func(T types.Type) bool {
-		ptr, ok := T.(*types.Pointer)
-		return ok && !types.IsInterface(ptr.Elem())
+func IntuitiveMethodSet(T Type, msets *MethodSetCache) []*Selection {
+	isPointerToConcrete := func(T Type) bool {
+		ptr, ok := T.(*Pointer)
+		return ok && !IsInterface(ptr.Elem())
 	}
 
-	var result []*types.Selection
+	var result []*Selection
 	mset := msets.MethodSet(T)
-	if types.IsInterface(T) || isPointerToConcrete(T) {
+	if IsInterface(T) || isPointerToConcrete(T) {
 		for i, n := 0, mset.Len(); i < n; i++ {
 			result = append(result, mset.At(i))
 		}
 	} else {
 		// T is some other concrete type.
 		// Report methods of T and *T, preferring those of T.
-		pmset := msets.MethodSet(types.NewPointer(T))
+		pmset := msets.MethodSet(NewPointer(T))
 		for i, n := 0, pmset.Len(); i < n; i++ {
 			meth := pmset.At(i)
 			if m := mset.Lookup(meth.Obj().Pkg(), meth.Obj().Name()); m != nil {

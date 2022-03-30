@@ -12,21 +12,21 @@ package typeutil_test
 import (
 	"testing"
 
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 	"github.com/mdempsky/amigo/typeutil"
 )
 
 var (
-	tStr      = types.Typ[types.String]             // string
-	tPStr1    = types.NewPointer(tStr)              // *string
-	tPStr2    = types.NewPointer(tStr)              // *string, again
-	tInt      = types.Typ[types.Int]                // int
-	tChanInt1 = types.NewChan(types.RecvOnly, tInt) // <-chan int
-	tChanInt2 = types.NewChan(types.RecvOnly, tInt) // <-chan int, again
+	tStr      = Typ[String]             // string
+	tPStr1    = NewPointer(tStr)        // *string
+	tPStr2    = NewPointer(tStr)        // *string, again
+	tInt      = Typ[Int]                // int
+	tChanInt1 = NewChan(RecvOnly, tInt) // <-chan int
+	tChanInt2 = NewChan(RecvOnly, tInt) // <-chan int, again
 )
 
-func checkEqualButNotIdentical(t *testing.T, x, y types.Type, comment string) {
-	if !types.Identical(x, y) {
+func checkEqualButNotIdentical(t *testing.T, x, y Type, comment string) {
+	if !Identical(x, y) {
 		t.Errorf("%s: not equal: %s, %s", comment, x, y)
 	}
 	if x == y {
@@ -83,7 +83,7 @@ func TestMap(t *testing.T) {
 		t.Errorf("At(): got %q, want \"*string\"", v)
 	}
 	// Iteration over sole entry.
-	tmap.Iterate(func(key types.Type, value interface{}) {
+	tmap.Iterate(func(key Type, value interface{}) {
 		if key != tPStr1 {
 			t.Errorf("Iterate: key: got %s, want %s", key, tPStr1)
 		}
@@ -117,7 +117,7 @@ func TestMap(t *testing.T) {
 	}
 
 	// Keys().
-	I := types.Identical
+	I := Identical
 	switch k := tmap.Keys(); {
 	case I(k[0], tChanInt1) && I(k[1], tPStr1): // ok
 	case I(k[1], tChanInt1) && I(k[0], tPStr1): // ok
@@ -133,7 +133,7 @@ func TestMap(t *testing.T) {
 		t.Errorf("At(): got %q, want \"*string again\"", v)
 	}
 	hamming := 1
-	tmap.Iterate(func(key types.Type, value interface{}) {
+	tmap.Iterate(func(key Type, value interface{}) {
 		switch {
 		case I(key, tChanInt1):
 			hamming *= 2 // ok

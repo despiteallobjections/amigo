@@ -9,17 +9,17 @@ import (
 	"testing"
 
 	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 	"github.com/mdempsky/amigo/typeutil"
 )
 
-type closure map[string]*types.Package
+type closure map[string]*Package
 
-func (c closure) Import(path, srcDir string) (*types.Package, error) { return c[path], nil }
+func (c closure) Import(path, srcDir string) (*Package, error) { return c[path], nil }
 
 func TestDependencies(t *testing.T) {
-	packages := make(map[string]*types.Package)
-	conf := types.Config{
+	packages := make(map[string]*Package)
+	conf := Config{
 		Importer: closure(packages),
 	}
 
@@ -62,7 +62,7 @@ func TestDependencies(t *testing.T) {
 		{"ed", "acebd"},
 		{"ef", "acebdf"},
 	} {
-		var pkgs []*types.Package
+		var pkgs []*Package
 		for _, r := range test.roots {
 			pkgs = append(pkgs, packages[string(r)])
 		}

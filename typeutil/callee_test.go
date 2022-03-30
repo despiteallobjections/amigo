@@ -11,7 +11,7 @@ import (
 
 	"github.com/mdempsky/amigo/srcimporter"
 	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 	"github.com/mdempsky/amigo/typeutil"
 )
 
@@ -57,11 +57,11 @@ func noncalls() {
 	}
 
 	// type-check
-	info := &types.Info{
-		Uses:       make(map[*syntax.Name]types.Object),
-		Selections: make(map[*syntax.SelectorExpr]*types.Selection),
+	info := &Info{
+		Uses:       make(map[*syntax.Name]Object),
+		Selections: make(map[*syntax.SelectorExpr]*Selection),
 	}
-	cfg := &types.Config{Importer: srcimporter.New(&build.Default, map[string]*types.Package{})}
+	cfg := &Config{Importer: srcimporter.New(&build.Default, map[string]*Package{})}
 	if _, err := cfg.Check("p", []*syntax.File{f}, info); err != nil {
 		t.Fatal(err)
 	}

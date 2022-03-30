@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 	"github.com/mdempsky/amigo/typeutil"
 )
 
@@ -27,12 +27,12 @@ func (*A) g()
 		t.Fatal(err)
 	}
 
-	var conf types.Config
+	var conf Config
 	pkg, err := conf.Check("P", []*syntax.File{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	qual := types.RelativeTo(pkg)
+	qual := RelativeTo(pkg)
 
 	for _, test := range []struct {
 		expr string // type expression
@@ -45,13 +45,13 @@ func (*A) g()
 		{"struct{A}", "(struct{A}).f (*struct{A}).g"},
 		{"*struct{A}", "(*struct{A}).f (*struct{A}).g"},
 	} {
-		tv, err := types.Eval(pkg, syntax.NoPos, test.expr)
+		tv, err := Eval(pkg, syntax.NoPos, test.expr)
 		if err != nil {
 			t.Errorf("Eval(%s) failed: %v", test.expr, err)
 		}
 		var names []string
 		for _, m := range typeutil.IntuitiveMethodSet(tv.Type, nil) {
-			name := fmt.Sprintf("(%s).%s", types.TypeString(m.Recv(), qual), m.Obj().Name())
+			name := fmt.Sprintf("(%s).%s", TypeString(m.Recv(), qual), m.Obj().Name())
 			names = append(names, name)
 		}
 		got := strings.Join(names, " ")

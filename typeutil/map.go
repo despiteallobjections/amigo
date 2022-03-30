@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // TypeMap is a hash-table-based mapping from types (types.Type) to
@@ -32,7 +32,7 @@ type TypeMap struct {
 
 // entry is an entry (key/value association) in a hash bucket.
 type entry struct {
-	key   types.Type
+	key   Type
 	value interface{}
 }
 
@@ -64,12 +64,12 @@ func (m *TypeMap) SetHasher(hasher Hasher) {
 // Delete removes the entry with the given key, if any.
 // It returns true if the entry was found.
 //
-func (m *TypeMap) Delete(key types.Type) bool {
+func (m *TypeMap) Delete(key Type) bool {
 	if m != nil && m.table != nil {
 		hash := m.hasher.Hash(key)
 		bucket := m.table[hash]
 		for i, e := range bucket {
-			if e.key != nil && types.Identical(key, e.key) {
+			if e.key != nil && Identical(key, e.key) {
 				// We can't compact the bucket as it
 				// would disturb iterators.
 				bucket[i] = entry{}
@@ -84,10 +84,10 @@ func (m *TypeMap) Delete(key types.Type) bool {
 // At returns the map entry for the given key.
 // The result is nil if the entry is not present.
 //
-func (m *TypeMap) At(key types.Type) interface{} {
+func (m *TypeMap) At(key Type) interface{} {
 	if m != nil && m.table != nil {
 		for _, e := range m.table[m.hasher.Hash(key)] {
-			if e.key != nil && types.Identical(key, e.key) {
+			if e.key != nil && Identical(key, e.key) {
 				return e.value
 			}
 		}
@@ -97,7 +97,7 @@ func (m *TypeMap) At(key types.Type) interface{} {
 
 // Set sets the map entry for key to val,
 // and returns the previous entry, if any.
-func (m *TypeMap) Set(key types.Type, value interface{}) (prev interface{}) {
+func (m *TypeMap) Set(key Type, value interface{}) (prev interface{}) {
 	if m.table != nil {
 		hash := m.hasher.Hash(key)
 		bucket := m.table[hash]
@@ -105,7 +105,7 @@ func (m *TypeMap) Set(key types.Type, value interface{}) (prev interface{}) {
 		for i, e := range bucket {
 			if e.key == nil {
 				hole = &bucket[i]
-			} else if types.Identical(key, e.key) {
+			} else if Identical(key, e.key) {
 				prev = e.value
 				bucket[i].value = value
 				return
@@ -145,7 +145,7 @@ func (m *TypeMap) Len() int {
 // Iterate has not yet reached, whether or not f will be invoked for
 // it is unspecified.
 //
-func (m *TypeMap) Iterate(f func(key types.Type, value interface{})) {
+func (m *TypeMap) Iterate(f func(key Type, value interface{})) {
 	if m != nil {
 		for _, bucket := range m.table {
 			for _, e := range bucket {
@@ -159,9 +159,9 @@ func (m *TypeMap) Iterate(f func(key types.Type, value interface{})) {
 
 // Keys returns a new slice containing the set of map keys.
 // The order is unspecified.
-func (m *TypeMap) Keys() []types.Type {
-	keys := make([]types.Type, 0, m.Len())
-	m.Iterate(func(key types.Type, _ interface{}) {
+func (m *TypeMap) Keys() []Type {
+	keys := make([]Type, 0, m.Len())
+	m.Iterate(func(key Type, _ interface{}) {
 		keys = append(keys, key)
 	})
 	return keys
@@ -174,7 +174,7 @@ func (m *TypeMap) toString(values bool) string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "{")
 	sep := ""
-	m.Iterate(func(key types.Type, value interface{}) {
+	m.Iterate(func(key Type, value interface{}) {
 		fmt.Fprint(&buf, sep)
 		sep = ", "
 		fmt.Fprint(&buf, key)
@@ -211,17 +211,17 @@ func (m *TypeMap) KeysString() string {
 // Hashers have reference semantics.
 // Call MakeHasher to create a Hasher.
 type Hasher struct {
-	memo map[types.Type]uint32
+	memo map[Type]uint32
 }
 
 // MakeHasher returns a new Hasher instance.
 func MakeHasher() Hasher {
-	return Hasher{make(map[types.Type]uint32)}
+	return Hasher{make(map[Type]uint32)}
 }
 
 // Hash computes a hash value for the given type t such that
 // Identical(t, t') => Hash(t) == Hash(t').
-func (h Hasher) Hash(t types.Type) uint32 {
+func (h Hasher) Hash(t Type) uint32 {
 	hash, ok := h.memo[t]
 	if !ok {
 		hash = h.hashFor(t)
@@ -241,19 +241,19 @@ func hashString(s string) uint32 {
 }
 
 // hashFor computes the hash of t.
-func (h Hasher) hashFor(t types.Type) uint32 {
+func (h Hasher) hashFor(t Type) uint32 {
 	// See Identical for rationale.
 	switch t := t.(type) {
-	case *types.Basic:
+	case *Basic:
 		return uint32(t.Kind())
 
-	case *types.Array:
+	case *Array:
 		return 9043 + 2*uint32(t.Len()) + 3*h.Hash(t.Elem())
 
-	case *types.Slice:
+	case *Slice:
 		return 9049 + 2*h.Hash(t.Elem())
 
-	case *types.Struct:
+	case *Struct:
 		var hash uint32 = 9059
 		for i, n := 0, t.NumFields(); i < n; i++ {
 			f := t.Field(i)
@@ -266,17 +266,17 @@ func (h Hasher) hashFor(t types.Type) uint32 {
 		}
 		return hash
 
-	case *types.Pointer:
+	case *Pointer:
 		return 9067 + 2*h.Hash(t.Elem())
 
-	case *types.Signature:
+	case *Signature:
 		var hash uint32 = 9091
 		if t.Variadic() {
 			hash *= 8863
 		}
 		return hash + 3*h.hashTuple(t.Params()) + 5*h.hashTuple(t.Results())
 
-	case *types.Interface:
+	case *Interface:
 		var hash uint32 = 9103
 		for i, n := 0, t.NumMethods(); i < n; i++ {
 			// See go/types.identicalMethods for rationale.
@@ -287,20 +287,20 @@ func (h Hasher) hashFor(t types.Type) uint32 {
 		}
 		return hash
 
-	case *types.Map:
+	case *Map:
 		return 9109 + 2*h.Hash(t.Key()) + 3*h.Hash(t.Elem())
 
-	case *types.Chan:
+	case *Chan:
 		return 9127 + 2*uint32(t.Dir()) + 3*h.Hash(t.Elem())
 
-	case *types.Named:
+	case *Named:
 		// Not safe with a copying GC; objects may move.
 		return uint32(reflect.ValueOf(t.Obj()).Pointer())
 
-	case *types.Tuple:
+	case *Tuple:
 		return h.hashTuple(t)
 
-	case *types.TypeParam:
+	case *TypeParam:
 		// Not safe with a copying GC; objects may move.
 		return uint32(reflect.ValueOf(t.Obj()).Pointer())
 	}
@@ -308,7 +308,7 @@ func (h Hasher) hashFor(t types.Type) uint32 {
 	panic(t)
 }
 
-func (h Hasher) hashTuple(tuple *types.Tuple) uint32 {
+func (h Hasher) hashTuple(tuple *Tuple) uint32 {
 	// See go/types.identicalTypes for rationale.
 	n := tuple.Len()
 	var hash uint32 = 9137 + 2*uint32(n)

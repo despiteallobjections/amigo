@@ -9,7 +9,7 @@ import (
 	"sort"
 
 	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 
 	"github.com/mdempsky/amigo/typeutil"
 )
@@ -31,7 +31,7 @@ func g(rune) (uint8, bool)
 	if err != nil {
 		panic(err)
 	}
-	pkg, err := new(types.Config).Check("P", []*syntax.File{f}, nil)
+	pkg, err := new(Config).Check("P", []*syntax.File{f}, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -50,7 +50,7 @@ func g(rune) (uint8, bool)
 
 	// Format, sort, and print the map entries.
 	var lines []string
-	namesByType.Iterate(func(T types.Type, names interface{}) {
+	namesByType.Iterate(func(T Type, names interface{}) {
 		lines = append(lines, fmt.Sprintf("%s   %s", names, T))
 	})
 	sort.Strings(lines)
