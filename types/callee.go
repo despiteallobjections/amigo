@@ -5,17 +5,17 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // Callee returns the named target of a function call, if any:
 // a function, method, builtin, or variable.
-func Callee(info *Info, call *syntax.CallExpr) Object {
+func Callee(info *Info, call *CallExpr) Object {
 	var obj Object
-	switch fun := syntax.Unparen(call.Fun).(type) {
-	case *syntax.Name:
+	switch fun := Unparen(call.Fun).(type) {
+	case *Name:
 		obj = info.Uses[fun] // type, var, builtin, or declared func
-	case *syntax.SelectorExpr:
+	case *SelectorExpr:
 		if sel, ok := info.Selections[fun]; ok {
 			obj = sel.Obj() // method or field
 		} else {
@@ -30,7 +30,7 @@ func Callee(info *Info, call *syntax.CallExpr) Object {
 
 // StaticCallee returns the target (function or method) of a static
 // function call, if any. It returns nil for calls to builtins.
-func StaticCallee(info *Info, call *syntax.CallExpr) *Func {
+func StaticCallee(info *Info, call *CallExpr) *Func {
 	if f, ok := Callee(info, call).(*Func); ok && !interfaceMethod(f) {
 		return f
 	}

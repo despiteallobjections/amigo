@@ -11,12 +11,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 	. "github.com/mdempsky/amigo/types"
 )
 
-func testEval(t *testing.T, pkg *Package, pos syntax.Pos, expr string, typ Type, typStr, valStr string) {
+func testEval(t *testing.T, pkg *Package, pos Pos, expr string, typ Type, typStr, valStr string) {
 	gotTv, err := Eval(pkg, pos, expr)
 	if err != nil {
 		t.Errorf("Eval(%q) failed: %s", expr, err)
@@ -55,13 +55,13 @@ func testEval(t *testing.T, pkg *Package, pos syntax.Pos, expr string, typ Type,
 
 func TestEvalBasic(t *testing.T) {
 	for _, typ := range Typ[Bool : String+1] {
-		testEval(t, nil, syntax.NoPos, typ.Name(), typ, "", "")
+		testEval(t, nil, NoPos, typ.Name(), typ, "", "")
 	}
 }
 
 func TestEvalComposite(t *testing.T) {
 	for _, test := range independentTestTypes {
-		testEval(t, nil, syntax.NoPos, test.src, nil, test.str, "")
+		testEval(t, nil, NoPos, test.src, nil, test.str, "")
 	}
 }
 
@@ -77,7 +77,7 @@ func TestEvalArith(t *testing.T) {
 		`len([10]struct{}{}) == 2*5`,
 	}
 	for _, test := range tests {
-		testEval(t, nil, syntax.NoPos, test, Typ[UntypedBool], "", "true")
+		testEval(t, nil, NoPos, test, Typ[UntypedBool], "", "true")
 	}
 }
 
@@ -159,9 +159,9 @@ func TestEvalPos(t *testing.T) {
 		`,
 	}
 
-	var files []*syntax.File
+	var files []*File
 	for i, src := range sources {
-		file, err := syntax.ParseString("p", src)
+		file, err := ParseString("p", src)
 		if err != nil {
 			t.Fatalf("could not parse file %d: %s", i, err)
 		}
@@ -237,36 +237,36 @@ func f(a int, s string) S {
 		src = strings.ReplaceAll(src, "func (fmt.Stringer).", "func (interface).")
 	}
 
-	f, err := syntax.ParseString("p", src)
+	f, err := ParseString("p", src)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	conf := Config{Importer: defaultImporter()}
-	pkg, err := conf.Check("p", []*syntax.File{f}, nil)
+	pkg, err := conf.Check("p", []*File{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	checkExpr := func(pos syntax.Pos, str string) (Object, error) {
-		expr, err := syntax.ParseExpr(syntax.NewFileBase("eval"), strings.NewReader(str), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	checkExpr := func(pos Pos, str string) (Object, error) {
+		expr, err := ParseExpr(NewFileBase("eval"), strings.NewReader(str), nil, nil, CheckBranches|AllowGenerics)
 		if err != nil {
 			return nil, err
 		}
 
 		info := &Info{
-			Uses:       make(map[*syntax.Name]Object),
-			Selections: make(map[*syntax.SelectorExpr]*Selection),
+			Uses:       make(map[*Name]Object),
+			Selections: make(map[*SelectorExpr]*Selection),
 		}
 		if err := CheckExpr(pkg, pos, expr, info); err != nil {
 			return nil, fmt.Errorf("CheckExpr(%q) failed: %s", str, err)
 		}
 		switch expr := expr.(type) {
-		case *syntax.Name:
+		case *Name:
 			if obj, ok := info.Uses[expr]; ok {
 				return obj, nil
 			}
-		case *syntax.SelectorExpr:
+		case *SelectorExpr:
 			if sel, ok := info.Selections[expr]; ok {
 				return sel.Obj(), nil
 			}

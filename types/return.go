@@ -7,52 +7,52 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // isTerminating reports if s is a terminating statement.
 // If s is labeled, label is the label name; otherwise s
 // is "".
-func (check *Checker) isTerminating(s syntax.Stmt, label string) bool {
+func (check *Checker) isTerminating(s Stmt, label string) bool {
 	switch s := s.(type) {
 	default:
 		unreachable()
 
-	case *syntax.DeclStmt, *syntax.EmptyStmt, *syntax.SendStmt,
-		*syntax.AssignStmt, *syntax.CallStmt:
+	case *DeclStmt, *EmptyStmt, *SendStmt,
+		*AssignStmt, *CallStmt:
 		// no chance
 
-	case *syntax.LabeledStmt:
+	case *LabeledStmt:
 		return check.isTerminating(s.Stmt, s.Label.Value)
 
-	case *syntax.ExprStmt:
+	case *ExprStmt:
 		// calling the predeclared (possibly parenthesized) panic() function is terminating
-		if call, ok := syntax.Unparen(s.X).(*syntax.CallExpr); ok && check.isPanic[call] {
+		if call, ok := Unparen(s.X).(*CallExpr); ok && check.isPanic[call] {
 			return true
 		}
 
-	case *syntax.ReturnStmt:
+	case *ReturnStmt:
 		return true
 
-	case *syntax.BranchStmt:
-		if s.Tok == syntax.Goto || s.Tok == syntax.Fallthrough {
+	case *BranchStmt:
+		if s.Tok == Goto || s.Tok == Fallthrough {
 			return true
 		}
 
-	case *syntax.BlockStmt:
+	case *BlockStmt:
 		return check.isTerminatingList(s.List, "")
 
-	case *syntax.IfStmt:
+	case *IfStmt:
 		if s.Else != nil &&
 			check.isTerminating(s.Then, "") &&
 			check.isTerminating(s.Else, "") {
 			return true
 		}
 
-	case *syntax.SwitchStmt:
+	case *SwitchStmt:
 		return check.isTerminatingSwitch(s.Body, label)
 
-	case *syntax.SelectStmt:
+	case *SelectStmt:
 		for _, cc := range s.Body {
 			if !check.isTerminatingList(cc.Body, "") || hasBreakList(cc.Body, label, true) {
 				return false
@@ -61,8 +61,8 @@ func (check *Checker) isTerminating(s syntax.Stmt, label string) bool {
 		}
 		return true
 
-	case *syntax.ForStmt:
-		if _, ok := s.Init.(*syntax.RangeClause); ok {
+	case *ForStmt:
+		if _, ok := s.Init.(*RangeClause); ok {
 			// Range clauses guarantee that the loop terminates,
 			// so the loop is not a terminating statement. See issue 49003.
 			break
@@ -75,17 +75,17 @@ func (check *Checker) isTerminating(s syntax.Stmt, label string) bool {
 	return false
 }
 
-func (check *Checker) isTerminatingList(list []syntax.Stmt, label string) bool {
+func (check *Checker) isTerminatingList(list []Stmt, label string) bool {
 	// trailing empty statements are permitted - skip them
 	for i := len(list) - 1; i >= 0; i-- {
-		if _, ok := list[i].(*syntax.EmptyStmt); !ok {
+		if _, ok := list[i].(*EmptyStmt); !ok {
 			return check.isTerminating(list[i], label)
 		}
 	}
 	return false // all statements are empty
 }
 
-func (check *Checker) isTerminatingSwitch(body []*syntax.CaseClause, label string) bool {
+func (check *Checker) isTerminatingSwitch(body []*CaseClause, label string) bool {
 	hasDefault := false
 	for _, cc := range body {
 		if cc.Cases == nil {
@@ -105,21 +105,21 @@ func (check *Checker) isTerminatingSwitch(body []*syntax.CaseClause, label strin
 // hasBreak reports if s is or contains a break statement
 // referring to the label-ed statement or implicit-ly the
 // closest outer breakable statement.
-func hasBreak(s syntax.Stmt, label string, implicit bool) bool {
+func hasBreak(s Stmt, label string, implicit bool) bool {
 	switch s := s.(type) {
 	default:
 		unreachable()
 
-	case *syntax.DeclStmt, *syntax.EmptyStmt, *syntax.ExprStmt,
-		*syntax.SendStmt, *syntax.AssignStmt, *syntax.CallStmt,
-		*syntax.ReturnStmt:
+	case *DeclStmt, *EmptyStmt, *ExprStmt,
+		*SendStmt, *AssignStmt, *CallStmt,
+		*ReturnStmt:
 		// no chance
 
-	case *syntax.LabeledStmt:
+	case *LabeledStmt:
 		return hasBreak(s.Stmt, label, implicit)
 
-	case *syntax.BranchStmt:
-		if s.Tok == syntax.Break {
+	case *BranchStmt:
+		if s.Tok == Break {
 			if s.Label == nil {
 				return implicit
 			}
@@ -128,26 +128,26 @@ func hasBreak(s syntax.Stmt, label string, implicit bool) bool {
 			}
 		}
 
-	case *syntax.BlockStmt:
+	case *BlockStmt:
 		return hasBreakList(s.List, label, implicit)
 
-	case *syntax.IfStmt:
+	case *IfStmt:
 		if hasBreak(s.Then, label, implicit) ||
 			s.Else != nil && hasBreak(s.Else, label, implicit) {
 			return true
 		}
 
-	case *syntax.SwitchStmt:
+	case *SwitchStmt:
 		if label != "" && hasBreakCaseList(s.Body, label, false) {
 			return true
 		}
 
-	case *syntax.SelectStmt:
+	case *SelectStmt:
 		if label != "" && hasBreakCommList(s.Body, label, false) {
 			return true
 		}
 
-	case *syntax.ForStmt:
+	case *ForStmt:
 		if label != "" && hasBreak(s.Body, label, false) {
 			return true
 		}
@@ -156,7 +156,7 @@ func hasBreak(s syntax.Stmt, label string, implicit bool) bool {
 	return false
 }
 
-func hasBreakList(list []syntax.Stmt, label string, implicit bool) bool {
+func hasBreakList(list []Stmt, label string, implicit bool) bool {
 	for _, s := range list {
 		if hasBreak(s, label, implicit) {
 			return true
@@ -165,7 +165,7 @@ func hasBreakList(list []syntax.Stmt, label string, implicit bool) bool {
 	return false
 }
 
-func hasBreakCaseList(list []*syntax.CaseClause, label string, implicit bool) bool {
+func hasBreakCaseList(list []*CaseClause, label string, implicit bool) bool {
 	for _, s := range list {
 		if hasBreakList(s.Body, label, implicit) {
 			return true
@@ -174,7 +174,7 @@ func hasBreakCaseList(list []*syntax.CaseClause, label string, implicit bool) bo
 	return false
 }
 
-func hasBreakCommList(list []*syntax.CommClause, label string, implicit bool) bool {
+func hasBreakCommList(list []*CommClause, label string, implicit bool) bool {
 	for _, s := range list {
 		if hasBreakList(s.Body, label, implicit) {
 			return true

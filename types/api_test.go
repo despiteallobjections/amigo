@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
@@ -25,9 +25,9 @@ import (
 // generic code.
 const brokenPkg = "package broken_"
 
-func parseSrc(path, src string) (*syntax.File, error) {
+func parseSrc(path, src string) (*File, error) {
 	errh := func(error) {} // dummy error handler so that parsing continues in presence of errors
-	return syntax.Parse(syntax.NewFileBase(path), strings.NewReader(src), errh, nil, syntax.AllowGenerics|syntax.AllowMethodTypeParams)
+	return Parse(NewFileBase(path), strings.NewReader(src), errh, nil, AllowGenerics|AllowMethodTypeParams)
 }
 
 func pkgFor(path, source string, info *Info) (*Package, error) {
@@ -36,7 +36,7 @@ func pkgFor(path, source string, info *Info) (*Package, error) {
 		return nil, err
 	}
 	conf := Config{Importer: defaultImporter()}
-	return conf.Check(f.PkgName.Value, []*syntax.File{f}, info)
+	return conf.Check(f.PkgName.Value, []*File{f}, info)
 }
 
 func mustTypecheck(t *testing.T, path, source string, info *Info) string {
@@ -60,7 +60,7 @@ func mayTypecheck(t *testing.T, path, source string, info *Info) (string, error)
 		Error:    func(err error) {},
 		Importer: defaultImporter(),
 	}
-	pkg, err := conf.Check(f.PkgName.Value, []*syntax.File{f}, info)
+	pkg, err := conf.Check(f.PkgName.Value, []*File{f}, info)
 	return pkg.Name(), err
 }
 
@@ -145,14 +145,14 @@ func TestValuesInfo(t *testing.T) {
 
 	for _, test := range tests {
 		info := Info{
-			Types: make(map[syntax.Expr]TypeAndValue),
+			Types: make(map[Expr]TypeAndValue),
 		}
 		name := mustTypecheck(t, "ValuesInfo", test.src, &info)
 
 		// look for expression
-		var expr syntax.Expr
+		var expr Expr
 		for e := range info.Types {
-			if syntax.NodeString(e) == test.expr {
+			if NodeString(e) == test.expr {
 				expr = e
 				break
 			}
@@ -371,7 +371,7 @@ func TestTypesInfo(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		info := Info{Types: make(map[syntax.Expr]TypeAndValue)}
+		info := Info{Types: make(map[Expr]TypeAndValue)}
 		var name string
 		if strings.HasPrefix(test.src, brokenPkg) {
 			var err error
@@ -387,7 +387,7 @@ func TestTypesInfo(t *testing.T) {
 		// look for expression type
 		var typ Type
 		for e, tv := range info.Types {
-			if syntax.NodeString(e) == test.expr {
+			if NodeString(e) == test.expr {
 				typ = tv.Type
 				break
 			}
@@ -567,14 +567,14 @@ type T[P any] []P
 	for _, test := range tests {
 		imports := make(testImporter)
 		conf := Config{Importer: imports}
-		instMap := make(map[*syntax.Name]Instance)
-		useMap := make(map[*syntax.Name]Object)
+		instMap := make(map[*Name]Instance)
+		useMap := make(map[*Name]Object)
 		makePkg := func(src string) *Package {
 			f, err := parseSrc("p.go", src)
 			if err != nil {
 				t.Fatal(err)
 			}
-			pkg, err := conf.Check("", []*syntax.File{f}, &Info{Instances: instMap, Uses: useMap})
+			pkg, err := conf.Check("", []*File{f}, &Info{Instances: instMap, Uses: useMap})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -636,11 +636,11 @@ type T[P any] []P
 }
 
 type recordedInstance struct {
-	Name *syntax.Name
+	Name *Name
 	Inst Instance
 }
 
-func sortedInstances(m map[*syntax.Name]Instance) (instances []recordedInstance) {
+func sortedInstances(m map[*Name]Instance) (instances []recordedInstance) {
 	for id, inst := range m {
 		instances = append(instances, recordedInstance{id, inst})
 	}
@@ -671,7 +671,7 @@ func TestDefsInfo(t *testing.T) {
 
 	for _, test := range tests {
 		info := Info{
-			Defs: make(map[*syntax.Name]Object),
+			Defs: make(map[*Name]Object),
 		}
 		name := mustTypecheck(t, "DefsInfo", test.src, &info)
 
@@ -736,7 +736,7 @@ func TestUsesInfo(t *testing.T) {
 
 	for _, test := range tests {
 		info := Info{
-			Uses: make(map[*syntax.Name]Object),
+			Uses: make(map[*Name]Object),
 		}
 		name := mustTypecheck(t, "UsesInfo", test.src, &info)
 
@@ -775,12 +775,12 @@ func (r *N[C]) n() {  }
 		t.Fatal(err)
 	}
 	info := Info{
-		Defs:       make(map[*syntax.Name]Object),
-		Uses:       make(map[*syntax.Name]Object),
-		Selections: make(map[*syntax.SelectorExpr]*Selection),
+		Defs:       make(map[*Name]Object),
+		Uses:       make(map[*Name]Object),
+		Selections: make(map[*SelectorExpr]*Selection),
 	}
 	var conf Config
-	pkg, err := conf.Check("p", []*syntax.File{f}, &info)
+	pkg, err := conf.Check("p", []*File{f}, &info)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -797,7 +797,7 @@ func (r *N[C]) n() {  }
 	var dm, dn *Func   // the declared methods
 	var dmm, dmn *Func // the methods used in the body of m
 	for _, decl := range f.DeclList {
-		fdecl, ok := decl.(*syntax.FuncDecl)
+		fdecl, ok := decl.(*FuncDecl)
 		if !ok {
 			continue
 		}
@@ -805,9 +805,9 @@ func (r *N[C]) n() {  }
 		switch fdecl.Name.Value {
 		case "m":
 			dm = def
-			syntax.Inspect(fdecl.Body, func(n syntax.Node) bool {
-				if call, ok := n.(*syntax.CallExpr); ok {
-					sel := call.Fun.(*syntax.SelectorExpr)
+			Inspect(fdecl.Body, func(n Node) bool {
+				if call, ok := n.(*CallExpr); ok {
+					sel := call.Fun.(*SelectorExpr)
 					use := info.Uses[sel.Sel].(*Func)
 					selection := info.Selections[sel]
 					if selection.Kind() != MethodVal {
@@ -879,7 +879,7 @@ func TestImplicitsInfo(t *testing.T) {
 
 	for _, test := range tests {
 		info := Info{
-			Implicits: make(map[syntax.Node]Object),
+			Implicits: make(map[Node]Object),
 		}
 		name := mustTypecheck(t, "ImplicitsInfo", test.src, &info)
 
@@ -893,11 +893,11 @@ func TestImplicitsInfo(t *testing.T) {
 		var got string
 		for n, obj := range info.Implicits {
 			switch x := n.(type) {
-			case *syntax.ImportSpec:
+			case *ImportSpec:
 				got = "importSpec"
-			case *syntax.CaseClause:
+			case *CaseClause:
 				got = "caseClause"
-			case *syntax.Field:
+			case *Field:
 				got = "field"
 			default:
 				t.Fatalf("package %s: unexpected %T", name, x)
@@ -1008,14 +1008,14 @@ func TestPredicatesInfo(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		info := Info{Types: make(map[syntax.Expr]TypeAndValue)}
+		info := Info{Types: make(map[Expr]TypeAndValue)}
 		name := mustTypecheck(t, "PredicatesInfo", test.src, &info)
 
 		// look for expression predicates
 		got := "<missing>"
 		for e, tv := range info.Types {
 			//println(name, syntax.String(e))
-			if syntax.NodeString(e) == test.expr {
+			if NodeString(e) == test.expr {
 				got = predString(tv)
 				break
 			}
@@ -1100,7 +1100,7 @@ func TestScopesInfo(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		info := Info{Scopes: make(map[syntax.Node]*Scope)}
+		info := Info{Scopes: make(map[Node]*Scope)}
 		name := mustTypecheck(t, "ScopesInfo", test.src, &info)
 
 		// number of scopes must match
@@ -1112,23 +1112,23 @@ func TestScopesInfo(t *testing.T) {
 		for node, scope := range info.Scopes {
 			var kind string
 			switch node.(type) {
-			case *syntax.File:
+			case *File:
 				kind = "file"
-			case *syntax.FuncType:
+			case *FuncType:
 				kind = "func"
-			case *syntax.BlockStmt:
+			case *BlockStmt:
 				kind = "block"
-			case *syntax.IfStmt:
+			case *IfStmt:
 				kind = "if"
-			case *syntax.SwitchStmt:
+			case *SwitchStmt:
 				kind = "switch"
-			case *syntax.SelectStmt:
+			case *SelectStmt:
 				kind = "select"
-			case *syntax.CaseClause:
+			case *CaseClause:
 				kind = "case"
-			case *syntax.CommClause:
+			case *CommClause:
 				kind = "comm"
-			case *syntax.ForStmt:
+			case *ForStmt:
 				kind = "for"
 			default:
 				kind = fmt.Sprintf("%T", node)
@@ -1309,7 +1309,7 @@ func TestInitOrderInfo(t *testing.T) {
 }
 
 func TestMultiFileInitOrder(t *testing.T) {
-	mustParse := func(src string) *syntax.File {
+	mustParse := func(src string) *File {
 		f, err := parseSrc("main", src)
 		if err != nil {
 			t.Fatal(err)
@@ -1324,11 +1324,11 @@ func TestMultiFileInitOrder(t *testing.T) {
 	// order of the files, only on the presentation order to
 	// the type-checker.
 	for _, test := range []struct {
-		files []*syntax.File
+		files []*File
 		want  string
 	}{
-		{[]*syntax.File{fileA, fileB}, "[a = 1 b = 2]"},
-		{[]*syntax.File{fileB, fileA}, "[b = 2 a = 1]"},
+		{[]*File{fileA, fileB}, "[a = 1 b = 2]"},
+		{[]*File{fileB, fileA}, "[b = 2 a = 1]"},
 	} {
 		var info Info
 		if _, err := new(Config).Check("main", test.files, &info); err != nil {
@@ -1359,7 +1359,7 @@ func TestFiles(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := check.Files([]*syntax.File{f}); err != nil {
+		if err := check.Files([]*File{f}); err != nil {
 			t.Error(err)
 		}
 	}
@@ -1386,7 +1386,7 @@ func (m testImporter) Import(path, srcDir string) (*Package, error) {
 }
 
 func TestSelection(t *testing.T) {
-	selections := make(map[*syntax.SelectorExpr]*Selection)
+	selections := make(map[*SelectorExpr]*Selection)
 
 	imports := make(testImporter)
 	conf := Config{Importer: imports}
@@ -1395,7 +1395,7 @@ func TestSelection(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pkg, err := conf.Check(path, []*syntax.File{f}, &Info{Selections: selections})
+		pkg, err := conf.Check(path, []*File{f}, &Info{Selections: selections})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1526,8 +1526,8 @@ func main() {
 	for e, sel := range selections {
 		_ = sel.String() // assertion: must not panic
 
-		start := indexFor(mainSrc, syntax.StartPos(e))
-		end := indexFor(mainSrc, syntax.EndPos(e))
+		start := indexFor(mainSrc, StartPos(e))
+		end := indexFor(mainSrc, EndPos(e))
 		segment := mainSrc[start:end] // (all SelectorExprs are in main, not lib)
 
 		direct := "."
@@ -1565,7 +1565,7 @@ func main() {
 }
 
 // indexFor returns the index into s corresponding to the position pos.
-func indexFor(s string, pos syntax.Pos) int {
+func indexFor(s string, pos Pos) int {
 	i, line := 0, 1 // string index and corresponding line
 	target := int(pos.Line())
 	for line < target && i < len(s) {
@@ -1588,7 +1588,7 @@ func TestIssue8518(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pkg, _ := conf.Check(path, []*syntax.File{f}, nil) // errors logged via conf.Error
+		pkg, _ := conf.Check(path, []*File{f}, nil) // errors logged via conf.Error
 		imports[path] = pkg
 	}
 
@@ -1707,7 +1707,7 @@ func TestScopeLookupParent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		imports[path], err = conf.Check(path, []*syntax.File{f}, &info)
+		imports[path], err = conf.Check(path, []*File{f}, &info)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1756,15 +1756,15 @@ func F(){
 /*main=undef*/
 `
 
-	info.Uses = make(map[*syntax.Name]Object)
+	info.Uses = make(map[*Name]Object)
 	makePkg("main", mainSrc)
 	mainScope := imports["main"].Scope()
 
 	rx := regexp.MustCompile(`^/\*(\w*)=([\w:]*)\*/$`)
 
-	base := syntax.NewFileBase("main")
-	syntax.CommentsDo(strings.NewReader(mainSrc), func(line, col uint, text string) {
-		pos := syntax.MakePos(base, line, col)
+	base := NewFileBase("main")
+	CommentsDo(strings.NewReader(mainSrc), func(line, col uint, text string) {
+		pos := MakePos(base, line, col)
 
 		// Syntax errors are not comments.
 		if text[0] != '/' {
@@ -1823,7 +1823,7 @@ func F(){
 	}
 }
 
-var nopos syntax.Pos
+var nopos Pos
 
 // newDefined creates a new defined type named T with the given underlying type.
 func newDefined(underlying Type) *Named {
@@ -1997,11 +1997,11 @@ func TestIssue15305(t *testing.T) {
 		Error: func(err error) {}, // allow errors
 	}
 	info := &Info{
-		Types: make(map[syntax.Expr]TypeAndValue),
+		Types: make(map[Expr]TypeAndValue),
 	}
-	conf.Check("p", []*syntax.File{f}, info) // ignore result
+	conf.Check("p", []*File{f}, info) // ignore result
 	for e, tv := range info.Types {
-		if _, ok := e.(*syntax.CallExpr); ok {
+		if _, ok := e.(*CallExpr); ok {
 			if tv.Type != Typ[Int16] {
 				t.Errorf("CallExpr has type %v, want int16", tv.Type)
 			}
@@ -2033,13 +2033,13 @@ func TestCompositeLitTypes(t *testing.T) {
 		}
 
 		info := &Info{
-			Types: make(map[syntax.Expr]TypeAndValue),
+			Types: make(map[Expr]TypeAndValue),
 		}
-		if _, err = new(Config).Check("p", []*syntax.File{f}, info); err != nil {
+		if _, err = new(Config).Check("p", []*File{f}, info); err != nil {
 			t.Fatalf("%s: %v", test.lit, err)
 		}
 
-		cmptype := func(x syntax.Expr, want string) {
+		cmptype := func(x Expr, want string) {
 			tv, ok := info.Types[x]
 			if !ok {
 				t.Errorf("%s: no Types entry found", test.lit)
@@ -2055,11 +2055,11 @@ func TestCompositeLitTypes(t *testing.T) {
 		}
 
 		// test type of composite literal expression
-		rhs := f.DeclList[0].(*syntax.GenDecl).SpecList[0].(*syntax.VarSpec).Values
+		rhs := f.DeclList[0].(*GenDecl).SpecList[0].(*VarSpec).Values
 		cmptype(rhs, test.typ)
 
 		// test type of composite literal type expression
-		cmptype(rhs.(*syntax.CompositeLit).Type, test.typ)
+		cmptype(rhs.(*CompositeLit).Type, test.typ)
 	}
 }
 
@@ -2093,9 +2093,9 @@ func f(x int) { y := x; print(y) }
 	}
 
 	info := &Info{
-		Defs: make(map[*syntax.Name]Object),
+		Defs: make(map[*Name]Object),
 	}
-	if _, err = new(Config).Check("p", []*syntax.File{f}, info); err != nil {
+	if _, err = new(Config).Check("p", []*File{f}, info); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2152,7 +2152,7 @@ func f(x T) T { return foo.F(x) }
 	if err != nil {
 		t.Fatal(err)
 	}
-	files := []*syntax.File{f}
+	files := []*File{f}
 
 	// type-check using all possible importers
 	for _, compiler := range []string{"gc", "gccgo", "source"} {
@@ -2169,7 +2169,7 @@ func f(x T) T { return foo.F(x) }
 		}
 
 		info := &Info{
-			Uses: make(map[*syntax.Name]Object),
+			Uses: make(map[*Name]Object),
 		}
 		pkg, _ := conf.Check("p", files, info)
 		if pkg == nil {
@@ -2290,7 +2290,7 @@ func TestInstanceIdentity(t *testing.T) {
 			t.Fatal(err)
 		}
 		name := f.PkgName.Value
-		pkg, err := conf.Check(name, []*syntax.File{f}, nil)
+		pkg, err := conf.Check(name, []*File{f}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2350,7 +2350,7 @@ type Bad Bad // invalid type
 		t.Fatal(err)
 	}
 	conf := Config{Error: func(error) {}}
-	pkg, _ := conf.Check(f.PkgName.Value, []*syntax.File{f}, nil)
+	pkg, _ := conf.Check(f.PkgName.Value, []*File{f}, nil)
 
 	lookup := func(tname string) Type { return pkg.Scope().Lookup(tname).Type() }
 	var (

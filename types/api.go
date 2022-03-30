@@ -29,7 +29,7 @@ import (
 	"fmt"
 	"go/constant"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // An TypeError describes a type-checking error; it implements the error interface.
@@ -37,10 +37,10 @@ import (
 // package (such as "unused variable"); "hard" errors may lead to unpredictable
 // behavior if ignored.
 type TypeError struct {
-	Pos  syntax.Pos // error position
-	Msg  string     // default error message, user-friendly
-	Full string     // full error message, for debugging (may contain internal details)
-	Soft bool       // if set, error is "soft"
+	Pos  Pos    // error position
+	Msg  string // default error message, user-friendly
+	Full string // full error message, for debugging (may contain internal details)
+	Soft bool   // if set, error is "soft"
 }
 
 // Error returns an error string formatted as follows:
@@ -174,7 +174,7 @@ type Info struct {
 	// identifier z in a variable declaration 'var z int' is found
 	// only in the Defs map, and identifiers denoting packages in
 	// qualified identifiers are collected in the Uses map.
-	Types map[syntax.Expr]TypeAndValue
+	Types map[Expr]TypeAndValue
 
 	// Instances maps identifiers denoting generic types or functions to their
 	// type arguments and instantiated type.
@@ -188,7 +188,7 @@ type Info struct {
 	//
 	// Invariant: Instantiating Uses[id].Type() with Instances[id].TypeArgs
 	// results in an equivalent of Instances[id].Type.
-	Instances map[*syntax.Name]Instance
+	Instances map[*Name]Instance
 
 	// Defs maps identifiers to the objects they define (including
 	// package names, dots "." of dot-imports, and blank "_" identifiers).
@@ -199,14 +199,14 @@ type Info struct {
 	// For an embedded field, Defs returns the field *Var it defines.
 	//
 	// Invariant: Defs[id] == nil || Defs[id].Pos() == id.Pos()
-	Defs map[*syntax.Name]Object
+	Defs map[*Name]Object
 
 	// Uses maps identifiers to the objects they denote.
 	//
 	// For an embedded field, Uses returns the *TypeName it denotes.
 	//
 	// Invariant: Uses[id].Pos() != id.Pos()
-	Uses map[*syntax.Name]Object
+	Uses map[*Name]Object
 
 	// Implicits maps nodes to their implicitly declared objects, if any.
 	// The following node and object types may appear:
@@ -217,11 +217,11 @@ type Info struct {
 	//     *syntax.CaseClause    type-specific *Var for each type switch case clause (incl. default)
 	//     *syntax.Field         anonymous parameter *Var (incl. unnamed results)
 	//
-	Implicits map[syntax.Node]Object
+	Implicits map[Node]Object
 
 	// Selections maps selector expressions (excluding qualified identifiers)
 	// to their corresponding selections.
-	Selections map[*syntax.SelectorExpr]*Selection
+	Selections map[*SelectorExpr]*Selection
 
 	// Scopes maps syntax.Nodes to the scopes they define. Package scopes are not
 	// associated with a specific node but with all files belonging to a package.
@@ -245,7 +245,7 @@ type Info struct {
 	//     *syntax.CommClause
 	//     *syntax.ForStmt
 	//
-	Scopes map[syntax.Node]*Scope
+	Scopes map[Node]*Scope
 
 	// InitOrder is the list of package-level initializers in the order in which
 	// they must be executed. Initializers referring to variables related by an
@@ -258,11 +258,11 @@ type Info struct {
 // TypeOf returns the type of expression e, or nil if not found.
 // Precondition: the Types, Uses and Defs maps are populated.
 //
-func (info *Info) TypeOf(e syntax.Expr) Type {
+func (info *Info) TypeOf(e Expr) Type {
 	if t, ok := info.Types[e]; ok {
 		return t.Type
 	}
-	if id, _ := e.(*syntax.Name); id != nil {
+	if id, _ := e.(*Name); id != nil {
 		if obj := info.ObjectOf(id); obj != nil {
 			return obj.Type()
 		}
@@ -278,7 +278,7 @@ func (info *Info) TypeOf(e syntax.Expr) Type {
 //
 // Precondition: the Uses and Defs maps are populated.
 //
-func (info *Info) ObjectOf(id *syntax.Name) Object {
+func (info *Info) ObjectOf(id *Name) Object {
 	if obj := info.Defs[id]; obj != nil {
 		return obj
 	}
@@ -360,7 +360,7 @@ type Instance struct {
 // expression.
 type Initializer struct {
 	Lhs []*Var // var Lhs = Rhs
-	Rhs syntax.Expr
+	Rhs Expr
 }
 
 func (init *Initializer) String() string {
@@ -372,7 +372,7 @@ func (init *Initializer) String() string {
 		buf.WriteString(lhs.Name())
 	}
 	buf.WriteString(" = ")
-	syntax.Fprint(&buf, init.Rhs, syntax.ShortForm)
+	Fprint(&buf, init.Rhs, ShortForm)
 	return buf.String()
 }
 
@@ -387,7 +387,7 @@ func (init *Initializer) String() string {
 // The package is specified by a list of *syntax.Files and corresponding
 // file set, and the package path the package is identified with.
 // The clean path must not be empty or dot (".").
-func (conf *Config) Check(path string, files []*syntax.File, info *Info) (*Package, error) {
+func (conf *Config) Check(path string, files []*File, info *Info) (*Package, error) {
 	pkg := NewPackage(path, "")
 	return pkg, NewChecker(conf, pkg, info).Files(files)
 }

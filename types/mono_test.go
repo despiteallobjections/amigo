@@ -11,17 +11,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
 
 func checkMono(t *testing.T, body string) error {
 	src := "package x; import `unsafe`; var _ unsafe.Pointer;\n" + body
-	file, err := syntax.Parse(syntax.NewFileBase("x.go"), strings.NewReader(src), nil, nil, syntax.AllowGenerics)
+	file, err := Parse(NewFileBase("x.go"), strings.NewReader(src), nil, nil, AllowGenerics)
 	if err != nil {
 		t.Fatal(err)
 	}
-	files := []*syntax.File{file}
+	files := []*File{file}
 
 	var buf bytes.Buffer
 	conf := types.Config{

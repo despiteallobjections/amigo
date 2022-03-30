@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 
 	. "github.com/mdempsky/amigo/types"
 )
@@ -158,9 +158,9 @@ func TestBuiltinSignatures(t *testing.T) {
 	}
 }
 
-func parseGenericSrc(path, src string) (*syntax.File, error) {
+func parseGenericSrc(path, src string) (*File, error) {
 	errh := func(error) {} // dummy error handler so that parsing continues in presence of errors
-	return syntax.Parse(syntax.NewFileBase(path), strings.NewReader(src), errh, nil, syntax.AllowGenerics)
+	return Parse(NewFileBase(path), strings.NewReader(src), errh, nil, AllowGenerics)
 }
 
 func testBuiltinSignature(t *testing.T, name, src0, want string) {
@@ -172,9 +172,9 @@ func testBuiltinSignature(t *testing.T, name, src0, want string) {
 	}
 
 	conf := Config{Importer: defaultImporter()}
-	uses := make(map[*syntax.Name]Object)
-	types := make(map[syntax.Expr]TypeAndValue)
-	_, err = conf.Check(f.PkgName.Value, []*syntax.File{f}, &Info{Uses: uses, Types: types})
+	uses := make(map[*Name]Object)
+	types := make(map[Expr]TypeAndValue)
+	_, err = conf.Check(f.PkgName.Value, []*File{f}, &Info{Uses: uses, Types: types})
 	if err != nil {
 		t.Errorf("%s: %s", src0, err)
 		return
@@ -182,9 +182,9 @@ func testBuiltinSignature(t *testing.T, name, src0, want string) {
 
 	// find called function
 	n := 0
-	var fun syntax.Expr
+	var fun Expr
 	for x := range types {
-		if call, _ := x.(*syntax.CallExpr); call != nil {
+		if call, _ := x.(*CallExpr); call != nil {
 			fun = call.Fun
 			n++
 		}
@@ -199,7 +199,7 @@ func testBuiltinSignature(t *testing.T, name, src0, want string) {
 		// the recorded type for the built-in must match the wanted signature
 		typ := types[fun].Type
 		if typ == nil {
-			t.Errorf("%s: no type recorded for %s", src0, syntax.NodeString(fun))
+			t.Errorf("%s: no type recorded for %s", src0, NodeString(fun))
 			return
 		}
 		if got := typ.String(); got != want {
@@ -210,7 +210,7 @@ func testBuiltinSignature(t *testing.T, name, src0, want string) {
 		// called function must be a (possibly parenthesized, qualified)
 		// identifier denoting the expected built-in
 		switch p := fun.(type) {
-		case *syntax.Name:
+		case *Name:
 			obj := uses[p]
 			if obj == nil {
 				t.Errorf("%s: no object found for %s", src0, p.Value)
@@ -227,10 +227,10 @@ func testBuiltinSignature(t *testing.T, name, src0, want string) {
 			}
 			return // we're done
 
-		case *syntax.ParenExpr:
+		case *ParenExpr:
 			fun = p.X // unpack
 
-		case *syntax.SelectorExpr:
+		case *SelectorExpr:
 			// built-in from package unsafe - ignore details
 			return // we're done
 

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 	. "github.com/mdempsky/amigo/types"
 )
@@ -108,7 +108,7 @@ func TestResolveIdents(t *testing.T) {
 	}
 
 	// parse package files
-	var files []*syntax.File
+	var files []*File
 	for i, src := range sources {
 		f, err := parseSrc(fmt.Sprintf("sources[%d]", i), src)
 		if err != nil {
@@ -120,8 +120,8 @@ func TestResolveIdents(t *testing.T) {
 	// resolve and type-check package AST
 	importer := new(resolveTestImporter)
 	conf := Config{Importer: importer}
-	uses := make(map[*syntax.Name]Object)
-	defs := make(map[*syntax.Name]Object)
+	uses := make(map[*Name]Object)
+	defs := make(map[*Name]Object)
 	_, err := conf.Check("testResolveIdents", files, &Info{Defs: defs, Uses: uses})
 	if err != nil {
 		t.Fatal(err)
@@ -136,9 +136,9 @@ func TestResolveIdents(t *testing.T) {
 
 	// check that qualified identifiers are resolved
 	for _, f := range files {
-		syntax.Crawl(f, func(n syntax.Node) bool {
-			if s, ok := n.(*syntax.SelectorExpr); ok {
-				if x, ok := s.X.(*syntax.Name); ok {
+		Crawl(f, func(n Node) bool {
+			if s, ok := n.(*SelectorExpr); ok {
+				if x, ok := s.X.(*Name); ok {
 					obj := uses[x]
 					if obj == nil {
 						t.Errorf("%s: unresolved qualified identifier %s", x.Pos(), x.Value)
@@ -166,12 +166,12 @@ func TestResolveIdents(t *testing.T) {
 	// We need the foundUses/Defs maps (rather then just deleting the found objects
 	// from the uses and defs maps) because syntax.Walk traverses shared nodes multiple
 	// times (e.g. types in field lists such as "a, b, c int").
-	foundUses := make(map[*syntax.Name]bool)
-	foundDefs := make(map[*syntax.Name]bool)
+	foundUses := make(map[*Name]bool)
+	foundDefs := make(map[*Name]bool)
 	var both []string
 	for _, f := range files {
-		syntax.Crawl(f, func(n syntax.Node) bool {
-			if x, ok := n.(*syntax.Name); ok {
+		Crawl(f, func(n Node) bool {
+			if x, ok := n.(*Name); ok {
 				var objects int
 				if _, found := uses[x]; found {
 					objects |= 1

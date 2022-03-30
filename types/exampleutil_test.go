@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -25,11 +25,11 @@ func g(rune) (uint8, bool)
 `
 
 	// Parse and type-check the package.
-	f, err := syntax.ParseString("P.go", source)
+	f, err := ParseString("P.go", source)
 	if err != nil {
 		panic(err)
 	}
-	pkg, err := new(Config).Check("P", []*syntax.File{f}, nil)
+	pkg, err := new(Config).Check("P", []*File{f}, nil)
 	if err != nil {
 		panic(err)
 	}

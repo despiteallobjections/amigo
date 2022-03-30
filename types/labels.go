@@ -5,13 +5,13 @@
 package types
 
 import (
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // labels checks correct label use in body.
-func (check *Checker) labels(body *syntax.BlockStmt) {
+func (check *Checker) labels(body *BlockStmt) {
 	// set of all labels in this body
-	all := NewScope(nil, body.Pos(), syntax.EndPos(body), "label")
+	all := NewScope(nil, body.Pos(), EndPos(body), "label")
 
 	fwdJumps := check.blockBranches(all, nil, nil, body.List)
 
@@ -42,21 +42,21 @@ func (check *Checker) labels(body *syntax.BlockStmt) {
 
 // A block tracks label declarations in a block and its enclosing blocks.
 type block struct {
-	parent *block                         // enclosing block
-	lstmt  *syntax.LabeledStmt            // labeled statement to which this block belongs, or nil
-	labels map[string]*syntax.LabeledStmt // allocated lazily
+	parent *block                  // enclosing block
+	lstmt  *LabeledStmt            // labeled statement to which this block belongs, or nil
+	labels map[string]*LabeledStmt // allocated lazily
 }
 
 // insert records a new label declaration for the current block.
 // The label must not have been declared before in any block.
-func (b *block) insert(s *syntax.LabeledStmt) {
+func (b *block) insert(s *LabeledStmt) {
 	name := s.Label.Value
 	if debug {
 		assert(b.gotoTarget(name) == nil)
 	}
 	labels := b.labels
 	if labels == nil {
-		labels = make(map[string]*syntax.LabeledStmt)
+		labels = make(map[string]*LabeledStmt)
 		b.labels = labels
 	}
 	labels[name] = s
@@ -64,7 +64,7 @@ func (b *block) insert(s *syntax.LabeledStmt) {
 
 // gotoTarget returns the labeled statement in the current
 // or an enclosing block with the given label name, or nil.
-func (b *block) gotoTarget(name string) *syntax.LabeledStmt {
+func (b *block) gotoTarget(name string) *LabeledStmt {
 	for s := b; s != nil; s = s.parent {
 		if t := s.labels[name]; t != nil {
 			return t
@@ -75,7 +75,7 @@ func (b *block) gotoTarget(name string) *syntax.LabeledStmt {
 
 // enclosingTarget returns the innermost enclosing labeled
 // statement with the given label name, or nil.
-func (b *block) enclosingTarget(name string) *syntax.LabeledStmt {
+func (b *block) enclosingTarget(name string) *LabeledStmt {
 	for s := b; s != nil; s = s.parent {
 		if t := s.lstmt; t != nil && t.Label.Value == name {
 			return t
@@ -87,23 +87,23 @@ func (b *block) enclosingTarget(name string) *syntax.LabeledStmt {
 // blockBranches processes a block's statement list and returns the set of outgoing forward jumps.
 // all is the scope of all declared labels, parent the set of labels declared in the immediately
 // enclosing block, and lstmt is the labeled statement this block is associated with (or nil).
-func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.LabeledStmt, list []syntax.Stmt) []*syntax.BranchStmt {
+func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *LabeledStmt, list []Stmt) []*BranchStmt {
 	b := &block{parent, lstmt, nil}
 
 	var (
-		varDeclPos         syntax.Pos
-		fwdJumps, badJumps []*syntax.BranchStmt
+		varDeclPos         Pos
+		fwdJumps, badJumps []*BranchStmt
 	)
 
 	// All forward jumps jumping over a variable declaration are possibly
 	// invalid (they may still jump out of the block and be ok).
 	// recordVarDecl records them for the given position.
-	recordVarDecl := func(pos syntax.Pos) {
+	recordVarDecl := func(pos Pos) {
 		varDeclPos = pos
 		badJumps = append(badJumps[:0], fwdJumps...) // copy fwdJumps to badJumps
 	}
 
-	jumpsOverVarDecl := func(jmp *syntax.BranchStmt) bool {
+	jumpsOverVarDecl := func(jmp *BranchStmt) bool {
 		if varDeclPos.IsKnown() {
 			for _, bad := range badJumps {
 				if jmp == bad {
@@ -114,17 +114,17 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 		return false
 	}
 
-	var stmtBranches func(syntax.Stmt)
-	stmtBranches = func(s syntax.Stmt) {
+	var stmtBranches func(Stmt)
+	stmtBranches = func(s Stmt) {
 		switch s := s.(type) {
-		case *syntax.DeclStmt:
+		case *DeclStmt:
 			for _, d := range s.Decl.SpecList {
-				if d, _ := d.(*syntax.VarSpec); d != nil {
+				if d, _ := d.(*VarSpec); d != nil {
 					recordVarDecl(d.Pos())
 				}
 			}
 
-		case *syntax.LabeledStmt:
+		case *LabeledStmt:
 			// declare non-blank label
 			if name := s.Label.Value; name != "_" {
 				lbl := NewLabel(s.Label.Pos(), check.pkg, name)
@@ -166,7 +166,7 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 			}
 			stmtBranches(s.Stmt)
 
-		case *syntax.BranchStmt:
+		case *BranchStmt:
 			if s.Label == nil {
 				return // checked in 1st pass (check.stmt)
 			}
@@ -174,14 +174,14 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 			// determine and validate target
 			name := s.Label.Value
 			switch s.Tok {
-			case syntax.Break:
+			case Break:
 				// spec: "If there is a label, it must be that of an enclosing
 				// "for", "switch", or "select" statement, and that is the one
 				// whose execution terminates."
 				valid := false
 				if t := b.enclosingTarget(name); t != nil {
 					switch t.Stmt.(type) {
-					case *syntax.SwitchStmt, *syntax.SelectStmt, *syntax.ForStmt:
+					case *SwitchStmt, *SelectStmt, *ForStmt:
 						valid = true
 					}
 				}
@@ -190,13 +190,13 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 					return
 				}
 
-			case syntax.Continue:
+			case Continue:
 				// spec: "If there is a label, it must be that of an enclosing
 				// "for" statement, and that is the one whose execution advances."
 				valid := false
 				if t := b.enclosingTarget(name); t != nil {
 					switch t.Stmt.(type) {
-					case *syntax.ForStmt:
+					case *ForStmt:
 						valid = true
 					}
 				}
@@ -205,7 +205,7 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 					return
 				}
 
-			case syntax.Goto:
+			case Goto:
 				if b.gotoTarget(name) == nil {
 					// label may be declared later - add branch to forward jumps
 					fwdJumps = append(fwdJumps, s)
@@ -222,35 +222,35 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *syntax.Lab
 			obj.(*Label).used = true
 			check.recordUse(s.Label, obj)
 
-		case *syntax.AssignStmt:
-			if s.Op == syntax.Def {
+		case *AssignStmt:
+			if s.Op == Def {
 				recordVarDecl(s.Pos())
 			}
 
-		case *syntax.BlockStmt:
+		case *BlockStmt:
 			// Unresolved forward jumps inside the nested block
 			// become forward jumps in the current block.
 			fwdJumps = append(fwdJumps, check.blockBranches(all, b, lstmt, s.List)...)
 
-		case *syntax.IfStmt:
+		case *IfStmt:
 			stmtBranches(s.Then)
 			if s.Else != nil {
 				stmtBranches(s.Else)
 			}
 
-		case *syntax.SwitchStmt:
+		case *SwitchStmt:
 			b := &block{b, lstmt, nil}
 			for _, s := range s.Body {
 				fwdJumps = append(fwdJumps, check.blockBranches(all, b, nil, s.Body)...)
 			}
 
-		case *syntax.SelectStmt:
+		case *SelectStmt:
 			b := &block{b, lstmt, nil}
 			for _, s := range s.Body {
 				fwdJumps = append(fwdJumps, check.blockBranches(all, b, nil, s.Body)...)
 			}
 
-		case *syntax.ForStmt:
+		case *ForStmt:
 			stmtBranches(s.Body)
 		}
 	}

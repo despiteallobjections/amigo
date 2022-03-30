@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // A Scope maintains a set of objects and links to its containing
@@ -26,14 +26,14 @@ type Scope struct {
 	children []*Scope
 	number   int               // parent.children[number-1] is this scope; 0 if there is no parent
 	elems    map[string]Object // lazily allocated
-	pos, end syntax.Pos        // scope extent; may be invalid
+	pos, end Pos               // scope extent; may be invalid
 	comment  string            // for debugging only
 	isFunc   bool              // set if this is a function scope (internal use only)
 }
 
 // NewScope returns a new, empty scope contained in the given parent
 // scope, if any. The comment is for debugging only.
-func NewScope(parent *Scope, pos, end syntax.Pos, comment string) *Scope {
+func NewScope(parent *Scope, pos, end Pos, comment string) *Scope {
 	s := &Scope{parent, nil, 0, nil, pos, end, comment, false}
 	// don't add children to Universe scope!
 	if parent != nil && parent != Universe {
@@ -83,7 +83,7 @@ func (s *Scope) Lookup(name string) Object {
 // object was inserted into the scope and already had a parent at that
 // time (see Insert). This can only happen for dot-imported objects
 // whose scope is the scope of the package that exported them.
-func (s *Scope) LookupParent(name string, pos syntax.Pos) (*Scope, Object) {
+func (s *Scope) LookupParent(name string, pos Pos) (*Scope, Object) {
 	for ; s != nil; s = s.parent {
 		if obj := s.Lookup(name); obj != nil && (!pos.IsKnown() || obj.scopePos().Cmp(pos) <= 0) {
 			return s, obj
@@ -170,13 +170,13 @@ func (s *Scope) Squash(err func(obj, alt Object)) {
 // The results are guaranteed to be valid only if the type-checked
 // AST has complete position information. The extent is undefined
 // for Universe and package scopes.
-func (s *Scope) Pos() syntax.Pos { return s.pos }
-func (s *Scope) End() syntax.Pos { return s.end }
+func (s *Scope) Pos() Pos { return s.pos }
+func (s *Scope) End() Pos { return s.end }
 
 // Contains reports whether pos is within the scope's extent.
 // The result is guaranteed to be valid only if the type-checked
 // AST has complete position information.
-func (s *Scope) Contains(pos syntax.Pos) bool {
+func (s *Scope) Contains(pos Pos) bool {
 	return s.pos.Cmp(pos) <= 0 && pos.Cmp(s.end) < 0
 }
 
@@ -185,7 +185,7 @@ func (s *Scope) Contains(pos syntax.Pos) bool {
 // The result is also nil for the Universe scope.
 // The result is guaranteed to be valid only if the type-checked
 // AST has complete position information.
-func (s *Scope) Innermost(pos syntax.Pos) *Scope {
+func (s *Scope) Innermost(pos Pos) *Scope {
 	// Package scopes do not have extents since they may be
 	// discontiguous, so iterate over the package's files.
 	if s.parent == Universe {
@@ -276,7 +276,7 @@ func resolve(name string, obj Object) Object {
 // stub implementations so *lazyObject implements Object and we can
 // store them directly into Scope.elems.
 func (*lazyObject) Parent() *Scope                        { panic("unreachable") }
-func (*lazyObject) Pos() syntax.Pos                       { panic("unreachable") }
+func (*lazyObject) Pos() Pos                              { panic("unreachable") }
 func (*lazyObject) Pkg() *Package                         { panic("unreachable") }
 func (*lazyObject) Name() string                          { panic("unreachable") }
 func (*lazyObject) Type() Type                            { panic("unreachable") }
@@ -290,5 +290,5 @@ func (*lazyObject) setOrder(uint32)                       { panic("unreachable")
 func (*lazyObject) setColor(color color)                  { panic("unreachable") }
 func (*lazyObject) setParent(*Scope)                      { panic("unreachable") }
 func (*lazyObject) sameId(pkg *Package, name string) bool { panic("unreachable") }
-func (*lazyObject) scopePos() syntax.Pos                  { panic("unreachable") }
-func (*lazyObject) setScopePos(pos syntax.Pos)            { panic("unreachable") }
+func (*lazyObject) scopePos() Pos                         { panic("unreachable") }
+func (*lazyObject) setScopePos(pos Pos)                   { panic("unreachable") }

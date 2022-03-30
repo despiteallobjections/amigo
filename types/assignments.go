@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // assignment reports whether x can be assigned to a variable of type T,
@@ -169,14 +169,14 @@ func (check *Checker) initVar(lhs *Var, x *operand, context string) Type {
 	return x.typ
 }
 
-func (check *Checker) assignVar(lhs syntax.Expr, x *operand) Type {
+func (check *Checker) assignVar(lhs Expr, x *operand) Type {
 	if x.mode == invalid || x.typ == Typ[Invalid] {
 		check.use(lhs)
 		return nil
 	}
 
 	// Determine if the lhs is a (possibly parenthesized) identifier.
-	ident, _ := syntax.Unparen(lhs).(*syntax.Name)
+	ident, _ := Unparen(lhs).(*Name)
 
 	// Don't evaluate lhs if it is the blank identifier.
 	if ident != nil && ident.Value == "_" {
@@ -223,11 +223,11 @@ func (check *Checker) assignVar(lhs syntax.Expr, x *operand) Type {
 	case variable, mapindex:
 		// ok
 	default:
-		if sel, ok := z.expr.(*syntax.SelectorExpr); ok {
+		if sel, ok := z.expr.(*SelectorExpr); ok {
 			var op operand
 			check.expr(&op, sel.X)
 			if op.mode == mapindex {
-				check.errorf(&z, "cannot assign to struct field %s in map", syntax.NodeString(z.expr))
+				check.errorf(&z, "cannot assign to struct field %s in map", NodeString(z.expr))
 				return nil
 			}
 		}
@@ -302,13 +302,13 @@ func measure(x int, unit string) string {
 	return fmt.Sprintf("%d %s", x, unit)
 }
 
-func (check *Checker) assignError(rhs []syntax.Expr, nvars, nvals int) {
+func (check *Checker) assignError(rhs []Expr, nvars, nvals int) {
 	vars := measure(nvars, "variable")
 	vals := measure(nvals, "value")
 	rhs0 := rhs[0]
 
 	if len(rhs) == 1 {
-		if call, _ := syntax.Unparen(rhs0).(*syntax.CallExpr); call != nil {
+		if call, _ := Unparen(rhs0).(*CallExpr); call != nil {
 			check.errorf(rhs0, "assignment mismatch: %s but %s returns %s", vars, call.Fun, vals)
 			return
 		}
@@ -318,7 +318,7 @@ func (check *Checker) assignError(rhs []syntax.Expr, nvars, nvals int) {
 
 // If returnStmt != nil, initVars is called to type-check the assignment
 // of return expressions, and returnStmt is the return statement.
-func (check *Checker) initVars(lhs []*Var, orig_rhs []syntax.Expr, returnStmt syntax.Stmt) {
+func (check *Checker) initVars(lhs []*Var, orig_rhs []Expr, returnStmt Stmt) {
 	rhs, commaOk := check.exprList(orig_rhs, len(lhs) == 2 && returnStmt == nil)
 
 	if len(lhs) != len(rhs) {
@@ -388,7 +388,7 @@ func (check *Checker) initVars(lhs []*Var, orig_rhs []syntax.Expr, returnStmt sy
 	}
 }
 
-func (check *Checker) assignVars(lhs, orig_rhs []syntax.Expr) {
+func (check *Checker) assignVars(lhs, orig_rhs []Expr) {
 	rhs, commaOk := check.exprList(orig_rhs, len(lhs) == 2)
 
 	if len(lhs) != len(rhs) {
@@ -427,7 +427,7 @@ func (check *Checker) assignVars(lhs, orig_rhs []syntax.Expr) {
 	if !ok {
 		// don't call check.use to avoid re-evaluation of the lhs expressions
 		for _, lhs := range lhs {
-			if name, _ := syntax.Unparen(lhs).(*syntax.Name); name != nil {
+			if name, _ := Unparen(lhs).(*Name); name != nil {
 				if obj := check.lookup(name.Value); obj != nil {
 					// see comment in assignVar
 					if v, _ := obj.(*Var); v != nil && v.pkg == check.pkg {
@@ -444,17 +444,17 @@ func (check *Checker) assignVars(lhs, orig_rhs []syntax.Expr) {
 // TODO(gri) Should find a more efficient solution that doesn't
 //           require introduction of a new slice for simple
 //           expressions.
-func unpackExpr(x syntax.Expr) []syntax.Expr {
-	if x, _ := x.(*syntax.ListExpr); x != nil {
+func unpackExpr(x Expr) []Expr {
+	if x, _ := x.(*ListExpr); x != nil {
 		return x.ElemList
 	}
 	if x != nil {
-		return []syntax.Expr{x}
+		return []Expr{x}
 	}
 	return nil
 }
 
-func (check *Checker) shortVarDecl(pos syntax.Pos, lhs, rhs []syntax.Expr) {
+func (check *Checker) shortVarDecl(pos Pos, lhs, rhs []Expr) {
 	top := len(check.delayed)
 	scope := check.scope
 
@@ -464,7 +464,7 @@ func (check *Checker) shortVarDecl(pos syntax.Pos, lhs, rhs []syntax.Expr) {
 	newVars := make([]*Var, 0, len(lhs))
 	hasErr := false
 	for i, lhs := range lhs {
-		ident, _ := lhs.(*syntax.Name)
+		ident, _ := lhs.(*Name)
 		if ident == nil {
 			check.use(lhs)
 			check.errorf(lhs, "non-name %s on left side of :=", lhs)
@@ -529,7 +529,7 @@ func (check *Checker) shortVarDecl(pos syntax.Pos, lhs, rhs []syntax.Expr) {
 	// a function begins at the end of the ConstSpec or VarSpec (ShortVarDecl
 	// for short variable declarations) and ends at the end of the innermost
 	// containing block."
-	scopePos := syntax.EndPos(rhs[len(rhs)-1])
+	scopePos := EndPos(rhs[len(rhs)-1])
 	for _, obj := range newVars {
 		check.declare(scope, nil, obj, scopePos) // id = nil: recordDef already called
 	}

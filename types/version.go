@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // langCompat reports an error if the representation of a numeric
 // literal is not compatible with the current language version.
-func (check *Checker) langCompat(lit *syntax.BasicLit) {
+func (check *Checker) langCompat(lit *BasicLit) {
 	s := lit.Value
 	if len(s) <= 2 || check.allowVersion(check.pkg, 1, 13) {
 		return
@@ -37,7 +37,7 @@ func (check *Checker) langCompat(lit *syntax.BasicLit) {
 		check.versionErrorf(lit, "go1.13", "0o/0O-style octal literals")
 		return
 	}
-	if lit.Kind != syntax.IntLit && (radix == 'x' || radix == 'X') {
+	if lit.Kind != IntLit && (radix == 'x' || radix == 'X') {
 		check.versionErrorf(lit, "go1.13", "hexadecimal floating-point literals")
 	}
 }

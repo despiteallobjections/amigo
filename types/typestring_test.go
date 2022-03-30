@@ -7,7 +7,7 @@ package types_test
 import (
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 	. "github.com/mdempsky/amigo/types"
 )
@@ -21,7 +21,7 @@ func makePkg(src string) (*Package, error) {
 	}
 	// use the package name as package path
 	conf := Config{Importer: defaultImporter()}
-	return conf.Check(file.PkgName.Value, []*syntax.File{file}, nil)
+	return conf.Check(file.PkgName.Value, []*File{file}, nil)
 }
 
 type testEntry struct {

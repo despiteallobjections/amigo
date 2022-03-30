@@ -6,7 +6,7 @@
 
 package types
 
-import "github.com/mdempsky/amigo/syntax"
+import . "github.com/mdempsky/amigo/syntax"
 
 type substMap map[*TypeParam]Type
 
@@ -49,7 +49,7 @@ func (m substMap) lookup(tpar *TypeParam) Type {
 // from the incoming type.
 //
 // If the given context is non-nil, it is used in lieu of check.Config.Context.
-func (check *Checker) subst(pos syntax.Pos, typ Type, smap substMap, ctxt *Context) Type {
+func (check *Checker) subst(pos Pos, typ Type, smap substMap, ctxt *Context) Type {
 	if smap.empty() {
 		return typ
 	}
@@ -73,7 +73,7 @@ func (check *Checker) subst(pos syntax.Pos, typ Type, smap substMap, ctxt *Conte
 }
 
 type subster struct {
-	pos   syntax.Pos
+	pos   Pos
 	smap  substMap
 	check *Checker // nil if called via Instantiate
 	ctxt  *Context

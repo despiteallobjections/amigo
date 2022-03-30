@@ -12,7 +12,7 @@ import (
 	"go/constant"
 	"go/token"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // An operandMode specifies the (addressing) mode of an operand.
@@ -56,7 +56,7 @@ var operandModeString = [...]string{
 //
 type operand struct {
 	mode operandMode
-	expr syntax.Expr
+	expr Expr
 	typ  Type
 	val  constant.Value
 	id   builtinId
@@ -65,7 +65,7 @@ type operand struct {
 // Pos returns the position of the expression corresponding to x.
 // If x is invalid the position is nopos.
 //
-func (x *operand) Pos() syntax.Pos {
+func (x *operand) Pos() Pos {
 	// x.expr may not be set if x is invalid
 	if x.expr == nil {
 		return nopos
@@ -127,7 +127,7 @@ func operandString(x *operand, qf Qualifier) string {
 
 	var expr string
 	if x.expr != nil {
-		expr = syntax.NodeString(x.expr)
+		expr = NodeString(x.expr)
 	} else {
 		switch x.mode {
 		case builtin:
@@ -206,18 +206,18 @@ func (x *operand) String() string {
 }
 
 // setConst sets x to the untyped constant for literal lit.
-func (x *operand) setConst(k syntax.LitKind, lit string) {
+func (x *operand) setConst(k LitKind, lit string) {
 	var kind BasicKind
 	switch k {
-	case syntax.IntLit:
+	case IntLit:
 		kind = UntypedInt
-	case syntax.FloatLit:
+	case FloatLit:
 		kind = UntypedFloat
-	case syntax.ImagLit:
+	case ImagLit:
 		kind = UntypedComplex
-	case syntax.RuneLit:
+	case RuneLit:
 		kind = UntypedRune
-	case syntax.StringLit:
+	case StringLit:
 		kind = UntypedString
 	default:
 		unreachable()
@@ -382,9 +382,9 @@ func (x *operand) assignableTo(check *Checker, T Type, reason *string) (bool, er
 
 // kind2tok translates syntax.LitKinds into token.Tokens.
 var kind2tok = [...]token.Token{
-	syntax.IntLit:    token.INT,
-	syntax.FloatLit:  token.FLOAT,
-	syntax.ImagLit:   token.IMAG,
-	syntax.RuneLit:   token.CHAR,
-	syntax.StringLit: token.STRING,
+	IntLit:    token.INT,
+	FloatLit:  token.FLOAT,
+	ImagLit:   token.IMAG,
+	RuneLit:   token.CHAR,
+	StringLit: token.STRING,
 }

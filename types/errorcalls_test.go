@@ -7,7 +7,7 @@ package types_test
 import (
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // TestErrorCalls makes sure that check.errorf calls have at
@@ -19,12 +19,12 @@ func TestErrorCalls(t *testing.T) {
 	}
 
 	for _, file := range files {
-		syntax.Crawl(file, func(n syntax.Node) bool {
-			call, _ := n.(*syntax.CallExpr)
+		Crawl(file, func(n Node) bool {
+			call, _ := n.(*CallExpr)
 			if call == nil {
 				return false
 			}
-			selx, _ := call.Fun.(*syntax.SelectorExpr)
+			selx, _ := call.Fun.(*SelectorExpr)
 			if selx == nil {
 				return false
 			}
@@ -42,8 +42,8 @@ func TestErrorCalls(t *testing.T) {
 	}
 }
 
-func isName(n syntax.Node, name string) bool {
-	if n, ok := n.(*syntax.Name); ok {
+func isName(n Node, name string) bool {
+	if n, ok := n.(*Name); ok {
 		return n.Value == name
 	}
 	return false

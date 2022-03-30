@@ -4,7 +4,7 @@
 
 package types
 
-import "github.com/mdempsky/amigo/syntax"
+import . "github.com/mdempsky/amigo/syntax"
 
 // ----------------------------------------------------------------------------
 // API
@@ -47,7 +47,7 @@ const maxTermCount = 100
 
 // parseUnion parses uexpr as a union of expressions.
 // The result is a Union type, or Typ[Invalid] for some errors.
-func parseUnion(check *Checker, uexpr syntax.Expr) Type {
+func parseUnion(check *Checker, uexpr Expr) Type {
 	blist, tlist := flattenUnion(nil, uexpr)
 	assert(len(blist) == len(tlist)-1)
 
@@ -134,10 +134,10 @@ func parseUnion(check *Checker, uexpr syntax.Expr) Type {
 	return u
 }
 
-func parseTilde(check *Checker, tx syntax.Expr) *Term {
+func parseTilde(check *Checker, tx Expr) *Term {
 	x := tx
 	var tilde bool
-	if op, _ := x.(*syntax.Operation); op != nil && op.Op == syntax.Tilde {
+	if op, _ := x.(*Operation); op != nil && op.Op == Tilde {
 		x = op.X
 		tilde = true
 	}
@@ -178,8 +178,8 @@ func overlappingTerm(terms []*Term, y *Term) int {
 
 // flattenUnion walks a union type expression of the form A | B | C | ...,
 // extracting both the binary exprs (blist) and leaf types (tlist).
-func flattenUnion(list []syntax.Expr, x syntax.Expr) (blist, tlist []syntax.Expr) {
-	if o, _ := x.(*syntax.Operation); o != nil && o.Op == syntax.Or {
+func flattenUnion(list []Expr, x Expr) (blist, tlist []Expr) {
+	if o, _ := x.(*Operation); o != nil && o.Op == Or {
 		blist, tlist = flattenUnion(list, o.X)
 		blist = append(blist, o)
 		x = o.Y

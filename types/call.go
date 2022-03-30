@@ -10,12 +10,12 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // funcInst type-checks a function instantiation inst and returns the result in x.
 // The operand x must be the evaluation of inst.X and its type must be a signature.
-func (check *Checker) funcInst(x *operand, inst *syntax.IndexExpr) {
+func (check *Checker) funcInst(x *operand, inst *IndexExpr) {
 	if !check.allowVersion(check.pkg, 1, 18) {
 		check.versionErrorf(inst.Pos(), "go1.18", "function instantiation")
 	}
@@ -60,7 +60,7 @@ func (check *Checker) funcInst(x *operand, inst *syntax.IndexExpr) {
 	x.expr = inst
 }
 
-func (check *Checker) instantiateSignature(pos syntax.Pos, typ *Signature, targs []Type, xlist []syntax.Expr) (res *Signature) {
+func (check *Checker) instantiateSignature(pos Pos, typ *Signature, targs []Type, xlist []Expr) (res *Signature) {
 	assert(check != nil)
 	assert(len(targs) == typ.TypeParams().Len())
 
@@ -83,7 +83,7 @@ func (check *Checker) instantiateSignature(pos syntax.Pos, typ *Signature, targs
 			// best position for error reporting
 			pos := pos
 			if i < len(xlist) {
-				pos = syntax.StartPos(xlist[i])
+				pos = StartPos(xlist[i])
 			}
 			check.softErrorf(pos, "%s", err)
 		} else {
@@ -94,9 +94,9 @@ func (check *Checker) instantiateSignature(pos syntax.Pos, typ *Signature, targs
 	return inst
 }
 
-func (check *Checker) callExpr(x *operand, call *syntax.CallExpr) exprKind {
-	var inst *syntax.IndexExpr // function instantiation, if any
-	if iexpr, _ := call.Fun.(*syntax.IndexExpr); iexpr != nil {
+func (check *Checker) callExpr(x *operand, call *CallExpr) exprKind {
+	var inst *IndexExpr // function instantiation, if any
+	if iexpr, _ := call.Fun.(*IndexExpr); iexpr != nil {
 		if check.indexExpr(x, iexpr) {
 			// Delay function instantiation to argument checking,
 			// where we combine type and value arguments for type
@@ -178,7 +178,7 @@ func (check *Checker) callExpr(x *operand, call *syntax.CallExpr) exprKind {
 	}
 
 	// evaluate type arguments, if any
-	var xlist []syntax.Expr
+	var xlist []Expr
 	var targs []Type
 	if inst != nil {
 		xlist = unpackExpr(inst.Index)
@@ -239,7 +239,7 @@ func (check *Checker) callExpr(x *operand, call *syntax.CallExpr) exprKind {
 	return statement
 }
 
-func (check *Checker) exprList(elist []syntax.Expr, allowCommaOk bool) (xlist []*operand, commaOk bool) {
+func (check *Checker) exprList(elist []Expr, allowCommaOk bool) (xlist []*operand, commaOk bool) {
 	switch len(elist) {
 	case 0:
 		// nothing to do
@@ -280,7 +280,7 @@ func (check *Checker) exprList(elist []syntax.Expr, allowCommaOk bool) (xlist []
 }
 
 // xlist is the list of type argument expressions supplied in the source code.
-func (check *Checker) arguments(call *syntax.CallExpr, sig *Signature, targs []Type, args []*operand, xlist []syntax.Expr) (rsig *Signature) {
+func (check *Checker) arguments(call *CallExpr, sig *Signature, targs []Type, args []*operand, xlist []Expr) (rsig *Signature) {
 	rsig = sig
 
 	// TODO(gri) try to eliminate this extra verification loop
@@ -376,7 +376,7 @@ func (check *Checker) arguments(call *syntax.CallExpr, sig *Signature, targs []T
 	// infer type arguments and instantiate signature if necessary
 	if sig.TypeParams().Len() > 0 {
 		if !check.allowVersion(check.pkg, 1, 18) {
-			if iexpr, _ := call.Fun.(*syntax.IndexExpr); iexpr != nil {
+			if iexpr, _ := call.Fun.(*IndexExpr); iexpr != nil {
 				check.versionErrorf(iexpr.Pos(), "go1.18", "function instantiation")
 			} else {
 				check.versionErrorf(call.Pos(), "go1.18", "implicit function instantiation")
@@ -424,7 +424,7 @@ var cgoPrefixes = [...]string{
 	"_Cmacro_", // function to evaluate the expanded expression
 }
 
-func (check *Checker) selector(x *operand, e *syntax.SelectorExpr, def *Named) {
+func (check *Checker) selector(x *operand, e *SelectorExpr, def *Named) {
 	// these must be declared before the "goto Error" statements
 	var (
 		obj      Object
@@ -437,7 +437,7 @@ func (check *Checker) selector(x *operand, e *syntax.SelectorExpr, def *Named) {
 	// so we don't need a "package" mode for operands: package names
 	// can only appear in qualified identifiers which are mapped to
 	// selector expressions.
-	if ident, ok := e.X.(*syntax.Name); ok {
+	if ident, ok := e.X.(*Name); ok {
 		obj := check.lookup(ident.Value)
 		if pname, _ := obj.(*PkgName); pname != nil {
 			assert(pname.pkg == check.pkg)
@@ -680,7 +680,7 @@ Error:
 // (and variables are "used") in the presence of other errors.
 // The arguments may be nil.
 // TODO(gri) make this accept a []syntax.Expr and use an unpack function when we have a ListExpr?
-func (check *Checker) use(arg ...syntax.Expr) {
+func (check *Checker) use(arg ...Expr) {
 	var x operand
 	for _, e := range arg {
 		switch n := e.(type) {
@@ -688,12 +688,12 @@ func (check *Checker) use(arg ...syntax.Expr) {
 			// some AST fields may be nil (e.g., elements of syntax.SliceExpr.Index)
 			// TODO(gri) can those fields really make it here?
 			continue
-		case *syntax.Name:
+		case *Name:
 			// don't report an error evaluating blank
 			if n.Value == "_" {
 				continue
 			}
-		case *syntax.ListExpr:
+		case *ListExpr:
 			check.use(n.ElemList...)
 			continue
 		}

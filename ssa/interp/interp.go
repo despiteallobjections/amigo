@@ -377,7 +377,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		for _, state := range instr.States {
 			var dir reflect.SelectDir
-			if state.Dir == types.RecvOnly {
+			if state.Dir == syntax.RecvOnly {
 				dir = reflect.SelectRecv
 			} else {
 				dir = reflect.SelectSend
@@ -398,7 +398,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		r := tuple{chosen, recvOk}
 		for i, st := range instr.States {
-			if st.Dir == types.RecvOnly {
+			if st.Dir == syntax.RecvOnly {
 				var v value
 				if i == chosen && recvOk {
 					// No need to copy since send makes an unaliased copy.

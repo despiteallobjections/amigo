@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // Eval returns the type and, if constant, the value for the
@@ -21,15 +21,15 @@ import (
 // same as in CheckExpr. An error is returned if expr cannot
 // be parsed successfully, or the resulting expr AST cannot be
 // type-checked.
-func Eval(pkg *Package, pos syntax.Pos, expr string) (_ TypeAndValue, err error) {
+func Eval(pkg *Package, pos Pos, expr string) (_ TypeAndValue, err error) {
 	// parse expressions
-	node, err := syntax.ParseExpr(syntax.NewFileBase("eval"), strings.NewReader(expr), nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+	node, err := ParseExpr(NewFileBase("eval"), strings.NewReader(expr), nil, nil, CheckBranches|AllowGenerics)
 	if err != nil {
 		return TypeAndValue{}, err
 	}
 
 	info := &Info{
-		Types: make(map[syntax.Expr]TypeAndValue),
+		Types: make(map[Expr]TypeAndValue),
 	}
 	err = CheckExpr(pkg, pos, node, info)
 	return info.Types[node], err
@@ -54,12 +54,12 @@ func Eval(pkg *Package, pos syntax.Pos, expr string) (_ TypeAndValue, err error)
 // assignment). Thus, top-level untyped constants will return an
 // untyped type rather then the respective context-specific type.
 //
-func CheckExpr(pkg *Package, pos syntax.Pos, expr syntax.Expr, info *Info) (err error) {
+func CheckExpr(pkg *Package, pos Pos, expr Expr, info *Info) (err error) {
 	// determine scope
 	var scope *Scope
 	if pkg == nil {
 		scope = Universe
-		pos = syntax.NoPos
+		pos = NoPos
 	} else if !pos.IsValid() {
 		scope = pkg.scope
 	} else {

@@ -9,13 +9,13 @@ package types
 import (
 	"go/constant"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // If e is a valid function instantiation, indexExpr returns true.
 // In that case x represents the uninstantiated function value and
 // it is the caller's responsibility to instantiate the function.
-func (check *Checker) indexExpr(x *operand, e *syntax.IndexExpr) (isFuncInst bool) {
+func (check *Checker) indexExpr(x *operand, e *IndexExpr) (isFuncInst bool) {
 	check.exprOrType(x, e.X, true)
 	// x may be generic
 
@@ -205,7 +205,7 @@ func (check *Checker) indexExpr(x *operand, e *syntax.IndexExpr) (isFuncInst boo
 	return false
 }
 
-func (check *Checker) sliceExpr(x *operand, e *syntax.SliceExpr) {
+func (check *Checker) sliceExpr(x *operand, e *SliceExpr) {
 	check.expr(x, e.X)
 	if x.mode == invalid {
 		check.use(e.Index[:]...)
@@ -326,13 +326,13 @@ L:
 // singleIndex returns the (single) index from the index expression e.
 // If the index is missing, or if there are multiple indices, an error
 // is reported and the result is nil.
-func (check *Checker) singleIndex(e *syntax.IndexExpr) syntax.Expr {
+func (check *Checker) singleIndex(e *IndexExpr) Expr {
 	index := e.Index
 	if index == nil {
 		check.errorf(e, invalidAST+"missing index for %s", e.X)
 		return nil
 	}
-	if l, _ := index.(*syntax.ListExpr); l != nil {
+	if l, _ := index.(*ListExpr); l != nil {
 		if n := len(l.ElemList); n <= 1 {
 			check.errorf(e, invalidAST+"invalid use of ListExpr for index expression %v with %d indices", e, n)
 			return nil
@@ -348,7 +348,7 @@ func (check *Checker) singleIndex(e *syntax.IndexExpr) syntax.Expr {
 // If max >= 0, it is the upper bound for index.
 // If the result typ is != Typ[Invalid], index is valid and typ is its (possibly named) integer type.
 // If the result val >= 0, index is valid and val is its constant int value.
-func (check *Checker) index(index syntax.Expr, max int64) (typ Type, val int64) {
+func (check *Checker) index(index Expr, max int64) (typ Type, val int64) {
 	typ = Typ[Invalid]
 	val = -1
 
@@ -423,14 +423,14 @@ func (check *Checker) isValidIndex(x *operand, what string, allowNegative bool) 
 // against the literal's element type (typ), and the element indices against
 // the literal length if known (length >= 0). It returns the length of the
 // literal (maximum index value + 1).
-func (check *Checker) indexedElts(elts []syntax.Expr, typ Type, length int64) int64 {
+func (check *Checker) indexedElts(elts []Expr, typ Type, length int64) int64 {
 	visited := make(map[int64]bool, len(elts))
 	var index, max int64
 	for _, e := range elts {
 		// determine and check index
 		validIndex := false
 		eval := e
-		if kv, _ := e.(*syntax.KeyValueExpr); kv != nil {
+		if kv, _ := e.(*KeyValueExpr); kv != nil {
 			if typ, i := check.index(kv.Key, length); typ != Typ[Invalid] {
 				if i >= 0 {
 					index = i

@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // A Qualifier controls how named package-level objects are printed in

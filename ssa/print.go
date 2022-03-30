@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
 
@@ -330,7 +331,7 @@ func (s *Select) String() string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		if st.Dir == types.RecvOnly {
+		if st.Dir == syntax.RecvOnly {
 			b.WriteString("<-")
 			b.WriteString(relName(st.Chan, s))
 		} else {

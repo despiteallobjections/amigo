@@ -4,7 +4,7 @@
 
 package types
 
-import "github.com/mdempsky/amigo/syntax"
+import . "github.com/mdempsky/amigo/syntax"
 
 // ----------------------------------------------------------------------------
 // API
@@ -89,7 +89,7 @@ func (s *Signature) String() string   { return TypeString(s, nil) }
 // Implementation
 
 // funcType type-checks a function or method type.
-func (check *Checker) funcType(sig *Signature, recvPar *syntax.Field, tparams []*syntax.Field, ftyp *syntax.FuncType) {
+func (check *Checker) funcType(sig *Signature, recvPar *Field, tparams []*Field, ftyp *FuncType) {
 	check.openScope(ftyp, "function")
 	check.scope.isFunc = true
 	check.recordScope(ftyp, check.scope)
@@ -117,7 +117,7 @@ func (check *Checker) funcType(sig *Signature, recvPar *syntax.Field, tparams []
 			for i, p := range rparams {
 				if p.Value == "_" {
 					if check.recvTParamMap == nil {
-						check.recvTParamMap = make(map[*syntax.Name]*TypeParam)
+						check.recvTParamMap = make(map[*Name]*TypeParam)
 					}
 					check.recvTParamMap[p] = tparams[i]
 				}
@@ -167,7 +167,7 @@ func (check *Checker) funcType(sig *Signature, recvPar *syntax.Field, tparams []
 	scope := NewScope(check.scope, nopos, nopos, "function body (temp. scope)")
 	var recvList []*Var // TODO(gri) remove the need for making a list here
 	if recvPar != nil {
-		recvList, _ = check.collectParams(scope, []*syntax.Field{recvPar}, false) // use rewritten receiver type, if any
+		recvList, _ = check.collectParams(scope, []*Field{recvPar}, false) // use rewritten receiver type, if any
 	}
 	params, variadic := check.collectParams(scope, ftyp.ParamList, true)
 	results, _ := check.collectParams(scope, ftyp.ResultList, false)
@@ -266,7 +266,7 @@ func (check *Checker) funcType(sig *Signature, recvPar *syntax.Field, tparams []
 
 // collectParams declares the parameters of list in scope and returns the corresponding
 // variable list.
-func (check *Checker) collectParams(scope *Scope, list []*syntax.Field, variadicOk bool) (params []*Var, variadic bool) {
+func (check *Checker) collectParams(scope *Scope, list []*Field, variadicOk bool) (params []*Var, variadic bool) {
 	if list == nil {
 		return
 	}
@@ -274,13 +274,13 @@ func (check *Checker) collectParams(scope *Scope, list []*syntax.Field, variadic
 	var named, anonymous bool
 
 	var typ Type
-	var prev syntax.Expr
+	var prev Expr
 	for i, field := range list {
 		ftype := field.Type
 		// type-check type of grouped fields only once
 		if ftype != prev {
 			prev = ftype
-			if t, _ := ftype.(*syntax.DotsType); t != nil {
+			if t, _ := ftype.(*DotsType); t != nil {
 				ftype = t.Elem
 				if variadicOk && i == len(list)-1 {
 					variadic = true

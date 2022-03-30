@@ -9,7 +9,7 @@ package types_test
 import (
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
 
@@ -19,9 +19,9 @@ func findStructType(t *testing.T, src string) *types.Struct {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info := types.Info{Types: make(map[syntax.Expr]types.TypeAndValue)}
+	info := types.Info{Types: make(map[Expr]types.TypeAndValue)}
 	var conf types.Config
-	_, err = conf.Check("x", []*syntax.File{f}, &info)
+	_, err = conf.Check("x", []*File{f}, &info)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,12 +92,12 @@ const _ = unsafe.Offsetof(struct{ x int64 }{}.x)
 	if err != nil {
 		t.Fatal(err)
 	}
-	info := types.Info{Types: make(map[syntax.Expr]types.TypeAndValue)}
+	info := types.Info{Types: make(map[Expr]types.TypeAndValue)}
 	conf := types.Config{
 		Importer: defaultImporter(),
 		Sizes:    &types.StdSizes{WordSize: 8, MaxAlign: 8},
 	}
-	_, err = conf.Check("x", []*syntax.File{f}, &info)
+	_, err = conf.Check("x", []*File{f}, &info)
 	if err != nil {
 		t.Fatal(err)
 	}

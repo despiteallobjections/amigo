@@ -33,7 +33,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 	. "github.com/mdempsky/amigo/types"
 )
@@ -44,12 +44,12 @@ var (
 	goVersion    = flag.String("lang", "", "Go language version (e.g. \"go1.12\")")
 )
 
-func parseFiles(t *testing.T, filenames []string, mode syntax.Mode) ([]*syntax.File, []error) {
-	var files []*syntax.File
+func parseFiles(t *testing.T, filenames []string, mode Mode) ([]*File, []error) {
+	var files []*File
 	var errlist []error
 	errh := func(err error) { errlist = append(errlist, err) }
 	for _, filename := range filenames {
-		file, err := syntax.ParseFile(filename, errh, nil, mode)
+		file, err := ParseFile(filename, errh, nil, mode)
 		if file == nil {
 			t.Fatalf("%s: %s", filename, err)
 		}
@@ -58,14 +58,14 @@ func parseFiles(t *testing.T, filenames []string, mode syntax.Mode) ([]*syntax.F
 	return files, errlist
 }
 
-func unpackError(err error) syntax.Error {
+func unpackError(err error) Error {
 	switch err := err.(type) {
-	case syntax.Error:
+	case Error:
 		return err
 	case TypeError:
-		return syntax.Error{Pos: err.Pos, Msg: err.Msg}
+		return Error{Pos: err.Pos, Msg: err.Msg}
 	default:
-		return syntax.Error{Msg: err.Error()}
+		return Error{Msg: err.Error()}
 	}
 }
 
@@ -135,7 +135,7 @@ func testFiles(t *testing.T, filenames []string, colDelta uint, manual bool) {
 		t.Fatal(err)
 	}
 
-	files, errlist := parseFiles(t, filenames, syntax.AllowGenerics|syntax.AllowMethodTypeParams)
+	files, errlist := parseFiles(t, filenames, AllowGenerics|AllowMethodTypeParams)
 
 	pkgName := "<no package>"
 	if len(files) > 0 {
@@ -177,14 +177,14 @@ func testFiles(t *testing.T, filenames []string, colDelta uint, manual bool) {
 	})
 
 	// collect expected errors
-	errmap := make(map[string]map[uint][]syntax.Error)
+	errmap := make(map[string]map[uint][]Error)
 	for _, filename := range filenames {
 		f, err := os.Open(filename)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
-		if m := syntax.ErrorMap(f); len(m) > 0 {
+		if m := ErrorMap(f); len(m) > 0 {
 			errmap[filename] = m
 		}
 		f.Close()
@@ -198,7 +198,7 @@ func testFiles(t *testing.T, filenames []string, colDelta uint, manual bool) {
 		filename := got.Pos.Base().Filename()
 		filemap := errmap[filename]
 		line := got.Pos.Line()
-		var list []syntax.Error
+		var list []Error
 		if filemap != nil {
 			list = filemap[line]
 		}

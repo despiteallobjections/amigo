@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 func TestInvalidTypeSet(t *testing.T) {
@@ -48,14 +48,14 @@ func TestTypeSetString(t *testing.T) {
 		// parse
 		errh := func(error) {} // dummy error handler so that parsing continues in presence of errors
 		src := "package p; type T interface" + body
-		file, err := syntax.Parse(nil, strings.NewReader(src), errh, nil, syntax.AllowGenerics)
+		file, err := Parse(nil, strings.NewReader(src), errh, nil, AllowGenerics)
 		if err != nil {
 			t.Fatalf("%s: %v (invalid test case)", body, err)
 		}
 
 		// type check
 		var conf Config
-		pkg, err := conf.Check(file.PkgName.Value, []*syntax.File{file}, nil)
+		pkg, err := conf.Check(file.PkgName.Value, []*File{file}, nil)
 		if err != nil {
 			t.Fatalf("%s: %v (invalid test case)", body, err)
 		}

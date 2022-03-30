@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 func unimplemented() {
@@ -38,7 +38,7 @@ type error_ struct {
 
 // An errorDesc describes part of a type-checking error.
 type errorDesc struct {
-	pos    syntax.Pos
+	pos    Pos
 	format string
 	args   []interface{}
 }
@@ -47,7 +47,7 @@ func (err *error_) empty() bool {
 	return err.desc == nil
 }
 
-func (err *error_) pos() syntax.Pos {
+func (err *error_) pos() Pos {
 	if err.empty() {
 		return nopos
 	}
@@ -95,18 +95,18 @@ func sprintf(qf Qualifier, debug bool, format string, args ...interface{}) strin
 			panic("got operand instead of *operand")
 		case *operand:
 			arg = operandString(a, qf)
-		case syntax.Pos:
+		case Pos:
 			arg = a.String()
-		case syntax.Expr:
-			arg = syntax.NodeString(a)
-		case []syntax.Expr:
+		case Expr:
+			arg = NodeString(a)
+		case []Expr:
 			var buf bytes.Buffer
 			buf.WriteByte('[')
 			for i, x := range a {
 				if i > 0 {
 					buf.WriteString(", ")
 				}
-				buf.WriteString(syntax.NodeString(x))
+				buf.WriteString(NodeString(x))
 			}
 			buf.WriteByte(']')
 			arg = buf.String()
@@ -195,7 +195,7 @@ func (check *Checker) report(err *error_) {
 	check.err(err.pos(), err.msg(check.qualifier), err.soft)
 }
 
-func (check *Checker) trace(pos syntax.Pos, format string, args ...interface{}) {
+func (check *Checker) trace(pos Pos, format string, args ...interface{}) {
 	fmt.Printf("%s:\t%s%s\n",
 		pos,
 		strings.Repeat(".  ", check.indent),
@@ -254,7 +254,7 @@ const (
 )
 
 type poser interface {
-	Pos() syntax.Pos
+	Pos() Pos
 }
 
 func (check *Checker) error(at poser, msg string) {
@@ -280,14 +280,14 @@ func (check *Checker) versionErrorf(at poser, goVersion string, format string, a
 }
 
 // posFor reports the left (= start) position of at.
-func posFor(at poser) syntax.Pos {
+func posFor(at poser) Pos {
 	switch x := at.(type) {
 	case *operand:
 		if x.expr != nil {
-			return syntax.StartPos(x.expr)
+			return StartPos(x.expr)
 		}
-	case syntax.Node:
-		return syntax.StartPos(x)
+	case Node:
+		return StartPos(x)
 	}
 	return at.Pos()
 }

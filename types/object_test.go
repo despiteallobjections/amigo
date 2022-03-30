@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
@@ -65,7 +65,7 @@ func TestEmbeddedMethod(t *testing.T) {
 		t.Fatalf("parse failed: %s", err)
 	}
 	var conf Config
-	pkg, err := conf.Check(f.PkgName.Value, []*syntax.File{f}, nil)
+	pkg, err := conf.Check(f.PkgName.Value, []*File{f}, nil)
 	if err != nil {
 		t.Fatalf("typecheck failed: %s", err)
 	}

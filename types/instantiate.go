@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // Instantiate instantiates the type orig with the given type arguments targs.
@@ -63,7 +63,7 @@ func Instantiate(ctxt *Context, orig Type, targs []Type, validate bool) (Type, e
 // instance creates a type or function instance using the given original type
 // typ and arguments targs. For Named types the resulting instance will be
 // unexpanded. check may be nil.
-func (check *Checker) instance(pos syntax.Pos, orig Type, targs []Type, ctxt *Context) (res Type) {
+func (check *Checker) instance(pos Pos, orig Type, targs []Type, ctxt *Context) (res Type) {
 	var h string
 	if ctxt != nil {
 		h = ctxt.instanceHash(orig, targs)
@@ -122,7 +122,7 @@ func (check *Checker) instance(pos syntax.Pos, orig Type, targs []Type, ctxt *Co
 // validateTArgLen verifies that the length of targs and tparams matches,
 // reporting an error if not. If validation fails and check is nil,
 // validateTArgLen panics.
-func (check *Checker) validateTArgLen(pos syntax.Pos, ntparams, ntargs int) bool {
+func (check *Checker) validateTArgLen(pos Pos, ntparams, ntargs int) bool {
 	if ntargs != ntparams {
 		// TODO(gri) provide better error message
 		if check != nil {
@@ -134,7 +134,7 @@ func (check *Checker) validateTArgLen(pos syntax.Pos, ntparams, ntargs int) bool
 	return true
 }
 
-func (check *Checker) verify(pos syntax.Pos, tparams []*TypeParam, targs []Type) (int, error) {
+func (check *Checker) verify(pos Pos, tparams []*TypeParam, targs []Type) (int, error) {
 	smap := makeSubstMap(tparams, targs)
 	for i, tpar := range tparams {
 		// Ensure that we have a (possibly implicit) interface as type bound (issue #51048).

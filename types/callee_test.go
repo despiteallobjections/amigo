@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/mdempsky/amigo/srcimporter"
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -50,26 +50,26 @@ func noncalls() {
 }
 `
 	// parse
-	f, err := syntax.ParseString("p.go", src)
+	f, err := ParseString("p.go", src)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// type-check
 	info := &Info{
-		Uses:       make(map[*syntax.Name]Object),
-		Selections: make(map[*syntax.SelectorExpr]*Selection),
+		Uses:       make(map[*Name]Object),
+		Selections: make(map[*SelectorExpr]*Selection),
 	}
 	cfg := &Config{Importer: srcimporter.New(&build.Default, map[string]*Package{})}
-	if _, err := cfg.Check("p", []*syntax.File{f}, info); err != nil {
+	if _, err := cfg.Check("p", []*File{f}, info); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, decl := range f.DeclList {
-		if decl, ok := decl.(*syntax.FuncDecl); ok && strings.HasSuffix(decl.Name.Value, "calls") {
+		if decl, ok := decl.(*FuncDecl); ok && strings.HasSuffix(decl.Name.Value, "calls") {
 			wantCallee := decl.Name.Value == "calls" // false within func noncalls()
-			syntax.Inspect(decl.Body, func(n syntax.Node) bool {
-				if call, ok := n.(*syntax.CallExpr); ok {
+			Inspect(decl.Body, func(n Node) bool {
+				if call, ok := n.(*CallExpr); ok {
 					fn := StaticCallee(info, call)
 					if fn == nil && wantCallee {
 						t.Errorf("%s: StaticCallee returned nil", call.Pos())

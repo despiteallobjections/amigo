@@ -4,23 +4,13 @@
 
 package types
 
-import "github.com/mdempsky/amigo/syntax"
+import . "github.com/mdempsky/amigo/syntax"
 
 // A Chan represents a channel type.
 type Chan struct {
 	dir  ChanDir
 	elem Type
 }
-
-// A ChanDir value indicates a channel direction.
-type ChanDir = syntax.ChanDir
-
-// The direction of a channel is indicated by one of these constants.
-const (
-	SendRecv = syntax.SendRecv
-	SendOnly = syntax.SendOnly
-	RecvOnly = syntax.RecvOnly
-)
 
 // NewChan returns a new channel type for the given direction and element type.
 func NewChan(dir ChanDir, elem Type) *Chan {

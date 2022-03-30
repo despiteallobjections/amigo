@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"go/constant"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 func (err *error_) recordAltDecl(obj Object) {
@@ -20,7 +20,7 @@ func (err *error_) recordAltDecl(obj Object) {
 	}
 }
 
-func (check *Checker) declare(scope *Scope, id *syntax.Name, obj Object, pos syntax.Pos) {
+func (check *Checker) declare(scope *Scope, id *Name, obj Object, pos Pos) {
 	// spec: "The blank identifier, represented by the underscore
 	// character _, may be used in a declaration like any other
 	// identifier but the declaration does not introduce a new
@@ -344,11 +344,11 @@ func firstInSrc(path []Object) int {
 	return fst
 }
 
-func (check *Checker) constDecl(obj *Const, typ, init syntax.Expr, inherited bool) {
+func (check *Checker) constDecl(obj *Const, typ, init Expr, inherited bool) {
 	assert(obj.typ == nil)
 
 	// use the correct value of iota and errpos
-	defer func(iota constant.Value, errpos syntax.Pos) {
+	defer func(iota constant.Value, errpos Pos) {
 		check.iota = iota
 		check.errpos = errpos
 	}(check.iota, check.errpos)
@@ -390,7 +390,7 @@ func (check *Checker) constDecl(obj *Const, typ, init syntax.Expr, inherited boo
 	check.initConst(obj, &x)
 }
 
-func (check *Checker) varDecl(obj *Var, lhs []*Var, typ, init syntax.Expr) {
+func (check *Checker) varDecl(obj *Var, lhs []*Var, typ, init Expr) {
 	assert(obj.typ == nil)
 
 	// If we have undefined variable types due to errors,
@@ -461,7 +461,7 @@ func (check *Checker) varDecl(obj *Var, lhs []*Var, typ, init syntax.Expr) {
 		}
 	}
 
-	check.initVars(lhs, []syntax.Expr{init}, nil)
+	check.initVars(lhs, []Expr{init}, nil)
 }
 
 // isImportedConstraint reports whether typ is an imported type constraint.
@@ -474,7 +474,7 @@ func (check *Checker) isImportedConstraint(typ Type) bool {
 	return u != nil && !u.IsMethodSet()
 }
 
-func (check *Checker) typeDecl(obj *TypeName, tdecl *syntax.TypeSpec, def *Named) {
+func (check *Checker) typeDecl(obj *TypeName, tdecl *TypeSpec, def *Named) {
 	assert(obj.typ == nil)
 
 	var rhs Type
@@ -540,7 +540,7 @@ func (check *Checker) typeDecl(obj *TypeName, tdecl *syntax.TypeSpec, def *Named
 	}
 }
 
-func (check *Checker) collectTypeParams(dst **TypeParamList, list []*syntax.Field) {
+func (check *Checker) collectTypeParams(dst **TypeParamList, list []*Field) {
 	tparams := make([]*TypeParam, len(list))
 
 	// Declare type parameters up-front.
@@ -589,12 +589,12 @@ func (check *Checker) collectTypeParams(dst **TypeParamList, list []*syntax.Fiel
 	}
 }
 
-func (check *Checker) bound(x syntax.Expr) Type {
+func (check *Checker) bound(x Expr) Type {
 	// A type set literal of the form ~T and A|B may only appear as constraint;
 	// embed it in an implicit interface so that only interface type-checking
 	// needs to take care of such type expressions.
-	if op, _ := x.(*syntax.Operation); op != nil && (op.Op == syntax.Tilde || op.Op == syntax.Or) {
-		t := check.typ(&syntax.InterfaceType{MethodList: []*syntax.Field{{Type: x}}})
+	if op, _ := x.(*Operation); op != nil && (op.Op == Tilde || op.Op == Or) {
+		t := check.typ(&InterfaceType{MethodList: []*Field{{Type: x}}})
 		// mark t as implicit interface if all went well
 		if t, _ := t.(*Interface); t != nil {
 			t.implicit = true
@@ -604,7 +604,7 @@ func (check *Checker) bound(x syntax.Expr) Type {
 	return check.typ(x)
 }
 
-func (check *Checker) declareTypeParam(name *syntax.Name) *TypeParam {
+func (check *Checker) declareTypeParam(name *Name) *TypeParam {
 	// Use Typ[Invalid] for the type constraint to ensure that a type
 	// is present even if the actual constraint has not been assigned
 	// yet.
@@ -721,14 +721,14 @@ func (check *Checker) funcDecl(obj *Func, decl *declInfo) {
 	}
 }
 
-func (check *Checker) declStmt(decl *syntax.GenDecl) {
+func (check *Checker) declStmt(decl *GenDecl) {
 	pkg := check.pkg
 
-	last := new(syntax.ConstSpec) // last ConstDecl with init expressions
+	last := new(ConstSpec) // last ConstDecl with init expressions
 
 	for index, spec := range decl.SpecList {
 		switch spec := spec.(type) {
-		case *syntax.ConstSpec:
+		case *ConstSpec:
 			top := len(check.delayed)
 
 			// iota is the index of the current constDecl within the group
@@ -747,7 +747,7 @@ func (check *Checker) declStmt(decl *syntax.GenDecl) {
 				obj := NewConst(name.Pos(), pkg, name.Value, nil, iota)
 				lhs[i] = obj
 
-				var init syntax.Expr
+				var init Expr
 				if i < len(values) {
 					init = values[i]
 				}
@@ -765,12 +765,12 @@ func (check *Checker) declStmt(decl *syntax.GenDecl) {
 			// inside a function begins at the end of the ConstSpec or VarSpec
 			// (ShortVarDecl for short variable declarations) and ends at the
 			// end of the innermost containing block."
-			scopePos := syntax.EndPos(spec)
+			scopePos := EndPos(spec)
 			for i, name := range spec.NameList {
 				check.declare(check.scope, name, lhs[i], scopePos)
 			}
 
-		case *syntax.VarSpec:
+		case *VarSpec:
 			top := len(check.delayed)
 
 			lhs0 := make([]*Var, len(spec.NameList))
@@ -782,7 +782,7 @@ func (check *Checker) declStmt(decl *syntax.GenDecl) {
 			values := unpackExpr(spec.Values)
 			for i, obj := range lhs0 {
 				var lhs []*Var
-				var init syntax.Expr
+				var init Expr
 				switch len(values) {
 				case len(spec.NameList):
 					// lhs and rhs match
@@ -822,13 +822,13 @@ func (check *Checker) declStmt(decl *syntax.GenDecl) {
 
 			// declare all variables
 			// (only at this point are the variable scopes (parents) set)
-			scopePos := syntax.EndPos(spec) // see constant declarations
+			scopePos := EndPos(spec) // see constant declarations
 			for i, name := range spec.NameList {
 				// see constant declarations
 				check.declare(check.scope, name, lhs0[i], scopePos)
 			}
 
-		case *syntax.TypeSpec:
+		case *TypeSpec:
 			obj := NewTypeName(spec.Name.Pos(), pkg, spec.Name.Value, nil)
 			// spec: "The scope of a type identifier declared inside a function
 			// begins at the identifier in the TypeSpec and ends at the end of

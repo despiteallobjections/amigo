@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -21,13 +21,13 @@ func (A) f()
 func (*A) g()
 `
 
-	f, err := syntax.ParseString("hello.go", source)
+	f, err := ParseString("hello.go", source)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var conf Config
-	pkg, err := conf.Check("P", []*syntax.File{f}, nil)
+	pkg, err := conf.Check("P", []*File{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func (*A) g()
 		{"struct{A}", "(struct{A}).f (*struct{A}).g"},
 		{"*struct{A}", "(*struct{A}).f (*struct{A}).g"},
 	} {
-		tv, err := Eval(pkg, syntax.NoPos, test.expr)
+		tv, err := Eval(pkg, NoPos, test.expr)
 		if err != nil {
 			t.Errorf("Eval(%s) failed: %v", test.expr, err)
 		}

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 
 	. "github.com/mdempsky/amigo/types"
 )
@@ -79,12 +79,12 @@ func runbench(b *testing.B, path string, ignoreFuncBodies, writeInfo bool) {
 		var info *Info
 		if writeInfo {
 			info = &Info{
-				Types:      make(map[syntax.Expr]TypeAndValue),
-				Defs:       make(map[*syntax.Name]Object),
-				Uses:       make(map[*syntax.Name]Object),
-				Implicits:  make(map[syntax.Node]Object),
-				Selections: make(map[*syntax.SelectorExpr]*Selection),
-				Scopes:     make(map[syntax.Node]*Scope),
+				Types:      make(map[Expr]TypeAndValue),
+				Defs:       make(map[*Name]Object),
+				Uses:       make(map[*Name]Object),
+				Implicits:  make(map[Node]Object),
+				Selections: make(map[*SelectorExpr]*Selection),
+				Scopes:     make(map[Node]*Scope),
 			}
 		}
 		if _, err := conf.Check(path, files, info); err != nil {
@@ -95,15 +95,15 @@ func runbench(b *testing.B, path string, ignoreFuncBodies, writeInfo bool) {
 	b.ReportMetric(float64(lines)*float64(b.N)/time.Since(start).Seconds(), "lines/s")
 }
 
-func pkgFiles(path string) ([]*syntax.File, error) {
+func pkgFiles(path string) ([]*File, error) {
 	filenames, err := pkgFilenames(path) // from stdlib_test.go
 	if err != nil {
 		return nil, err
 	}
 
-	var files []*syntax.File
+	var files []*File
 	for _, filename := range filenames {
-		file, err := syntax.ParseFile(filename, nil, nil, 0)
+		file, err := ParseFile(filename, nil, nil, 0)
 		if err != nil {
 			return nil, err
 		}

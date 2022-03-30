@@ -10,7 +10,7 @@ import (
 	"go/constant"
 	"go/token"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // builtin type-checks a call to the built-in specified by id and
@@ -18,7 +18,7 @@ import (
 // but x.expr is not set. If the call is invalid, the result is
 // false, and *x is undefined.
 //
-func (check *Checker) builtin(x *operand, call *syntax.CallExpr, id builtinId) (_ bool) {
+func (check *Checker) builtin(x *operand, call *CallExpr, id builtinId) (_ bool) {
 	// append is the only built-in that permits the use of ... for the last argument
 	bin := predeclaredFuncs[id]
 	if call.HasDots && id != _Append {
@@ -546,7 +546,7 @@ func (check *Checker) builtin(x *operand, call *syntax.CallExpr, id builtinId) (
 			p := check.isPanic
 			if p == nil {
 				// allocate lazily
-				p = make(map[*syntax.CallExpr]bool)
+				p = make(map[*CallExpr]bool)
 				check.isPanic = p
 			}
 			p[call] = true
@@ -641,7 +641,7 @@ func (check *Checker) builtin(x *operand, call *syntax.CallExpr, id builtinId) (
 		// unsafe.Offsetof(x T) uintptr, where x must be a selector
 		// (no argument evaluated yet)
 		arg0 := call.ArgList[0]
-		selx, _ := syntax.Unparen(arg0).(*syntax.SelectorExpr)
+		selx, _ := Unparen(arg0).(*SelectorExpr)
 		if selx == nil {
 			check.errorf(arg0, invalidArg+"%s is not a selector expression", arg0)
 			check.use(arg0)

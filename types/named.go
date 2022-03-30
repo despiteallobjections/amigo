@@ -7,7 +7,7 @@ package types
 import (
 	"sync"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // A Named represents a named (defined) type.
@@ -355,7 +355,7 @@ func (check *Checker) bestContext(ctxt *Context) *Context {
 
 // expandNamed ensures that the underlying type of n is instantiated.
 // The underlying type will be Typ[Invalid] if there was an error.
-func expandNamed(ctxt *Context, n *Named, instPos syntax.Pos) (tparams *TypeParamList, underlying Type, methods *methodList) {
+func expandNamed(ctxt *Context, n *Named, instPos Pos) (tparams *TypeParamList, underlying Type, methods *methodList) {
 	check := n.check
 	if check != nil && check.conf.Trace {
 		check.trace(instPos, "-- expandNamed %s", n)

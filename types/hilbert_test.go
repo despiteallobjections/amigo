@@ -11,7 +11,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 
 	. "github.com/mdempsky/amigo/types"
 )
@@ -30,7 +30,7 @@ func TestHilbert(t *testing.T) {
 	}
 
 	// parse source
-	f, err := syntax.Parse(syntax.NewFileBase("hilbert.go"), bytes.NewReader(src), nil, nil, 0)
+	f, err := Parse(NewFileBase("hilbert.go"), bytes.NewReader(src), nil, nil, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestHilbert(t *testing.T) {
 	// type-check file
 	DefPredeclaredTestFuncs() // define assert built-in
 	conf := Config{Importer: defaultImporter()}
-	_, err = conf.Check(f.PkgName.Value, []*syntax.File{f}, nil)
+	_, err = conf.Check(f.PkgName.Value, []*File{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

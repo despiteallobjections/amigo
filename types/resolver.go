@@ -12,18 +12,18 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 // A declInfo describes a package-level const, type, var, or func declaration.
 type declInfo struct {
-	file      *Scope           // scope of file containing this declaration
-	lhs       []*Var           // lhs of n:1 variable declarations, or nil
-	vtyp      syntax.Expr      // type, or nil (for const and var declarations only)
-	init      syntax.Expr      // init/orig expression, or nil (for const and var declarations only)
-	inherited bool             // if set, the init expression is inherited from a previous constant declaration
-	tdecl     *syntax.TypeSpec // type declaration, or nil
-	fdecl     *syntax.FuncDecl // func declaration, or nil
+	file      *Scope    // scope of file containing this declaration
+	lhs       []*Var    // lhs of n:1 variable declarations, or nil
+	vtyp      Expr      // type, or nil (for const and var declarations only)
+	init      Expr      // init/orig expression, or nil (for const and var declarations only)
+	inherited bool      // if set, the init expression is inherited from a previous constant declaration
+	tdecl     *TypeSpec // type declaration, or nil
+	fdecl     *FuncDecl // func declaration, or nil
 
 	// The deps field tracks initialization expression dependencies.
 	deps map[Object]bool // lazily initialized
@@ -49,7 +49,7 @@ func (d *declInfo) addDep(obj Object) {
 // have a matching number of names and initialization values.
 // If inherited is set, the initialization values are from
 // another (constant) declaration.
-func (check *Checker) arity(pos syntax.Pos, names []*syntax.Name, inits []syntax.Expr, constDecl, inherited bool) {
+func (check *Checker) arity(pos Pos, names []*Name, inits []Expr, constDecl, inherited bool) {
 	l := len(names)
 	r := len(inits)
 
@@ -86,7 +86,7 @@ func validatedImportPath(path string) (string, error) {
 
 // declarePkgObj declares obj in the package scope, records its ident -> obj mapping,
 // and updates check.objMap. The object must not be a function or method.
-func (check *Checker) declarePkgObj(ident *syntax.Name, obj Object, d *declInfo) {
+func (check *Checker) declarePkgObj(ident *Name, obj Object, d *declInfo) {
 	assert(ident.Value == obj.Name())
 
 	// spec: "A package-scope or file-scope identifier with name init
@@ -119,7 +119,7 @@ func (check *Checker) filename(fileNo int) string {
 	return fmt.Sprintf("file[%d]", fileNo)
 }
 
-func (check *Checker) importPackage(pos syntax.Pos, path, dir string) *Package {
+func (check *Checker) importPackage(pos Pos, path, dir string) *Package {
 	// If we already have a package for the given (path, dir)
 	// pair, use it instead of doing a full import.
 	// Checker.impMap only caches packages that are marked Complete
@@ -210,7 +210,7 @@ func (check *Checker) collectObjects() {
 		// but there is no corresponding package object.
 		check.recordDef(file.PkgName, nil)
 
-		fileScope := NewScope(check.pkg.scope, syntax.StartPos(file), syntax.EndPos(file), check.filename(fileNo))
+		fileScope := NewScope(check.pkg.scope, StartPos(file), EndPos(file), check.filename(fileNo))
 		fileScopes = append(fileScopes, fileScope)
 		check.recordScope(file, fileScope)
 
@@ -220,13 +220,13 @@ func (check *Checker) collectObjects() {
 		fileDir := dir(file.PkgName.Pos().RelFilename()) // TODO(gri) should this be filename?
 
 		for _, decl := range file.DeclList {
-			decl, ok := decl.(*syntax.GenDecl)
-			if !ok || decl.Tok != syntax.Import {
+			decl, ok := decl.(*GenDecl)
+			if !ok || decl.Tok != Import {
 				break
 			}
 
 			for _, spec := range decl.SpecList {
-				spec := spec.(*syntax.ImportSpec)
+				spec := spec.(*ImportSpec)
 				if spec.Path == nil || spec.Path.Bad {
 					continue // error reported during parsing
 				}
@@ -321,9 +321,9 @@ func (check *Checker) collectObjects() {
 	}
 
 	type methodInfo struct {
-		obj  *Func        // method
-		ptr  bool         // true if pointer receiver
-		recv *syntax.Name // receiver type name
+		obj  *Func // method
+		ptr  bool  // true if pointer receiver
+		recv *Name // receiver type name
 	}
 	var methods []methodInfo // collected methods with valid receivers and non-blank _ names
 
@@ -332,16 +332,16 @@ func (check *Checker) collectObjects() {
 
 		for _, decl := range file.DeclList {
 			switch decl := decl.(type) {
-			case *syntax.GenDecl:
-				if decl.Tok == syntax.Import {
+			case *GenDecl:
+				if decl.Tok == Import {
 					continue // handled above
 				}
 
-				last := new(syntax.ConstSpec) // last ConstSpec with init expressions, or zero val
+				last := new(ConstSpec) // last ConstSpec with init expressions, or zero val
 
 				for index, spec := range decl.SpecList {
 					switch spec := spec.(type) {
-					case *syntax.ConstSpec:
+					case *ConstSpec:
 						// iota is the index of the current constDecl within the group
 						iota := constant.MakeInt64(int64(index))
 
@@ -356,7 +356,7 @@ func (check *Checker) collectObjects() {
 						for i, name := range spec.NameList {
 							obj := NewConst(name.Pos(), pkg, name.Value, nil, iota)
 
-							var init syntax.Expr
+							var init Expr
 							if i < len(values) {
 								init = values[i]
 							}
@@ -368,14 +368,14 @@ func (check *Checker) collectObjects() {
 						// Constants must always have init values.
 						check.arity(spec.Pos(), spec.NameList, values, true, inherited)
 
-					case *syntax.VarSpec:
+					case *VarSpec:
 						lhs := make([]*Var, len(spec.NameList))
 						// If there's exactly one rhs initializer, use
 						// the same declInfo d1 for all lhs variables
 						// so that each lhs variable depends on the same
 						// rhs initializer (n:1 var declaration).
 						var d1 *declInfo
-						if _, ok := spec.Values.(*syntax.ListExpr); !ok {
+						if _, ok := spec.Values.(*ListExpr); !ok {
 							// The lhs elements are only set up after the for loop below,
 							// but that's ok because declarePkgObj only collects the declInfo
 							// for a later phase.
@@ -391,7 +391,7 @@ func (check *Checker) collectObjects() {
 							d := d1
 							if d == nil {
 								// individual assignments
-								var init syntax.Expr
+								var init Expr
 								if i < len(values) {
 									init = values[i]
 								}
@@ -406,7 +406,7 @@ func (check *Checker) collectObjects() {
 							check.arity(spec.Pos(), spec.NameList, values, false, false)
 						}
 
-					case *syntax.TypeSpec:
+					case *TypeSpec:
 						if len(spec.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) {
 							check.versionErrorf(spec.TParamList[0], "go1.18", "type parameter")
 						}
@@ -418,7 +418,7 @@ func (check *Checker) collectObjects() {
 					}
 				}
 
-			case *syntax.FuncDecl:
+			case *FuncDecl:
 				name := decl.Name.Value
 				obj := NewFunc(decl.Name.Pos(), pkg, name, nil)
 				hasTParamError := false // avoid duplicate type parameter errors
@@ -516,20 +516,20 @@ func (check *Checker) collectObjects() {
 // type parameters, if any. The type parameters are only unpacked if unpackParams is
 // set. If rname is nil, the receiver is unusable (i.e., the source has a bug which we
 // cannot easily work around).
-func (check *Checker) unpackRecv(rtyp syntax.Expr, unpackParams bool) (ptr bool, rname *syntax.Name, tparams []*syntax.Name) {
+func (check *Checker) unpackRecv(rtyp Expr, unpackParams bool) (ptr bool, rname *Name, tparams []*Name) {
 L: // unpack receiver type
 	// This accepts invalid receivers such as ***T and does not
 	// work for other invalid receivers, but we don't care. The
 	// validity of receiver expressions is checked elsewhere.
 	for {
 		switch t := rtyp.(type) {
-		case *syntax.ParenExpr:
+		case *ParenExpr:
 			rtyp = t.X
 		// case *ast.StarExpr:
 		//      ptr = true
 		// 	rtyp = t.X
-		case *syntax.Operation:
-			if t.Op != syntax.Mul || t.Y != nil {
+		case *Operation:
+			if t.Op != Mul || t.Y != nil {
 				break
 			}
 			ptr = true
@@ -540,15 +540,15 @@ L: // unpack receiver type
 	}
 
 	// unpack type parameters, if any
-	if ptyp, _ := rtyp.(*syntax.IndexExpr); ptyp != nil {
+	if ptyp, _ := rtyp.(*IndexExpr); ptyp != nil {
 		rtyp = ptyp.X
 		if unpackParams {
 			for _, arg := range unpackExpr(ptyp.Index) {
-				var par *syntax.Name
+				var par *Name
 				switch arg := arg.(type) {
-				case *syntax.Name:
+				case *Name:
 					par = arg
-				case *syntax.BadExpr:
+				case *BadExpr:
 					// ignore - error already reported by parser
 				case nil:
 					check.error(ptyp, invalidAST+"parameterized receiver contains nil parameters")
@@ -556,7 +556,7 @@ L: // unpack receiver type
 					check.errorf(arg, "receiver type parameter %s must be an identifier", arg)
 				}
 				if par == nil {
-					par = syntax.NewName(arg.Pos(), "_")
+					par = NewName(arg.Pos(), "_")
 				}
 				tparams = append(tparams, par)
 			}
@@ -565,7 +565,7 @@ L: // unpack receiver type
 	}
 
 	// unpack receiver name
-	if name, _ := rtyp.(*syntax.Name); name != nil {
+	if name, _ := rtyp.(*Name); name != nil {
 		rname = name
 	}
 
@@ -576,7 +576,7 @@ L: // unpack receiver type
 // there was a pointer indirection to get to it. The base type name must be declared
 // in package scope, and there can be at most one pointer indirection. If no such type
 // name exists, the returned base is nil.
-func (check *Checker) resolveBaseTypeName(seenPtr bool, typ syntax.Expr) (ptr bool, base *TypeName) {
+func (check *Checker) resolveBaseTypeName(seenPtr bool, typ Expr) (ptr bool, base *TypeName) {
 	// Algorithm: Starting from a type expression, which may be a name,
 	// we follow that type through alias declarations until we reach a
 	// non-alias type name. If we encounter anything but pointer types or
@@ -585,21 +585,21 @@ func (check *Checker) resolveBaseTypeName(seenPtr bool, typ syntax.Expr) (ptr bo
 	ptr = seenPtr
 	var seen map[*TypeName]bool
 	for {
-		typ = syntax.Unparen(typ)
+		typ = Unparen(typ)
 
 		// check if we have a pointer type
 		// if pexpr, _ := typ.(*ast.StarExpr); pexpr != nil {
-		if pexpr, _ := typ.(*syntax.Operation); pexpr != nil && pexpr.Op == syntax.Mul && pexpr.Y == nil {
+		if pexpr, _ := typ.(*Operation); pexpr != nil && pexpr.Op == Mul && pexpr.Y == nil {
 			// if we've already seen a pointer, we're done
 			if ptr {
 				return false, nil
 			}
 			ptr = true
-			typ = syntax.Unparen(pexpr.X) // continue with pointer base type
+			typ = Unparen(pexpr.X) // continue with pointer base type
 		}
 
 		// typ must be a name
-		name, _ := typ.(*syntax.Name)
+		name, _ := typ.(*Name)
 		if name == nil {
 			return false, nil
 		}

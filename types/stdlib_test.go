@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/testenv"
 
 	. "github.com/mdempsky/amigo/types"
@@ -65,7 +65,7 @@ func firstComment(filename string) (first string) {
 		}
 	}()
 
-	syntax.CommentsDo(src, func(_, _ uint, text string) {
+	CommentsDo(src, func(_, _ uint, text string) {
 		if text[0] != '/' {
 			return // not a comment
 		}
@@ -137,10 +137,10 @@ func testTestDir(t *testing.T, path string, ignore ...string) {
 		if testing.Verbose() {
 			fmt.Println("\t", filename)
 		}
-		file, err := syntax.ParseFile(filename, nil, nil, 0)
+		file, err := ParseFile(filename, nil, nil, 0)
 		if err == nil {
 			conf := Config{GoVersion: goVersion, Importer: stdLibImporter}
-			_, err = conf.Check(filename, []*syntax.File{file}, nil)
+			_, err = conf.Check(filename, []*File{file}, nil)
 		}
 
 		if expectErrors {
@@ -219,10 +219,10 @@ var excluded = map[string]bool{
 // typecheck typechecks the given package files.
 func typecheck(t *testing.T, path string, filenames []string) {
 	// parse package files
-	var files []*syntax.File
+	var files []*File
 	for _, filename := range filenames {
 		errh := func(err error) { t.Error(err) }
-		file, err := syntax.ParseFile(filename, errh, nil, syntax.AllowGenerics)
+		file, err := ParseFile(filename, errh, nil, AllowGenerics)
 		if err != nil {
 			return
 		}
@@ -242,7 +242,7 @@ func typecheck(t *testing.T, path string, filenames []string) {
 		Error:    func(err error) { t.Error(err) },
 		Importer: stdLibImporter,
 	}
-	info := Info{Uses: make(map[*syntax.Name]Object)}
+	info := Info{Uses: make(map[*Name]Object)}
 	conf.Check(path, files, &info)
 
 	// Perform checks of API invariants.

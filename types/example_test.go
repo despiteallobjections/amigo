@@ -24,7 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
 
@@ -32,7 +32,7 @@ import (
 // set of parsed files.
 func ExampleScope() {
 	// Parse the source files for a package.
-	var files []*syntax.File
+	var files []*File
 	for _, file := range []struct{ name, input string }{
 		{"main.go", `
 package main
@@ -135,12 +135,12 @@ func fib(x int) int {
 	// We create an empty map for each kind of input
 	// we're interested in, and Check populates them.
 	info := types.Info{
-		Types: make(map[syntax.Expr]types.TypeAndValue),
-		Defs:  make(map[*syntax.Name]types.Object),
-		Uses:  make(map[*syntax.Name]types.Object),
+		Types: make(map[Expr]types.TypeAndValue),
+		Defs:  make(map[*Name]types.Object),
+		Uses:  make(map[*Name]types.Object),
 	}
 	var conf types.Config
-	pkg, err := conf.Check("fib", []*syntax.File{f}, &info)
+	pkg, err := conf.Check("fib", []*File{f}, &info)
 	if err != nil {
 		log.Fatal(err)
 	}

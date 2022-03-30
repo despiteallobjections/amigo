@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 	. "github.com/mdempsky/amigo/types"
 )
@@ -35,11 +35,11 @@ func TestDependencies(t *testing.T) {
 		`package d; import (_ "b"; _ "c")`,
 		`package f; import (_ "d"; _ "e")`,
 	} {
-		f, err := syntax.ParseString(fmt.Sprintf("%d.go", i), content)
+		f, err := ParseString(fmt.Sprintf("%d.go", i), content)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pkg, err := conf.Check(f.PkgName.Value, []*syntax.File{f}, nil)
+		pkg, err := conf.Check(f.PkgName.Value, []*File{f}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

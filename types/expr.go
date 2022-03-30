@@ -12,7 +12,7 @@ import (
 	"go/token"
 	"math"
 
-	"github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/syntax"
 )
 
 /*
@@ -57,21 +57,21 @@ on the way down in updateExprType, or at the end of the type checker run,
 the type (and constant value, if any) is recorded via Info.Types, if present.
 */
 
-type opPredicates map[syntax.Operator]func(Type) bool
+type opPredicates map[Operator]func(Type) bool
 
 var unaryOpPredicates opPredicates
 
 func init() {
 	// Setting unaryOpPredicates in init avoids declaration cycles.
 	unaryOpPredicates = opPredicates{
-		syntax.Add: allNumeric,
-		syntax.Sub: allNumeric,
-		syntax.Xor: allInteger,
-		syntax.Not: allBoolean,
+		Add: allNumeric,
+		Sub: allNumeric,
+		Xor: allInteger,
+		Not: allBoolean,
 	}
 }
 
-func (check *Checker) op(m opPredicates, x *operand, op syntax.Operator) bool {
+func (check *Checker) op(m opPredicates, x *operand, op Operator) bool {
 	if pred := m[op]; pred != nil {
 		if !pred(x.typ) {
 			check.errorf(x, invalidOp+"operator %s not defined on %s", op, x)
@@ -93,9 +93,9 @@ func (check *Checker) overflow(x *operand) {
 	// If the corresponding expression is an operation, use the
 	// operator position rather than the start of the expression
 	// as error position.
-	pos := syntax.StartPos(x.expr)
+	pos := StartPos(x.expr)
 	what := "" // operator description, if any
-	if op, _ := x.expr.(*syntax.Operation); op != nil {
+	if op, _ := x.expr.(*Operation); op != nil {
 		pos = op.Pos()
 		what = opName(op)
 	}
@@ -127,7 +127,7 @@ func (check *Checker) overflow(x *operand) {
 
 // opName returns the name of an operation, or the empty string.
 // Only operations that might overflow are handled.
-func opName(e *syntax.Operation) string {
+func opName(e *Operation) string {
 	op := int(e.Op)
 	if e.Y == nil {
 		if op < len(op2str1) {
@@ -142,16 +142,16 @@ func opName(e *syntax.Operation) string {
 }
 
 var op2str1 = [...]string{
-	syntax.Xor: "bitwise complement",
+	Xor: "bitwise complement",
 }
 
 // This is only used for operations that may cause overflow.
 var op2str2 = [...]string{
-	syntax.Add: "addition",
-	syntax.Sub: "subtraction",
-	syntax.Xor: "bitwise XOR",
-	syntax.Mul: "multiplication",
-	syntax.Shl: "shift",
+	Add: "addition",
+	Sub: "subtraction",
+	Xor: "bitwise XOR",
+	Mul: "multiplication",
+	Shl: "shift",
 }
 
 // If typ is a type parameter, underIs returns the result of typ.underIs(f).
@@ -163,17 +163,17 @@ func underIs(typ Type, f func(Type) bool) bool {
 	return f(under(typ))
 }
 
-func (check *Checker) unary(x *operand, e *syntax.Operation) {
+func (check *Checker) unary(x *operand, e *Operation) {
 	check.expr(x, e.X)
 	if x.mode == invalid {
 		return
 	}
 
 	switch e.Op {
-	case syntax.And:
+	case And:
 		// spec: "As an exception to the addressability
 		// requirement x may also be a composite literal."
-		if _, ok := syntax.Unparen(e.X).(*syntax.CompositeLit); !ok && x.mode != variable {
+		if _, ok := Unparen(e.X).(*CompositeLit); !ok && x.mode != variable {
 			check.errorf(x, invalidOp+"cannot take address of %s", x)
 			x.mode = invalid
 			return
@@ -182,7 +182,7 @@ func (check *Checker) unary(x *operand, e *syntax.Operation) {
 		x.typ = &Pointer{base: x.typ}
 		return
 
-	case syntax.Recv:
+	case Recv:
 		u := coreType(x.typ)
 		if u == nil {
 			check.errorf(x, invalidOp+"cannot receive from %s: no core type", x)
@@ -230,14 +230,14 @@ func (check *Checker) unary(x *operand, e *syntax.Operation) {
 	// x.typ remains unchanged
 }
 
-func isShift(op syntax.Operator) bool {
-	return op == syntax.Shl || op == syntax.Shr
+func isShift(op Operator) bool {
+	return op == Shl || op == Shr
 }
 
-func isComparison(op syntax.Operator) bool {
+func isComparison(op Operator) bool {
 	// Note: tokens are not ordered well to make this much easier
 	switch op {
-	case syntax.Eql, syntax.Neq, syntax.Lss, syntax.Leq, syntax.Gtr, syntax.Geq:
+	case Eql, Neq, Lss, Leq, Gtr, Geq:
 		return true
 	}
 	return false
@@ -505,11 +505,11 @@ func (check *Checker) invalidConversion(code errorCode, x *operand, target Type)
 // Also, if x is a constant, it must be representable as a value of typ,
 // and if x is the (formerly untyped) lhs operand of a non-constant
 // shift, it must be an integer value.
-func (check *Checker) updateExprType(x syntax.Expr, typ Type, final bool) {
+func (check *Checker) updateExprType(x Expr, typ Type, final bool) {
 	check.updateExprType0(nil, x, typ, final)
 }
 
-func (check *Checker) updateExprType0(parent, x syntax.Expr, typ Type, final bool) {
+func (check *Checker) updateExprType0(parent, x Expr, typ Type, final bool) {
 	old, found := check.untyped[x]
 	if !found {
 		return // nothing to do
@@ -517,21 +517,21 @@ func (check *Checker) updateExprType0(parent, x syntax.Expr, typ Type, final boo
 
 	// update operands of x if necessary
 	switch x := x.(type) {
-	case *syntax.BadExpr,
-		*syntax.FuncLit,
-		*syntax.CompositeLit,
-		*syntax.IndexExpr,
-		*syntax.SliceExpr,
-		*syntax.AssertExpr,
-		*syntax.ListExpr,
+	case *BadExpr,
+		*FuncLit,
+		*CompositeLit,
+		*IndexExpr,
+		*SliceExpr,
+		*AssertExpr,
+		*ListExpr,
 		//*syntax.StarExpr,
-		*syntax.KeyValueExpr,
-		*syntax.ArrayType,
-		*syntax.StructType,
-		*syntax.FuncType,
-		*syntax.InterfaceType,
-		*syntax.MapType,
-		*syntax.ChanType:
+		*KeyValueExpr,
+		*ArrayType,
+		*StructType,
+		*FuncType,
+		*InterfaceType,
+		*MapType,
+		*ChanType:
 		// These expression are never untyped - nothing to do.
 		// The respective sub-expressions got their final types
 		// upon assignment or use.
@@ -541,17 +541,17 @@ func (check *Checker) updateExprType0(parent, x syntax.Expr, typ Type, final boo
 		}
 		return
 
-	case *syntax.CallExpr:
+	case *CallExpr:
 		// Resulting in an untyped constant (e.g., built-in complex).
 		// The respective calls take care of calling updateExprType
 		// for the arguments if necessary.
 
-	case *syntax.Name, *syntax.BasicLit, *syntax.SelectorExpr:
+	case *Name, *BasicLit, *SelectorExpr:
 		// An identifier denoting a constant, a constant literal,
 		// or a qualified identifier (imported untyped constant).
 		// No operands to take care of.
 
-	case *syntax.ParenExpr:
+	case *ParenExpr:
 		check.updateExprType0(x, x.X, typ, final)
 
 	// case *syntax.UnaryExpr:
@@ -565,10 +565,10 @@ func (check *Checker) updateExprType0(parent, x syntax.Expr, typ Type, final boo
 	// 	}
 	// 	check.updateExprType0(x, x.X, typ, final)
 
-	case *syntax.Operation:
+	case *Operation:
 		if x.Y == nil {
 			// unary expression
-			if x.Op == syntax.Mul {
+			if x.Op == Mul {
 				// see commented out code for StarExpr above
 				// TODO(gri) needs cleanup
 				if debug {
@@ -651,7 +651,7 @@ func (check *Checker) updateExprType0(parent, x syntax.Expr, typ Type, final boo
 }
 
 // updateExprVal updates the value of x to val.
-func (check *Checker) updateExprVal(x syntax.Expr, val constant.Value) {
+func (check *Checker) updateExprVal(x Expr, val constant.Value) {
 	if info, ok := check.untyped[x]; ok {
 		info.val = val
 		check.untyped[x] = info
@@ -772,9 +772,9 @@ func (check *Checker) implicitTypeAndValue(x *operand, target Type) (Type, const
 }
 
 // If switchCase is true, the operator op is ignored.
-func (check *Checker) comparison(x, y *operand, op syntax.Operator, switchCase bool) {
+func (check *Checker) comparison(x, y *operand, op Operator, switchCase bool) {
 	if switchCase {
-		op = syntax.Eql
+		op = Eql
 	}
 
 	errOp := x  // operand for which error is reported, if any
@@ -802,7 +802,7 @@ func (check *Checker) comparison(x, y *operand, op syntax.Operator, switchCase b
 
 	// check if comparison is defined for operands
 	switch op {
-	case syntax.Eql, syntax.Neq:
+	case Eql, Neq:
 		// spec: "The equality operators == and != apply to operands that are comparable."
 		switch {
 		case x.isNil() || y.isNil():
@@ -831,7 +831,7 @@ func (check *Checker) comparison(x, y *operand, op syntax.Operator, switchCase b
 			goto Error
 		}
 
-	case syntax.Lss, syntax.Leq, syntax.Gtr, syntax.Geq:
+	case Lss, Leq, Gtr, Geq:
 		// spec: The ordering operators <, <=, >, and >= apply to operands that are ordered."
 		switch {
 		case !allOrdered(x.typ):
@@ -934,7 +934,7 @@ func (check *Checker) kindString(typ Type) string {
 }
 
 // If e != nil, it must be the shift expression; it may be nil for non-constant shifts.
-func (check *Checker) shift(x, y *operand, e syntax.Expr, op syntax.Operator) {
+func (check *Checker) shift(x, y *operand, e Expr, op Operator) {
 	// TODO(gri) This function seems overly complex. Revisit.
 
 	var xval constant.Value
@@ -1062,25 +1062,25 @@ var binaryOpPredicates opPredicates
 func init() {
 	// Setting binaryOpPredicates in init avoids declaration cycles.
 	binaryOpPredicates = opPredicates{
-		syntax.Add: allNumericOrString,
-		syntax.Sub: allNumeric,
-		syntax.Mul: allNumeric,
-		syntax.Div: allNumeric,
-		syntax.Rem: allInteger,
+		Add: allNumericOrString,
+		Sub: allNumeric,
+		Mul: allNumeric,
+		Div: allNumeric,
+		Rem: allInteger,
 
-		syntax.And:    allInteger,
-		syntax.Or:     allInteger,
-		syntax.Xor:    allInteger,
-		syntax.AndNot: allInteger,
+		And:    allInteger,
+		Or:     allInteger,
+		Xor:    allInteger,
+		AndNot: allInteger,
 
-		syntax.AndAnd: allBoolean,
-		syntax.OrOr:   allBoolean,
+		AndAnd: allBoolean,
+		OrOr:   allBoolean,
 	}
 }
 
 // If e != nil, it must be the binary expression; it may be nil for non-constant expressions
 // (when invoked for an assignment operation where the binary expression is implicit).
-func (check *Checker) binary(x *operand, e syntax.Expr, lhs, rhs syntax.Expr, op syntax.Operator) {
+func (check *Checker) binary(x *operand, e Expr, lhs, rhs Expr, op Operator) {
 	var y operand
 
 	check.expr(x, lhs)
@@ -1155,7 +1155,7 @@ func (check *Checker) binary(x *operand, e syntax.Expr, lhs, rhs syntax.Expr, op
 		return
 	}
 
-	if op == syntax.Div || op == syntax.Rem {
+	if op == Div || op == Rem {
 		// check for zero divisor
 		if (x.mode == constant_ || allInteger(x.typ)) && y.mode == constant_ && constant.Sign(y.val) == 0 {
 			check.error(&y, invalidOp+"division by zero")
@@ -1184,7 +1184,7 @@ func (check *Checker) binary(x *operand, e syntax.Expr, lhs, rhs syntax.Expr, op
 		}
 		// force integer division for integer operands
 		tok := op2tok[op]
-		if op == syntax.Div && isInteger(x.typ) {
+		if op == Div && isInteger(x.typ) {
 			tok = token.QUO_ASSIGN
 		}
 		x.val = constant.BinaryOp(x.val, tok, y.val)
@@ -1213,7 +1213,7 @@ const (
 // If allowGeneric is set, the operand type may be an uninstantiated
 // parameterized type or function value.
 //
-func (check *Checker) rawExpr(x *operand, e syntax.Expr, hint Type, allowGeneric bool) exprKind {
+func (check *Checker) rawExpr(x *operand, e Expr, hint Type, allowGeneric bool) exprKind {
 	if check.conf.Trace {
 		check.trace(e.Pos(), "-- expr %s", e)
 		check.indent++
@@ -1261,7 +1261,7 @@ func (check *Checker) nonGeneric(x *operand) {
 // exprInternal contains the core of type checking of expressions.
 // Must only be called by rawExpr.
 //
-func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKind {
+func (check *Checker) exprInternal(x *operand, e Expr, hint Type) exprKind {
 	// make sure x has a valid state in case of bailout
 	// (was issue 5770)
 	x.mode = invalid
@@ -1271,24 +1271,24 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 	case nil:
 		unreachable()
 
-	case *syntax.BadExpr:
+	case *BadExpr:
 		goto Error // error was reported before
 
-	case *syntax.Name:
+	case *Name:
 		check.ident(x, e, nil, false)
 
-	case *syntax.DotsType:
+	case *DotsType:
 		// dots are handled explicitly where they are legal
 		// (array composite literals and parameter lists)
 		check.error(e, "invalid use of '...'")
 		goto Error
 
-	case *syntax.BasicLit:
+	case *BasicLit:
 		if e.Bad {
 			goto Error // error reported during parsing
 		}
 		switch e.Kind {
-		case syntax.IntLit, syntax.FloatLit, syntax.ImagLit:
+		case IntLit, FloatLit, ImagLit:
 			check.langCompat(e)
 			// The max. mantissa precision for untyped numeric values
 			// is 512 bits, or 4048 bits for each of the two integer
@@ -1315,7 +1315,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			goto Error
 		}
 
-	case *syntax.FuncLit:
+	case *FuncLit:
 		if sig, ok := check.typ(e.Type).(*Signature); ok {
 			if !check.conf.IgnoreFuncBodies && e.Body != nil {
 				// Anonymous functions are considered part of the
@@ -1338,7 +1338,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			goto Error
 		}
 
-	case *syntax.CompositeLit:
+	case *CompositeLit:
 		var typ, base Type
 
 		switch {
@@ -1346,7 +1346,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			// composite literal type present - use it
 			// [...]T array types may only appear with composite literals.
 			// Check for them here so we don't have to handle ... in general.
-			if atyp, _ := e.Type.(*syntax.ArrayType); atyp != nil && atyp.Len == nil {
+			if atyp, _ := e.Type.(*ArrayType); atyp != nil && atyp.Len == nil {
 				// We have an "open" [...]T array type.
 				// Create a new ArrayType with unknown length (-1)
 				// and finish setting it up after analyzing the literal.
@@ -1384,16 +1384,16 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 				break
 			}
 			fields := utyp.fields
-			if _, ok := e.ElemList[0].(*syntax.KeyValueExpr); ok {
+			if _, ok := e.ElemList[0].(*KeyValueExpr); ok {
 				// all elements must have keys
 				visited := make([]bool, len(fields))
 				for _, e := range e.ElemList {
-					kv, _ := e.(*syntax.KeyValueExpr)
+					kv, _ := e.(*KeyValueExpr)
 					if kv == nil {
 						check.error(e, "mixture of field:value and value elements in struct literal")
 						continue
 					}
-					key, _ := kv.Key.(*syntax.Name)
+					key, _ := kv.Key.(*Name)
 					// do all possible checks early (before exiting due to errors)
 					// so we don't drop information on the floor
 					check.expr(x, kv.Value)
@@ -1424,7 +1424,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			} else {
 				// no element must have a key
 				for i, e := range e.ElemList {
-					if kv, _ := e.(*syntax.KeyValueExpr); kv != nil {
+					if kv, _ := e.(*KeyValueExpr); kv != nil {
 						check.error(kv, "mixture of field:value and value elements in struct literal")
 						continue
 					}
@@ -1498,7 +1498,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			keyIsInterface := isNonTypeParamInterface(utyp.key)
 			visited := make(map[interface{}][]Type, len(e.ElemList))
 			for _, e := range e.ElemList {
-				kv, _ := e.(*syntax.KeyValueExpr)
+				kv, _ := e.(*KeyValueExpr)
 				if kv == nil {
 					check.error(e, "missing key in map literal")
 					continue
@@ -1536,7 +1536,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			// when "using" all elements unpack KeyValueExpr
 			// explicitly because check.use doesn't accept them
 			for _, e := range e.ElemList {
-				if kv, _ := e.(*syntax.KeyValueExpr); kv != nil {
+				if kv, _ := e.(*KeyValueExpr); kv != nil {
 					// Ideally, we should also "use" kv.Key but we can't know
 					// if it's an externally defined struct key or not. Going
 					// forward anyway can lead to other errors. Give up instead.
@@ -1554,15 +1554,15 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 		x.mode = value
 		x.typ = typ
 
-	case *syntax.ParenExpr:
+	case *ParenExpr:
 		kind := check.rawExpr(x, e.X, nil, false)
 		x.expr = e
 		return kind
 
-	case *syntax.SelectorExpr:
+	case *SelectorExpr:
 		check.selector(x, e, nil)
 
-	case *syntax.IndexExpr:
+	case *IndexExpr:
 		if check.indexExpr(x, e) {
 			check.funcInst(x, e)
 		}
@@ -1570,13 +1570,13 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			goto Error
 		}
 
-	case *syntax.SliceExpr:
+	case *SliceExpr:
 		check.sliceExpr(x, e)
 		if x.mode == invalid {
 			goto Error
 		}
 
-	case *syntax.AssertExpr:
+	case *AssertExpr:
 		check.expr(x, e.X)
 		if x.mode == invalid {
 			goto Error
@@ -1603,15 +1603,15 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 		x.mode = commaok
 		x.typ = T
 
-	case *syntax.TypeSwitchGuard:
+	case *TypeSwitchGuard:
 		// x.(type) expressions are handled explicitly in type switches
 		check.error(e, invalidAST+"use of .(type) outside type switch")
 		goto Error
 
-	case *syntax.CallExpr:
+	case *CallExpr:
 		return check.callExpr(x, e)
 
-	case *syntax.ListExpr:
+	case *ListExpr:
 		// catch-all for unexpected expression lists
 		check.error(e, "unexpected list of expressions")
 		goto Error
@@ -1636,10 +1636,10 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 	// 		goto Error
 	// 	}
 
-	case *syntax.Operation:
+	case *Operation:
 		if e.Y == nil {
 			// unary expression
-			if e.Op == syntax.Mul {
+			if e.Op == Mul {
 				// pointer indirection
 				check.exprOrType(x, e.X, false)
 				switch x.mode {
@@ -1675,7 +1675,7 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			if x.mode == invalid {
 				goto Error
 			}
-			if e.Op == syntax.Recv {
+			if e.Op == Recv {
 				x.expr = e
 				return statement // receive operations may appear in statement context
 			}
@@ -1688,13 +1688,13 @@ func (check *Checker) exprInternal(x *operand, e syntax.Expr, hint Type) exprKin
 			goto Error
 		}
 
-	case *syntax.KeyValueExpr:
+	case *KeyValueExpr:
 		// key:value expressions are handled in composite literals
 		check.error(e, invalidAST+"no key:value expected")
 		goto Error
 
-	case *syntax.ArrayType, *syntax.SliceType, *syntax.StructType, *syntax.FuncType,
-		*syntax.InterfaceType, *syntax.MapType, *syntax.ChanType:
+	case *ArrayType, *SliceType, *StructType, *FuncType,
+		*InterfaceType, *MapType, *ChanType:
 		x.mode = typexpr
 		x.typ = check.typ(e)
 		// Note: rawExpr (caller of exprInternal) will call check.recordTypeAndValue
@@ -1746,7 +1746,7 @@ func keyVal(x constant.Value) interface{} {
 }
 
 // typeAssertion checks x.(T). The type of x must be an interface.
-func (check *Checker) typeAssertion(e syntax.Expr, x *operand, T Type, typeSwitch bool) {
+func (check *Checker) typeAssertion(e Expr, x *operand, T Type, typeSwitch bool) {
 	method, alt := check.assertableTo(under(x.typ).(*Interface), T)
 	if method == nil {
 		return // success
@@ -1766,14 +1766,14 @@ func (check *Checker) typeAssertion(e syntax.Expr, x *operand, T Type, typeSwitc
 // The result must be a single value.
 // If an error occurred, x.mode is set to invalid.
 //
-func (check *Checker) expr(x *operand, e syntax.Expr) {
+func (check *Checker) expr(x *operand, e Expr) {
 	check.rawExpr(x, e, nil, false)
 	check.exclude(x, 1<<novalue|1<<builtin|1<<typexpr)
 	check.singleValue(x)
 }
 
 // multiExpr is like expr but the result may also be a multi-value.
-func (check *Checker) multiExpr(x *operand, e syntax.Expr) {
+func (check *Checker) multiExpr(x *operand, e Expr) {
 	check.rawExpr(x, e, nil, false)
 	check.exclude(x, 1<<novalue|1<<builtin|1<<typexpr)
 }
@@ -1782,7 +1782,7 @@ func (check *Checker) multiExpr(x *operand, e syntax.Expr) {
 // hint is the type of a composite literal element.
 // If an error occurred, x.mode is set to invalid.
 //
-func (check *Checker) exprWithHint(x *operand, e syntax.Expr, hint Type) {
+func (check *Checker) exprWithHint(x *operand, e Expr, hint Type) {
 	assert(hint != nil)
 	check.rawExpr(x, e, hint, false)
 	check.exclude(x, 1<<novalue|1<<builtin|1<<typexpr)
@@ -1794,7 +1794,7 @@ func (check *Checker) exprWithHint(x *operand, e syntax.Expr, hint Type) {
 // value.
 // If an error occurred, x.mode is set to invalid.
 //
-func (check *Checker) exprOrType(x *operand, e syntax.Expr, allowGeneric bool) {
+func (check *Checker) exprOrType(x *operand, e Expr, allowGeneric bool) {
 	check.rawExpr(x, e, nil, allowGeneric)
 	check.exclude(x, 1<<novalue)
 	check.singleValue(x)
@@ -1842,30 +1842,30 @@ func (check *Checker) singleValue(x *operand) {
 
 // op2tok translates syntax.Operators into token.Tokens.
 var op2tok = [...]token.Token{
-	syntax.Def:  token.ILLEGAL,
-	syntax.Not:  token.NOT,
-	syntax.Recv: token.ILLEGAL,
+	Def:  token.ILLEGAL,
+	Not:  token.NOT,
+	Recv: token.ILLEGAL,
 
-	syntax.OrOr:   token.LOR,
-	syntax.AndAnd: token.LAND,
+	OrOr:   token.LOR,
+	AndAnd: token.LAND,
 
-	syntax.Eql: token.EQL,
-	syntax.Neq: token.NEQ,
-	syntax.Lss: token.LSS,
-	syntax.Leq: token.LEQ,
-	syntax.Gtr: token.GTR,
-	syntax.Geq: token.GEQ,
+	Eql: token.EQL,
+	Neq: token.NEQ,
+	Lss: token.LSS,
+	Leq: token.LEQ,
+	Gtr: token.GTR,
+	Geq: token.GEQ,
 
-	syntax.Add: token.ADD,
-	syntax.Sub: token.SUB,
-	syntax.Or:  token.OR,
-	syntax.Xor: token.XOR,
+	Add: token.ADD,
+	Sub: token.SUB,
+	Or:  token.OR,
+	Xor: token.XOR,
 
-	syntax.Mul:    token.MUL,
-	syntax.Div:    token.QUO,
-	syntax.Rem:    token.REM,
-	syntax.And:    token.AND,
-	syntax.AndNot: token.AND_NOT,
-	syntax.Shl:    token.SHL,
-	syntax.Shr:    token.SHR,
+	Mul:    token.MUL,
+	Div:    token.QUO,
+	Rem:    token.REM,
+	And:    token.AND,
+	AndNot: token.AND_NOT,
+	Shl:    token.SHL,
+	Shr:    token.SHR,
 }
