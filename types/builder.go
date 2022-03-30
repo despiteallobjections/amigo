@@ -66,7 +66,7 @@ var (
 	vTrue = NewSSAConst(constant.MakeBool(true), tBool)
 )
 
-// builder holds state associated with the package currently being built.
+// builder holds state associated with the function currently being built.
 // Its methods contain all the logic for AST-to-SSA conversion.
 type builder struct{}
 
@@ -2264,19 +2264,9 @@ func (p *SSAPackage) build() {
 		return // synthetic package, e.g. "testmain"
 	}
 
-	// Ensure we have runtime type info for all exported members.
-	// TODO(adonovan): ideally belongs in memberFromObject, but
-	// that would require package creation in topological order.
-	for name, mem := range p.Members {
-		if token.IsExported(name) {
-			p.Prog.needMethodsOf(mem.Type())
-		}
-	}
 	if p.Prog.mode&LogSource != 0 {
 		defer logStack("build %s", p)()
 	}
-
-	var b builder
 
 	// Build all package-level functions, init functions
 	// and methods.
@@ -2285,11 +2275,23 @@ func (p *SSAPackage) build() {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
 				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
+					var b builder
 					b.buildFunction(obj.member)
 				}
 			}
 		}
 	}
+
+	// Ensure we have runtime type info for all exported members.
+	// TODO(adonovan): ideally belongs in memberFromObject, but
+	// that would require package creation in topological order.
+	for name, mem := range p.Members {
+		if token.IsExported(name) {
+			p.Prog.needMethodsOf(mem.Type())
+		}
+	}
+
+	var b builder
 
 	init := p.init
 	init.startBody()

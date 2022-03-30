@@ -92,6 +92,10 @@ func doPackages(initial []*packages.Package, mode types.BuilderMode, deps bool) 
 			},
 		}
 
+		if deps || isInitial[p] {
+			cfg.Prog = prog
+		}
+
 		info := types.Info{
 			Types:      make(map[syntax.Expr]types.TypeAndValue),
 			Defs:       make(map[*syntax.Name]types.Object),
@@ -106,11 +110,11 @@ func doPackages(initial []*packages.Package, mode types.BuilderMode, deps bool) 
 			panic(fmt.Errorf("checking package %q failed: %w", p.PkgPath, err))
 		}
 
-		if !deps && !isInitial[p] {
-			files = nil
+		if cfg.Prog != nil {
+			ssamap[p] = prog.Package(pkg)
+		} else {
+			ssamap[p] = prog.CreatePackage(pkg, nil, nil, true)
 		}
-
-		ssamap[p] = prog.CreatePackage(pkg, files, &info, true)
 	})
 
 	var ssapkgs []*types.SSAPackage
