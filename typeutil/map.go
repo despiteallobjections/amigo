@@ -14,17 +14,17 @@ import (
 	"github.com/mdempsky/amigo/types"
 )
 
-// Map is a hash-table-based mapping from types (types.Type) to
+// TypeMap is a hash-table-based mapping from types (types.Type) to
 // arbitrary interface{} values.  The concrete types that implement
 // the Type interface are pointers.  Since they are not canonicalized,
 // == cannot be used to check for equivalence, and thus we cannot
 // simply use a Go map.
 //
-// Just as with map[K]V, a nil *Map is a valid empty map.
+// Just as with map[K]V, a nil *TypeMap is a valid empty map.
 //
 // Not thread-safe.
 //
-type Map struct {
+type TypeMap struct {
 	hasher Hasher             // shared by many Maps
 	table  map[uint32][]entry // maps hash to bucket; entry.key==nil means unused
 	length int                // number of map entries
@@ -57,14 +57,14 @@ type entry struct {
 // If SetHasher is not called, the Map will create a private hasher at
 // the first call to Insert.
 //
-func (m *Map) SetHasher(hasher Hasher) {
+func (m *TypeMap) SetHasher(hasher Hasher) {
 	m.hasher = hasher
 }
 
 // Delete removes the entry with the given key, if any.
 // It returns true if the entry was found.
 //
-func (m *Map) Delete(key types.Type) bool {
+func (m *TypeMap) Delete(key types.Type) bool {
 	if m != nil && m.table != nil {
 		hash := m.hasher.Hash(key)
 		bucket := m.table[hash]
@@ -84,7 +84,7 @@ func (m *Map) Delete(key types.Type) bool {
 // At returns the map entry for the given key.
 // The result is nil if the entry is not present.
 //
-func (m *Map) At(key types.Type) interface{} {
+func (m *TypeMap) At(key types.Type) interface{} {
 	if m != nil && m.table != nil {
 		for _, e := range m.table[m.hasher.Hash(key)] {
 			if e.key != nil && types.Identical(key, e.key) {
@@ -97,7 +97,7 @@ func (m *Map) At(key types.Type) interface{} {
 
 // Set sets the map entry for key to val,
 // and returns the previous entry, if any.
-func (m *Map) Set(key types.Type, value interface{}) (prev interface{}) {
+func (m *TypeMap) Set(key types.Type, value interface{}) (prev interface{}) {
 	if m.table != nil {
 		hash := m.hasher.Hash(key)
 		bucket := m.table[hash]
@@ -130,7 +130,7 @@ func (m *Map) Set(key types.Type, value interface{}) (prev interface{}) {
 }
 
 // Len returns the number of map entries.
-func (m *Map) Len() int {
+func (m *TypeMap) Len() int {
 	if m != nil {
 		return m.length
 	}
@@ -145,7 +145,7 @@ func (m *Map) Len() int {
 // Iterate has not yet reached, whether or not f will be invoked for
 // it is unspecified.
 //
-func (m *Map) Iterate(f func(key types.Type, value interface{})) {
+func (m *TypeMap) Iterate(f func(key types.Type, value interface{})) {
 	if m != nil {
 		for _, bucket := range m.table {
 			for _, e := range bucket {
@@ -159,7 +159,7 @@ func (m *Map) Iterate(f func(key types.Type, value interface{})) {
 
 // Keys returns a new slice containing the set of map keys.
 // The order is unspecified.
-func (m *Map) Keys() []types.Type {
+func (m *TypeMap) Keys() []types.Type {
 	keys := make([]types.Type, 0, m.Len())
 	m.Iterate(func(key types.Type, _ interface{}) {
 		keys = append(keys, key)
@@ -167,7 +167,7 @@ func (m *Map) Keys() []types.Type {
 	return keys
 }
 
-func (m *Map) toString(values bool) string {
+func (m *TypeMap) toString(values bool) string {
 	if m == nil {
 		return "{}"
 	}
@@ -190,14 +190,14 @@ func (m *Map) toString(values bool) string {
 // Values are printed using fmt.Sprintf("%v", v).
 // Order is unspecified.
 //
-func (m *Map) String() string {
+func (m *TypeMap) String() string {
 	return m.toString(true)
 }
 
 // KeysString returns a string representation of the map's key set.
 // Order is unspecified.
 //
-func (m *Map) KeysString() string {
+func (m *TypeMap) KeysString() string {
 	return m.toString(false)
 }
 

@@ -39,7 +39,7 @@ func g(rune) (uint8, bool)
 	scope := pkg.Scope()
 
 	// Group names of package-level objects by their type.
-	var namesByType typeutil.Map // value is []string
+	var namesByType typeutil.TypeMap // value is []string
 	for _, name := range scope.Names() {
 		T := scope.Lookup(name).Type()
 

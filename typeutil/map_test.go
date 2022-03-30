@@ -40,7 +40,7 @@ func TestAxioms(t *testing.T) {
 }
 
 func TestMap(t *testing.T) {
-	var tmap *typeutil.Map
+	var tmap *typeutil.TypeMap
 
 	// All methods but Set are safe on on (*T)(nil).
 	tmap.Len()
@@ -49,7 +49,7 @@ func TestMap(t *testing.T) {
 	tmap.KeysString()
 	_ = tmap.String()
 
-	tmap = new(typeutil.Map)
+	tmap = new(typeutil.TypeMap)
 
 	// Length of empty map.
 	if l := tmap.Len(); l != 0 {
