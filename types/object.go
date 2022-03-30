@@ -253,7 +253,12 @@ type Const struct {
 	val    constant.Value
 }
 
-func (obj *Const) Member() Member { return obj.member }
+func (obj *Const) Member() Member {
+	if obj.member != nil {
+		return obj.member
+	}
+	return nil
+}
 
 // NewConst returns a new constant with value val.
 // The remaining arguments set the attributes found with all Objects.
@@ -272,7 +277,12 @@ type TypeName struct {
 	member *SSAType
 }
 
-func (obj *TypeName) Member() Member { return obj.member }
+func (obj *TypeName) Member() Member {
+	if obj.member != nil {
+		return obj.member
+	}
+	return nil
+}
 
 // NewTypeName returns a new type name denoting the given typ.
 // The remaining arguments set the attributes found with all Objects.
@@ -368,7 +378,12 @@ func (obj *Var) Embedded() bool { return obj.embedded }
 // IsField reports whether the variable is a struct field.
 func (obj *Var) IsField() bool { return obj.isField }
 
-func (obj *Var) Member() Member { return obj.member }
+func (obj *Var) Member() Member {
+	if obj.member != nil {
+		return obj.member
+	}
+	return nil
+}
 
 func (*Var) isDependency() {} // a variable may be a dependency of an initialization expression
 
@@ -381,7 +396,12 @@ type Func struct {
 	hasPtrRecv_ bool // only valid for methods that don't have a type yet; use hasPtrRecv() to read
 }
 
-func (obj *Func) Member() Member { return obj.member }
+func (obj *Func) Member() Member {
+	if obj.member != nil {
+		return obj.member
+	}
+	return nil
+}
 
 // NewFunc returns a new function with the given signature, representing
 // the function's type.

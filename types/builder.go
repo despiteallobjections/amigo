@@ -2225,24 +2225,6 @@ func (b *builder) buildFunction(fn *Function) {
 	fn.finishBody()
 }
 
-// buildFuncDecl builds SSA code for the function or method declared
-// by decl in package pkg.
-//
-func (b *builder) buildFuncDecl(pkg *SSAPackage, decl *FuncDecl) {
-	id := decl.Name
-	if isBlankIdent(id) {
-		return // discard
-	}
-	fn := pkg.values[pkg.info.Defs[id]].(*Function)
-	if decl.Recv == nil && id.Value == "init" {
-		var v Call
-		v.Call.Value = fn
-		v.setType(NewTuple())
-		pkg.init.emit(&v)
-	}
-	b.buildFunction(fn)
-}
-
 // Build calls Package.Build for each package in prog.
 // Building occurs in parallel unless the BuildSerially mode flag was set.
 //
@@ -2293,6 +2275,22 @@ func (p *SSAPackage) build() {
 	if p.Prog.mode&LogSource != 0 {
 		defer logStack("build %s", p)()
 	}
+
+	var b builder
+
+	// Build all package-level functions, init functions
+	// and methods.
+	// We build them in source order, but it's not significant.
+	for _, file := range p.files {
+		for _, decl := range file.DeclList {
+			if decl, ok := decl.(*FuncDecl); ok {
+				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
+					b.buildFunction(obj.member)
+				}
+			}
+		}
+	}
+
 	init := p.init
 	init.startBody()
 
@@ -2321,8 +2319,6 @@ func (p *SSAPackage) build() {
 		}
 	}
 
-	var b builder
-
 	// Initialize package-level vars in correct order.
 	for _, varinit := range p.info.InitOrder {
 		if init.Prog.mode&LogSource != 0 {
@@ -2350,13 +2346,15 @@ func (p *SSAPackage) build() {
 		}
 	}
 
-	// Build all package-level functions, init functions
-	// and methods, including unreachable/blank ones.
-	// We build them in source order, but it's not significant.
+	// Call user declared init functions in source order.
 	for _, file := range p.files {
 		for _, decl := range file.DeclList {
-			if decl, ok := decl.(*FuncDecl); ok {
-				b.buildFuncDecl(p, decl)
+			if decl, ok := decl.(*FuncDecl); ok && decl.Recv == nil && decl.Name.Value == "init" {
+				obj := p.info.Defs[decl.Name].(*Func)
+				var v Call
+				v.Call.Value = obj.member
+				v.setType(NewTuple())
+				init.emit(&v)
 			}
 		}
 	}
