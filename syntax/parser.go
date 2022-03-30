@@ -433,15 +433,11 @@ func (p *parser) genDecl() *GenDecl {
 		// TODO(mdempsky): Elaborate.
 		p.clearPragma()
 
-		p.async(func() {
-			s.Lparen = p.pos()
-			p.next()
-			s.Rparen = p.list(_Semi, _Rparen, func() bool {
-				if x := spec(p); x != nil {
-					s.SpecList = append(s.SpecList, x)
-				}
-				return false
-			})
+		s.Lparen, s.Rparen = p.asyncList(_Lparen, _Semi, _Rparen, func() bool {
+			if x := spec(p); x != nil {
+				s.SpecList = append(s.SpecList, x)
+			}
+			return false
 		})
 	} else {
 		if x := spec(p); x != nil {
@@ -1109,16 +1105,16 @@ loop:
 		case _Lparen:
 			t := new(CallExpr)
 			t.pos = pos
+			t.Fun = x
+
 			// TODO(mdempsky): This can't be async yet, because
 			// parser.typeDecl introspects the AST from parsing `type
 			// T[F(X)` to recognize that "F(X)" (the CallExpr constructed
 			// here) could actually be "F (X)" (i.e., a type parameter F of
 			// parenthesized type X).
+			p.xnest++
 			p.asyncTODO(func() {
 				p.next()
-				t.Fun = x
-
-				p.xnest++
 				p.list(_Comma, _Rparen, func() bool {
 					t.ArgList = append(t.ArgList, p.expr())
 					if p.got(_DotDotDot) {
@@ -1127,8 +1123,8 @@ loop:
 					}
 					return false
 				})
-				p.xnest--
 			})
+			p.xnest--
 			x = t
 
 		case _Lbrace:
@@ -1206,30 +1202,25 @@ func (p *parser) complitexpr() *CompositeLit {
 		defer p.trace("complitexpr")()
 	}
 
+	p.xnest++
 	x := new(CompositeLit)
-	x.pos = p.pos()
-
-	p.async(func() {
-		p.xnest++
-		p.want(_Lbrace)
-		x.Rbrace = p.list(_Comma, _Rbrace, func() bool {
-			// value
-			e := p.bare_complitexpr()
-			if p.tok == _Colon {
-				// key ':' value
-				l := new(KeyValueExpr)
-				l.pos = p.pos()
-				p.next()
-				l.Key = e
-				l.Value = p.bare_complitexpr()
-				e = l
-				x.NKeys++
-			}
-			x.ElemList = append(x.ElemList, e)
-			return false
-		})
-		p.xnest--
+	x.pos, x.Rbrace = p.asyncList(_Lbrace, _Comma, _Rbrace, func() bool {
+		// value
+		e := p.bare_complitexpr()
+		if p.tok == _Colon {
+			// key ':' value
+			l := new(KeyValueExpr)
+			l.pos = p.pos()
+			p.next()
+			l.Key = e
+			l.Value = p.bare_complitexpr()
+			e = l
+			x.NKeys++
+		}
+		x.ElemList = append(x.ElemList, e)
+		return false
 	})
+	p.xnest--
 
 	return x
 }
@@ -1465,12 +1456,9 @@ func (p *parser) structType() *StructType {
 	typ.pos = p.pos()
 
 	p.want(_Struct)
-	p.async(func() {
-		p.want(_Lbrace)
-		p.list(_Semi, _Rbrace, func() bool {
-			p.fieldDecl(typ)
-			return false
-		})
+	p.asyncList(_Lbrace, _Semi, _Rbrace, func() bool {
+		p.fieldDecl(typ)
+		return false
 	})
 
 	return typ
@@ -1488,58 +1476,55 @@ func (p *parser) interfaceType() *InterfaceType {
 	typ.pos = p.pos()
 
 	p.want(_Interface)
-	p.async(func() {
-		p.want(_Lbrace)
-		p.list(_Semi, _Rbrace, func() bool {
-			switch p.tok {
-			case _Name:
-				f := p.methodDecl()
-				if f.Name == nil && p.allowGenerics() {
-					f = p.embeddedElem(f)
-				}
-				typ.MethodList = append(typ.MethodList, f)
-				return false
+	p.asyncList(_Lbrace, _Semi, _Rbrace, func() bool {
+		switch p.tok {
+		case _Name:
+			f := p.methodDecl()
+			if f.Name == nil && p.allowGenerics() {
+				f = p.embeddedElem(f)
+			}
+			typ.MethodList = append(typ.MethodList, f)
+			return false
 
-			case _Lparen:
-				// TODO(gri) Need to decide how to adjust this restriction.
-				p.syntaxError("cannot parenthesize embedded type")
-				f := new(Field)
-				f.pos = p.pos()
-				p.next()
-				f.Type = p.qualifiedName(nil)
-				p.want(_Rparen)
-				typ.MethodList = append(typ.MethodList, f)
-				return false
+		case _Lparen:
+			// TODO(gri) Need to decide how to adjust this restriction.
+			p.syntaxError("cannot parenthesize embedded type")
+			f := new(Field)
+			f.pos = p.pos()
+			p.next()
+			f.Type = p.qualifiedName(nil)
+			p.want(_Rparen)
+			typ.MethodList = append(typ.MethodList, f)
+			return false
 
-			case _Operator:
-				if p.op == Tilde && p.allowGenerics() {
-					typ.MethodList = append(typ.MethodList, p.embeddedElem(nil))
+		case _Operator:
+			if p.op == Tilde && p.allowGenerics() {
+				typ.MethodList = append(typ.MethodList, p.embeddedElem(nil))
+				return false
+			}
+
+		default:
+			if p.allowGenerics() {
+				pos := p.pos()
+				if t := p.typeOrNil(); t != nil {
+					f := new(Field)
+					f.pos = pos
+					f.Type = t
+					typ.MethodList = append(typ.MethodList, p.embeddedElem(f))
 					return false
 				}
-
-			default:
-				if p.allowGenerics() {
-					pos := p.pos()
-					if t := p.typeOrNil(); t != nil {
-						f := new(Field)
-						f.pos = pos
-						f.Type = t
-						typ.MethodList = append(typ.MethodList, p.embeddedElem(f))
-						return false
-					}
-				}
 			}
+		}
 
-			if p.allowGenerics() {
-				p.syntaxError("expecting method or embedded element")
-				p.advance(_Semi, _Rbrace)
-				return false
-			}
-
-			p.syntaxError("expecting method or interface name")
+		if p.allowGenerics() {
+			p.syntaxError("expecting method or embedded element")
 			p.advance(_Semi, _Rbrace)
 			return false
-		})
+		}
+
+		p.syntaxError("expecting method or interface name")
+		p.advance(_Semi, _Rbrace)
+		return false
 	})
 
 	return typ
@@ -2257,20 +2242,17 @@ func (p *parser) blockStmt(context string) *BlockStmt {
 	s := new(BlockStmt)
 	s.pos = p.pos()
 
-	// people coming from C may forget that braces are mandatory in Go
-	if p.tok != _Lbrace {
-		p.syntaxError("expecting { after " + context)
-		p.advance(_Name, _Rbrace)
-		s.Rbrace = p.pos() // in case we found "}"
-		if p.got(_Rbrace) {
-			return s
-		}
-	}
-
 	p.async(func() {
-		p.next()
-		s.List = p.stmtList()
+		// people coming from C may forget that braces are mandatory in Go
+		if !p.got(_Lbrace) {
+			p.syntaxError("missing { after " + context)
+			p.advance(_Name, _Rbrace)
+			if p.got(_Rbrace) {
+				return
+			}
+		}
 
+		s.List = p.stmtList()
 		s.Rbrace = p.pos()
 		p.want(_Rbrace)
 	})
@@ -2800,6 +2782,30 @@ func (p *parser) typeList() (x Expr, comma bool) {
 	}
 	p.xnest--
 	return
+}
+
+func (p *parser) asyncList(open, sep, close token, f func() bool) (Pos, Pos) {
+	pos := p.pos()
+	link := p.link
+
+	// Bad syntax; eagerly parse.
+	if p.tok != open || link < 0 || p.tape[link].tok != close {
+		p.want(open)
+		return pos, p.list(sep, close, f)
+	}
+
+	p.asyncCalls = append(p.asyncCalls, p.capture(func() {
+		p.next() // skip open
+		p.list(sep, close, f)
+	}))
+
+	for p.tapepos < link {
+		p.next()
+	}
+	end := p.pos()
+	p.next()
+
+	return pos, end
 }
 
 func (p *parser) async(fn func())     { p.asyncOK(true, fn) }
