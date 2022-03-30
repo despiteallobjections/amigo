@@ -169,7 +169,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 	// Add init() function.
 	obj := NewFunc(NoPos, pkg, "init", new(Signature))
 	fn := &Function{
-		name:      "init",
+		name:      obj.Name(),
 		object:    obj,
 		Signature: obj.Type().(*Signature),
 		Synthetic: "package initializer",
@@ -210,10 +210,14 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 
 	if prog.mode&BareInits == 0 {
 		// Add initializer guard variable.
+		obj := NewVar(NoPos, pkg, "init$guard", tBool)
 		initguard := &Global{
-			name: "init$guard",
-			typ:  NewPointer(tBool),
+			name:   obj.Name(),
+			object: obj,
+			typ:    NewPointer(obj.Type()), // address
+			pos:    obj.Pos(),
 		}
+		obj.member = initguard
 		p.Members[initguard.Name()] = initguard
 	}
 
