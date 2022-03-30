@@ -89,13 +89,13 @@ func Id(pkg *Package, name string) string {
 // An object implements the common parts of an Object.
 type object struct {
 	parent    *Scope
-	pos       syntax.Pos
+	pos       syntax.Pos // position of the object's name (or type, in the case of anonymous fields and parameters)
 	pkg       *Package
 	name      string
 	typ       Type
 	order_    uint32
 	color_    color
-	scopePos_ syntax.Pos
+	scopePos_ syntax.Pos // position where the object is declared (e.g., the end of the ConstSpec or VarSpec)
 }
 
 // color encodes the color of an object (see Checker.objDecl for details).
