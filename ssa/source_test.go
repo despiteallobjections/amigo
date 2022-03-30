@@ -25,8 +25,8 @@ import (
 	"github.com/mdempsky/amigo/loader"
 	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 	"golang.org/x/tools/go/expect"
 )
 
@@ -99,18 +99,18 @@ func TestObjValueLookup(t *testing.T) {
 	mainPkg.SetDebugMode(true)
 	mainPkg.Build()
 
-	var varIds []*syntax.Name
-	var varObjs []*types.Var
+	var varIds []*Name
+	var varObjs []*Var
 	for id, obj := range mainInfo.Defs {
 		// Check invariants for func and const objects.
 		switch obj := obj.(type) {
-		case *types.Func:
+		case *Func:
 			checkFuncValue(t, prog, obj)
 
-		case *types.Const:
+		case *Const:
 			checkConstValue(t, prog, obj)
 
-		case *types.Var:
+		case *Var:
 			if id.Name == "_" {
 				continue
 			}
@@ -119,7 +119,7 @@ func TestObjValueLookup(t *testing.T) {
 		}
 	}
 	for id, obj := range mainInfo.Uses {
-		if obj, ok := obj.(*types.Var); ok {
+		if obj, ok := obj.(*Var); ok {
 			varIds = append(varIds, id)
 			varObjs = append(varObjs, obj)
 		}
@@ -145,7 +145,7 @@ func TestObjValueLookup(t *testing.T) {
 	}
 }
 
-func checkFuncValue(t *testing.T, prog *ssa.Program, obj *types.Func) {
+func checkFuncValue(t *testing.T, prog *ssa.Program, obj *Func) {
 	fn := prog.FuncValue(obj)
 	// fmt.Printf("FuncValue(%s) = %s\n", obj, fn) // debugging
 	if fn == nil {
@@ -159,25 +159,25 @@ func checkFuncValue(t *testing.T, prog *ssa.Program, obj *types.Func) {
 			obj, fnobj, fn.Name())
 		return
 	}
-	if !types.Identical(fn.Type(), obj.Type()) {
+	if !Identical(fn.Type(), obj.Type()) {
 		t.Errorf("FuncValue(%s).Type() == %s", obj, fn.Type())
 		return
 	}
 }
 
-func checkConstValue(t *testing.T, prog *ssa.Program, obj *types.Const) {
+func checkConstValue(t *testing.T, prog *ssa.Program, obj *Const) {
 	c := prog.ConstValue(obj)
 	// fmt.Printf("ConstValue(%s) = %s\n", obj, c) // debugging
 	if c == nil {
 		t.Errorf("ConstValue(%s) == nil", obj)
 		return
 	}
-	if !types.Identical(c.Type(), obj.Type()) {
+	if !Identical(c.Type(), obj.Type()) {
 		t.Errorf("ConstValue(%s).Type() == %s", obj, c.Type())
 		return
 	}
 	if obj.Name() != "nil" {
-		if !constant.Compare(c.Value, syntax.Eql, obj.Val()) {
+		if !constant.Compare(c.Value, Eql, obj.Val()) {
 			t.Errorf("ConstValue(%s).Value (%s) != %s",
 				obj, c.Value, obj.Val())
 			return
@@ -185,7 +185,7 @@ func checkConstValue(t *testing.T, prog *ssa.Program, obj *types.Const) {
 	}
 }
 
-func checkVarValue(t *testing.T, prog *ssa.Program, pkg *ssa.Package, ref []syntax.Node, obj *types.Var, expKind string, wantAddr bool) {
+func checkVarValue(t *testing.T, prog *ssa.Program, pkg *ssa.Package, ref []Node, obj *Var, expKind string, wantAddr bool) {
 	// The prefix of all assertions messages.
 	prefix := fmt.Sprintf("VarValue(%s @ L%d)",
 		obj, ref[0].Pos().Line)
@@ -211,14 +211,14 @@ func checkVarValue(t *testing.T, prog *ssa.Program, pkg *ssa.Package, ref []synt
 	if v != nil {
 		expType := obj.Type()
 		if wantAddr {
-			expType = types.NewPointer(expType)
+			expType = NewPointer(expType)
 			if !gotAddr {
 				t.Errorf("%s: got value, want address", prefix)
 			}
 		} else if gotAddr {
 			t.Errorf("%s: got address, want value", prefix)
 		}
-		if !types.Identical(v.Type(), expType) {
+		if !Identical(v.Type(), expType) {
 			t.Errorf("%s.Type() == %s, want %s", prefix, v.Type(), expType)
 		}
 	}
@@ -265,10 +265,10 @@ func testValueForExpr(t *testing.T, testfile string) {
 		}
 	}
 
-	var parenExprs []*syntax.ParenExpr
-	syntax.Inspect(f, func(n syntax.Node) bool {
+	var parenExprs []*ParenExpr
+	Inspect(f, func(n Node) bool {
 		if n != nil {
-			if e, ok := n.(*syntax.ParenExpr); ok {
+			if e, ok := n.(*ParenExpr); ok {
 				parenExprs = append(parenExprs, e)
 			}
 		}
@@ -285,7 +285,7 @@ func testValueForExpr(t *testing.T, testfile string) {
 			want = "<nil>"
 		}
 		position := n.Pos
-		var e syntax.Expr
+		var e Expr
 		for _, paren := range parenExprs {
 			if paren.Pos() > n.Pos {
 				e = paren.X
@@ -317,9 +317,9 @@ func testValueForExpr(t *testing.T, testfile string) {
 		if v != nil {
 			T := v.Type()
 			if gotAddr {
-				T = T.Underlying().(*types.Pointer).Elem() // deref
+				T = T.Underlying().(*Pointer).Elem() // deref
 			}
-			if !types.Identical(T, mainInfo.TypeOf(e)) {
+			if !Identical(T, mainInfo.TypeOf(e)) {
 				t.Errorf("%s: got type %s, want %s", position, mainInfo.TypeOf(e), T)
 			}
 		}
@@ -330,7 +330,7 @@ func testValueForExpr(t *testing.T, testfile string) {
 // the first occurrence of substr in input.  f==nil indicates failure;
 // an error has already been reported in that case.
 //
-func findInterval(t *testing.T, fset *token.FileSet, input, substr string) (f *syntax.File, start, end syntax.Pos) {
+func findInterval(t *testing.T, fset *token.FileSet, input, substr string) (f *File, start, end Pos) {
 	f, err := parser.ParseFile(fset, "<input>", input, 0)
 	if err != nil {
 		t.Errorf("parse error: %s", err)

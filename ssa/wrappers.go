@@ -22,7 +22,7 @@ package ssa
 import (
 	"fmt"
 
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // -- wrappers -----------------------------------------------------------
@@ -42,15 +42,15 @@ import (
 //
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
 //
-func makeWrapper(prog *Program, sel *types.Selection) *Function {
-	obj := sel.Obj().(*types.Func)       // the declared function
-	sig := sel.Type().(*types.Signature) // type of this wrapper
+func makeWrapper(prog *Program, sel *Selection) *Function {
+	obj := sel.Obj().(*Func)       // the declared function
+	sig := sel.Type().(*Signature) // type of this wrapper
 
-	var recv *types.Var // wrapper's receiver or thunk's params[0]
+	var recv *Var // wrapper's receiver or thunk's params[0]
 	name := obj.Name()
 	var description string
 	var start int // first regular param
-	if sel.Kind() == types.MethodExpr {
+	if sel.Kind() == MethodExpr {
 		name += "$thunk"
 		description = "thunk"
 		recv = sig.Params().At(0)
@@ -89,9 +89,9 @@ func makeWrapper(prog *Program, sel *types.Selection) *Function {
 			var c Call
 			c.Call.Value = &SSABuiltin{
 				name: "ssa:wrapnilchk",
-				sig: types.NewSignatureType(nil, nil, nil,
-					types.NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),
-					types.NewTuple(anonVar(sel.Recv())), false),
+				sig: NewSignatureType(nil, nil, nil,
+					NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),
+					NewTuple(anonVar(sel.Recv())), false),
 			}
 			c.Call.Args = []Value{
 				v,
@@ -174,7 +174,7 @@ func createParams(fn *Function, start int) {
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
 //
-func makeBound(prog *Program, obj *types.Func) *Function {
+func makeBound(prog *Program, obj *Func) *Function {
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
 	fn, ok := prog.bounds[obj]
@@ -186,7 +186,7 @@ func makeBound(prog *Program, obj *types.Func) *Function {
 		fn = &Function{
 			name:      obj.Name() + "$bound",
 			object:    obj,
-			Signature: changeRecv(obj.Type().(*types.Signature), nil), // drop receiver
+			Signature: changeRecv(obj.Type().(*Signature), nil), // drop receiver
 			Synthetic: description,
 			Prog:      prog,
 			pos:       obj.Pos(),
@@ -241,8 +241,8 @@ func makeBound(prog *Program, obj *types.Func) *Function {
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
 //
-func makeThunk(prog *Program, sel *types.Selection) *Function {
-	if sel.Kind() != types.MethodExpr {
+func makeThunk(prog *Program, sel *Selection) *Function {
+	if sel.Kind() != MethodExpr {
 		panic(sel)
 	}
 
@@ -258,7 +258,7 @@ func makeThunk(prog *Program, sel *types.Selection) *Function {
 	defer prog.methodsMu.Unlock()
 
 	// Canonicalize key.recv to avoid constructing duplicate thunks.
-	canonRecv, ok := prog.canon.At(key.recv).(types.Type)
+	canonRecv, ok := prog.canon.At(key.recv).(Type)
 	if !ok {
 		canonRecv = key.recv
 		prog.canon.Set(key.recv, canonRecv)
@@ -276,15 +276,15 @@ func makeThunk(prog *Program, sel *types.Selection) *Function {
 	return fn
 }
 
-func changeRecv(s *types.Signature, recv *types.Var) *types.Signature {
-	return types.NewSignatureType(recv, nil, nil, s.Params(), s.Results(), s.Variadic())
+func changeRecv(s *Signature, recv *Var) *Signature {
+	return NewSignatureType(recv, nil, nil, s.Params(), s.Results(), s.Variadic())
 }
 
 // selectionKey is like types.Selection but a usable map key.
 type selectionKey struct {
-	kind     types.SelectionKind
-	recv     types.Type // canonicalized via Program.canon
-	obj      types.Object
+	kind     SelectionKind
+	recv     Type // canonicalized via Program.canon
+	obj      Object
 	index    string
 	indirect bool
 }

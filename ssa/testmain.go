@@ -20,8 +20,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // FindTests returns the Test, Benchmark, and Example functions
@@ -35,9 +35,9 @@ func FindTests(pkg *SSAPackage) (tests, benchmarks, examples []*Function, main *
 
 	// The first two of these may be nil: if the program doesn't import "testing",
 	// it can't contain any tests, but it may yet contain Examples.
-	var testSig *types.Signature                                            // func(*testing.T)
-	var benchmarkSig *types.Signature                                       // func(*testing.B)
-	var exampleSig = types.NewSignatureType(nil, nil, nil, nil, nil, false) // func()
+	var testSig *Signature                                            // func(*testing.T)
+	var benchmarkSig *Signature                                       // func(*testing.B)
+	var exampleSig = NewSignatureType(nil, nil, nil, nil, nil, false) // func()
 
 	// Obtain the types from the parameters of testing.MainStart.
 	if testingPkg := prog.ImportedPackage("testing"); testingPkg != nil {
@@ -49,11 +49,11 @@ func FindTests(pkg *SSAPackage) (tests, benchmarks, examples []*Function, main *
 		// Does the package define this function?
 		//   func TestMain(*testing.M)
 		if f := pkg.Func("TestMain"); f != nil {
-			sig := f.Type().(*types.Signature)
+			sig := f.Type().(*Signature)
 			starM := mainStart.Signature.Results().At(0).Type() // *testing.M
 			if sig.Results().Len() == 0 &&
 				sig.Params().Len() == 1 &&
-				types.Identical(sig.Params().At(0).Type(), starM) {
+				Identical(sig.Params().At(0).Type(), starM) {
 				main = f
 			}
 		}
@@ -81,14 +81,14 @@ func FindTests(pkg *SSAPackage) (tests, benchmarks, examples []*Function, main *
 }
 
 // Like isTest, but checks the signature too.
-func isTestSig(f *Function, prefix string, sig *types.Signature) bool {
-	return isTest(f.Name(), prefix) && types.Identical(f.Signature, sig)
+func isTestSig(f *Function, prefix string, sig *Signature) bool {
+	return isTest(f.Name(), prefix) && Identical(f.Signature, sig)
 }
 
 // Given the type of one of the three slice parameters of testing.Main,
 // returns the function type.
-func funcField(slice types.Type) *types.Signature {
-	return slice.(*types.Slice).Elem().Underlying().(*types.Struct).Field(1).Type().(*types.Signature)
+func funcField(slice Type) *Signature {
+	return slice.(*Slice).Elem().Underlying().(*Struct).Field(1).Type().(*Signature)
 }
 
 // isTest tells whether name looks like a test (or benchmark, according to prefix).
@@ -142,7 +142,7 @@ func (prog *Program) CreateTestMainPackage(pkg *SSAPackage) *SSAPackage {
 	tmpl := testmainTmpl
 	if testingPkg := prog.ImportedPackage("testing"); testingPkg != nil {
 		// In Go 1.8, testing.MainStart's first argument is an interface, not a func.
-		data.Go18 = types.IsInterface(testingPkg.Func("MainStart").Signature.Params().At(0).Type())
+		data.Go18 = IsInterface(testingPkg.Func("MainStart").Signature.Params().At(0).Type())
 	} else {
 		// The program does not import "testing", but FindTests
 		// returned non-nil, which must mean there were Examples
@@ -164,22 +164,22 @@ func (prog *Program) CreateTestMainPackage(pkg *SSAPackage) *SSAPackage {
 	}
 
 	// Parse and type-check the testmain package.
-	f, err := syntax.ParseReader(path+".go", &buf)
+	f, err := ParseReader(path+".go", &buf)
 	if err != nil {
 		log.Fatalf("internal error parsing %s: %v", path, err)
 	}
-	conf := types.Config{
+	conf := Config{
 		DisableUnusedImportCheck: true,
 		Importer:                 importer{pkg},
 	}
-	files := []*syntax.File{f}
-	info := &types.Info{
-		Types:      make(map[syntax.Expr]types.TypeAndValue),
-		Defs:       make(map[*syntax.Name]types.Object),
-		Uses:       make(map[*syntax.Name]types.Object),
-		Implicits:  make(map[syntax.Node]types.Object),
-		Scopes:     make(map[syntax.Node]*types.Scope),
-		Selections: make(map[*syntax.SelectorExpr]*types.Selection),
+	files := []*File{f}
+	info := &Info{
+		Types:      make(map[Expr]TypeAndValue),
+		Defs:       make(map[*Name]Object),
+		Uses:       make(map[*Name]Object),
+		Implicits:  make(map[Node]Object),
+		Scopes:     make(map[Node]*Scope),
+		Selections: make(map[*SelectorExpr]*Selection),
 	}
 	testmainPkg, err := conf.Check(path, files, info)
 	if err != nil {
@@ -200,7 +200,7 @@ type importer struct {
 	pkg *SSAPackage // package under test; may be non-importable
 }
 
-func (imp importer) Import(path, srcDir string) (*types.Package, error) {
+func (imp importer) Import(path, srcDir string) (*Package, error) {
 	if p := imp.pkg.Prog.ImportedPackage(path); p != nil {
 		return p.Pkg, nil
 	}

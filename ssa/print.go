@@ -14,8 +14,8 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // relName returns the name of v relative to i.
@@ -25,7 +25,7 @@ import (
 // references are package-qualified.
 //
 func relName(v Value, i Instruction) string {
-	var from *types.Package
+	var from *Package
 	if i != nil {
 		from = i.Parent().pkg()
 	}
@@ -38,11 +38,11 @@ func relName(v Value, i Instruction) string {
 	return v.Name()
 }
 
-func relType(t types.Type, from *types.Package) string {
-	return types.TypeString(t, types.RelativeTo(from))
+func relType(t Type, from *Package) string {
+	return TypeString(t, RelativeTo(from))
 }
 
-func relString(m Member, from *types.Package) string {
+func relString(m Member, from *Package) string {
 	// NB: not all globals have an Object (e.g. init$guard),
 	// so use Package().Object not Object.Package().
 	if pkg := m.Package().Pkg; pkg != nil && pkg != from {
@@ -224,7 +224,7 @@ func (v *MakeChan) String() string {
 }
 
 func (v *FieldAddr) String() string {
-	st := deref(v.X.Type()).Underlying().(*types.Struct)
+	st := deref(v.X.Type()).Underlying().(*Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {
@@ -234,7 +234,7 @@ func (v *FieldAddr) String() string {
 }
 
 func (v *SSAField) String() string {
-	st := v.X.Type().Underlying().(*types.Struct)
+	st := v.X.Type().Underlying().(*Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {
@@ -331,7 +331,7 @@ func (s *Select) String() string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		if st.Dir == syntax.RecvOnly {
+		if st.Dir == RecvOnly {
 			b.WriteString("<-")
 			b.WriteString(relName(st.Chan, s))
 		} else {
@@ -411,13 +411,13 @@ func WritePackage(buf *bytes.Buffer, p *SSAPackage) {
 		case *SSAType:
 			fmt.Fprintf(buf, "  type  %-*s %s\n",
 				maxname, name, relType(mem.Type().Underlying(), from))
-			for _, meth := range types.IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {
-				fmt.Fprintf(buf, "    %s\n", types.SelectionString(meth, types.RelativeTo(from)))
+			for _, meth := range IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {
+				fmt.Fprintf(buf, "    %s\n", SelectionString(meth, RelativeTo(from)))
 			}
 
 		case *Global:
 			fmt.Fprintf(buf, "  var   %-*s %s\n",
-				maxname, name, relType(mem.Type().(*types.Pointer).Elem(), from))
+				maxname, name, relType(mem.Type().(*Pointer).Elem(), from))
 		}
 	}
 

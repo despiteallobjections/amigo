@@ -8,8 +8,8 @@ package ssa
 // expressions.
 
 import (
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // An lvalue represents an assignable location that may appear on the
@@ -20,14 +20,14 @@ type lvalue interface {
 	store(fn *Function, v Value) // stores v into the location
 	load(fn *Function) Value     // loads the contents of the location
 	address(fn *Function) Value  // address of the location
-	typ() types.Type             // returns the type of the location
+	typ() Type                   // returns the type of the location
 }
 
 // An address is an lvalue represented by a true pointer.
 type address struct {
 	addr Value
-	pos  syntax.Pos  // source position
-	expr syntax.Expr // source syntax of the value (not address) [debug mode]
+	pos  Pos  // source position
+	expr Expr // source syntax of the value (not address) [debug mode]
 }
 
 func (a *address) load(fn *Function) Value {
@@ -51,7 +51,7 @@ func (a *address) address(fn *Function) Value {
 	return a.addr
 }
 
-func (a *address) typ() types.Type {
+func (a *address) typ() Type {
 	return deref(a.addr.Type())
 }
 
@@ -61,9 +61,9 @@ func (a *address) typ() types.Type {
 // load(), and in the case of maps, store().
 //
 type element struct {
-	m, k Value      // map or string
-	t    types.Type // map element type or string byte type
-	pos  syntax.Pos // source position of colon ({k:v}) or lbrack (m[k]=v)
+	m, k Value // map or string
+	t    Type  // map element type or string byte type
+	pos  Pos   // source position of colon ({k:v}) or lbrack (m[k]=v)
 }
 
 func (e *element) load(fn *Function) Value {
@@ -90,7 +90,7 @@ func (e *element) address(fn *Function) Value {
 	panic("map/string elements are not addressable")
 }
 
-func (e *element) typ() types.Type {
+func (e *element) typ() Type {
 	return e.t
 }
 
@@ -111,7 +111,7 @@ func (bl blank) address(fn *Function) Value {
 	panic("blank var is not addressable")
 }
 
-func (bl blank) typ() types.Type {
+func (bl blank) typ() Type {
 	// This should be the type of the blank Ident; the typechecker
 	// doesn't provide this yet, but fortunately, we don't need it
 	// yet either.

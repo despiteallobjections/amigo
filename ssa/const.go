@@ -11,14 +11,14 @@ import (
 	"go/constant"
 	"strconv"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // NewSSAConst returns a new constant of the specified value and type.
 // val must be valid according to the specification of Const.Value.
 //
-func NewSSAConst(val constant.Value, typ types.Type) *SSAConst {
+func NewSSAConst(val constant.Value, typ Type) *SSAConst {
 	return &SSAConst{typ, val}
 }
 
@@ -31,7 +31,7 @@ func intConst(i int64) *SSAConst {
 // nilConst returns a nil constant of the specified type, which may
 // be any reference type, including interfaces.
 //
-func nilConst(typ types.Type) *SSAConst {
+func nilConst(typ Type) *SSAConst {
 	return NewSSAConst(nil, typ)
 }
 
@@ -44,34 +44,34 @@ func stringConst(s string) *SSAConst {
 // which must not be an array or struct type: the zero values of
 // aggregates are well-defined but cannot be represented by Const.
 //
-func zeroConst(t types.Type) *SSAConst {
+func zeroConst(t Type) *SSAConst {
 	switch t := t.(type) {
-	case *types.Basic:
+	case *Basic:
 		switch {
-		case t.Info()&types.IsBoolean != 0:
+		case t.Info()&IsBoolean != 0:
 			return NewSSAConst(constant.MakeBool(false), t)
-		case t.Info()&types.IsNumeric != 0:
+		case t.Info()&IsNumeric != 0:
 			return NewSSAConst(constant.MakeInt64(0), t)
-		case t.Info()&types.IsString != 0:
+		case t.Info()&IsString != 0:
 			return NewSSAConst(constant.MakeString(""), t)
-		case t.Kind() == types.UnsafePointer:
+		case t.Kind() == UnsafePointer:
 			fallthrough
-		case t.Kind() == types.UntypedNil:
+		case t.Kind() == UntypedNil:
 			return nilConst(t)
 		default:
 			panic(fmt.Sprint("zeroConst for unexpected type:", t))
 		}
-	case *types.Pointer, *types.Slice, *types.Interface, *types.Chan, *types.Map, *types.Signature:
+	case *Pointer, *Slice, *Interface, *Chan, *Map, *Signature:
 		return nilConst(t)
-	case *types.Named:
+	case *Named:
 		return NewSSAConst(zeroConst(t.Underlying()).Value, t)
-	case *types.Array, *types.Struct, *types.Tuple:
+	case *Array, *Struct, *Tuple:
 		panic(fmt.Sprint("zeroConst applied to aggregate:", t))
 	}
 	panic(fmt.Sprint("zeroConst: unexpected ", t))
 }
 
-func (c *SSAConst) RelString(from *types.Package) string {
+func (c *SSAConst) RelString(from *Package) string {
 	var s string
 	if c.Value == nil {
 		s = "nil"
@@ -97,7 +97,7 @@ func (c *SSAConst) String() string {
 	return c.Name()
 }
 
-func (c *SSAConst) Type() types.Type {
+func (c *SSAConst) Type() Type {
 	return c.typ
 }
 
@@ -107,8 +107,8 @@ func (c *SSAConst) Referrers() *[]Instruction {
 
 func (c *SSAConst) Parent() *Function { return nil }
 
-func (c *SSAConst) Pos() syntax.Pos {
-	return syntax.NoPos
+func (c *SSAConst) Pos() Pos {
+	return NoPos
 }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.

@@ -9,7 +9,7 @@ package ssa
 import (
 	"fmt"
 
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // MethodValue returns the Function implementing method sel, building
@@ -22,8 +22,8 @@ import (
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(prog.methodsMu)
 //
-func (prog *Program) MethodValue(sel *types.Selection) *Function {
-	if sel.Kind() != types.MethodVal {
+func (prog *Program) MethodValue(sel *Selection) *Function {
+	if sel.Kind() != MethodVal {
 		panic(fmt.Sprintf("MethodValue(%s) kind != MethodVal", sel))
 	}
 	T := sel.Recv()
@@ -44,10 +44,10 @@ func (prog *Program) MethodValue(sel *types.Selection) *Function {
 // identified by (pkg, name).  It returns nil if the method exists but
 // is abstract, and panics if T has no such method.
 //
-func (prog *Program) LookupMethod(T types.Type, pkg *types.Package, name string) *Function {
+func (prog *Program) LookupMethod(T Type, pkg *Package, name string) *Function {
 	sel := prog.MethodSets.MethodSet(T).Lookup(pkg, name)
 	if sel == nil {
-		panic(fmt.Sprintf("%s has no method %s", T, types.Id(pkg, name)))
+		panic(fmt.Sprintf("%s has no method %s", T, Id(pkg, name)))
 	}
 	return prog.MethodValue(sel)
 }
@@ -60,7 +60,7 @@ type methodSet struct {
 
 // Precondition: !isInterface(T).
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
-func (prog *Program) createMethodSet(T types.Type) *methodSet {
+func (prog *Program) createMethodSet(T Type) *methodSet {
 	mset, ok := prog.methodSets.At(T).(*methodSet)
 	if !ok {
 		mset = &methodSet{mapping: make(map[string]*Function)}
@@ -70,14 +70,14 @@ func (prog *Program) createMethodSet(T types.Type) *methodSet {
 }
 
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
-func (prog *Program) addMethod(mset *methodSet, sel *types.Selection) *Function {
-	if sel.Kind() == types.MethodExpr {
+func (prog *Program) addMethod(mset *methodSet, sel *Selection) *Function {
+	if sel.Kind() == MethodExpr {
 		panic(sel)
 	}
 	id := sel.Obj().Id()
 	fn := mset.mapping[id]
 	if fn == nil {
-		obj := sel.Obj().(*types.Func)
+		obj := sel.Obj().(*Func)
 
 		needsPromotion := len(sel.Index()) > 1
 		needsIndirection := !isPointer(recvType(obj)) && isPointer(sel.Recv())
@@ -102,12 +102,12 @@ func (prog *Program) addMethod(mset *methodSet, sel *types.Selection) *Function 
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(prog.methodsMu)
 //
-func (prog *Program) RuntimeTypes() []types.Type {
+func (prog *Program) RuntimeTypes() []Type {
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
 
-	var res []types.Type
-	prog.methodSets.Iterate(func(T types.Type, v interface{}) {
+	var res []Type
+	prog.methodSets.Iterate(func(T Type, v interface{}) {
 		if v.(*methodSet).complete {
 			res = append(res, T)
 		}
@@ -118,7 +118,7 @@ func (prog *Program) RuntimeTypes() []types.Type {
 // declaredFunc returns the concrete function/method denoted by obj.
 // Panic ensues if there is none.
 //
-func (prog *Program) declaredFunc(obj *types.Func) *Function {
+func (prog *Program) declaredFunc(obj *Func) *Function {
 	if v := prog.packageLevelValue(obj); v != nil {
 		return v.(*Function)
 	}
@@ -141,7 +141,7 @@ func (prog *Program) declaredFunc(obj *types.Func) *Function {
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(prog.methodsMu)
 //
-func (prog *Program) needMethodsOf(T types.Type) {
+func (prog *Program) needMethodsOf(T Type) {
 	prog.methodsMu.Lock()
 	prog.needMethods(T, false)
 	prog.methodsMu.Unlock()
@@ -152,7 +152,7 @@ func (prog *Program) needMethodsOf(T types.Type) {
 //
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
 //
-func (prog *Program) needMethods(T types.Type, skip bool) {
+func (prog *Program) needMethods(T Type, skip bool) {
 	// Each package maintains its own set of types it has visited.
 	if prevSkip, ok := prog.runtimeTypes.At(T).(bool); ok {
 		// needMethods(T) was previously called
@@ -178,42 +178,42 @@ func (prog *Program) needMethods(T types.Type, skip bool) {
 
 	// Recursion over signatures of each method.
 	for i := 0; i < tmset.Len(); i++ {
-		sig := tmset.At(i).Type().(*types.Signature)
+		sig := tmset.At(i).Type().(*Signature)
 		prog.needMethods(sig.Params(), false)
 		prog.needMethods(sig.Results(), false)
 	}
 
 	switch t := T.(type) {
-	case *types.Basic:
+	case *Basic:
 		// nop
 
-	case *types.Interface, *types.TypeParam:
+	case *Interface, *TypeParam:
 		// nop---handled by recursion over method set.
 
-	case *types.Pointer:
+	case *Pointer:
 		prog.needMethods(t.Elem(), false)
 
-	case *types.Slice:
+	case *Slice:
 		prog.needMethods(t.Elem(), false)
 
-	case *types.Chan:
+	case *Chan:
 		prog.needMethods(t.Elem(), false)
 
-	case *types.Map:
+	case *Map:
 		prog.needMethods(t.Key(), false)
 		prog.needMethods(t.Elem(), false)
 
-	case *types.Signature:
+	case *Signature:
 		if t.Recv() != nil {
 			panic(fmt.Sprintf("Signature %s has Recv %s", t, t.Recv()))
 		}
 		prog.needMethods(t.Params(), false)
 		prog.needMethods(t.Results(), false)
 
-	case *types.Named:
+	case *Named:
 		// A pointer-to-named type can be derived from a named
 		// type via reflection.  It may have methods too.
-		prog.needMethods(types.NewPointer(T), false)
+		prog.needMethods(NewPointer(T), false)
 
 		// Consider 'type T struct{S}' where S has methods.
 		// Reflection provides no way to get from T to struct{S},
@@ -221,15 +221,15 @@ func (prog *Program) needMethods(T types.Type, skip bool) {
 		// so set 'skip' flag during recursion.
 		prog.needMethods(t.Underlying(), true)
 
-	case *types.Array:
+	case *Array:
 		prog.needMethods(t.Elem(), false)
 
-	case *types.Struct:
+	case *Struct:
 		for i, n := 0, t.NumFields(); i < n; i++ {
 			prog.needMethods(t.Field(i).Type(), false)
 		}
 
-	case *types.Tuple:
+	case *Tuple:
 		for i, n := 0, t.Len(); i < n; i++ {
 			prog.needMethods(t.At(i).Type(), false)
 		}

@@ -13,15 +13,15 @@ import (
 	"github.com/mdempsky/amigo/importer"
 	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 func TestBuildPackageGo117(t *testing.T) {
 	tests := []struct {
 		name     string
 		src      string
-		importer types.Importer
+		importer Importer
 	}{
 		{"slice to array pointer", "package p; var s []byte; var _ = (*[4]byte)(s)", nil},
 		{"unsafe slice", `package p; import "unsafe"; var _ = unsafe.Add(nil, 0)`, importer.Default()},
@@ -32,14 +32,14 @@ func TestBuildPackageGo117(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f, err := syntax.ParseString("p.go", tc.src)
+			f, err := ParseString("p.go", tc.src)
 			if err != nil {
 				t.Error(err)
 			}
-			files := []*syntax.File{f}
+			files := []*File{f}
 
-			pkg := types.NewPackage("p", "")
-			conf := &types.Config{Importer: tc.importer}
+			pkg := NewPackage("p", "")
+			conf := &Config{Importer: tc.importer}
 			if _, _, err := ssautil.BuildPackage(conf, pkg, files, ssa.SanityCheckFunctions); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -51,7 +51,7 @@ func TestBuildPackageFailuresGo117(t *testing.T) {
 	tests := []struct {
 		name     string
 		src      string
-		importer types.Importer
+		importer Importer
 	}{
 		{"slice to array pointer - source is not a slice", "package p; var s [4]byte; var _ = (*[4]byte)(s)", nil},
 		{"slice to array pointer - dest is not a pointer", "package p; var s []byte; var _ = ([4]byte)(s)", nil},
@@ -62,14 +62,14 @@ func TestBuildPackageFailuresGo117(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f, err := syntax.ParseString("p.go", tc.src)
+			f, err := ParseString("p.go", tc.src)
 			if err != nil {
 				t.Error(err)
 			}
-			files := []*syntax.File{f}
+			files := []*File{f}
 
-			pkg := types.NewPackage("p", "")
-			conf := &types.Config{Importer: tc.importer}
+			pkg := NewPackage("p", "")
+			conf := &Config{Importer: tc.importer}
 			if _, _, err := ssautil.BuildPackage(conf, pkg, files, ssa.SanityCheckFunctions); err == nil {
 				t.Error("want error, but got nil")
 			}

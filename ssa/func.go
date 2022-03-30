@@ -13,8 +13,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // addEdge adds a control-flow graph edge from from to to.
@@ -150,7 +150,7 @@ type lblock struct {
 // labelledBlock returns the branch target associated with the
 // specified label, creating it if needed.
 //
-func (f *Function) labelledBlock(label *syntax.Name) *lblock {
+func (f *Function) labelledBlock(label *Name) *lblock {
 	// TODO(mdempsky): This used to be keyed by label.Object, but now
 	// I'm using label.Value. I think that's safe, but double check that
 	// it doesn't cause problems with closures and identically named
@@ -170,7 +170,7 @@ func (f *Function) labelledBlock(label *syntax.Name) *lblock {
 // addParam adds a (non-escaping) parameter to f.Params of the
 // specified name, type and source position.
 //
-func (f *Function) addParam(name string, typ types.Type, pos syntax.Pos) *Parameter {
+func (f *Function) addParam(name string, typ Type, pos Pos) *Parameter {
 	v := &Parameter{
 		name:   name,
 		typ:    typ,
@@ -181,7 +181,7 @@ func (f *Function) addParam(name string, typ types.Type, pos syntax.Pos) *Parame
 	return v
 }
 
-func (f *Function) addParamObj(obj types.Object) *Parameter {
+func (f *Function) addParamObj(obj Object) *Parameter {
 	name := obj.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Params))
@@ -195,10 +195,10 @@ func (f *Function) addParamObj(obj types.Object) *Parameter {
 // stack; the function body will load/store the spilled location.
 // Subsequent lifting will eliminate spills where possible.
 //
-func (f *Function) addSpilledParam(obj types.Object) {
+func (f *Function) addSpilledParam(obj Object) {
 	param := f.addParamObj(obj)
 	spill := &Alloc{Comment: obj.Name()}
-	spill.setType(types.NewPointer(obj.Type()))
+	spill.setType(NewPointer(obj.Type()))
 	spill.setPos(obj.Pos())
 	f.objects[obj] = spill
 	f.Locals = append(f.Locals, spill)
@@ -211,7 +211,7 @@ func (f *Function) addSpilledParam(obj types.Object) {
 //
 func (f *Function) startBody() {
 	f.currentBlock = f.newBasicBlock("entry")
-	f.objects = make(map[types.Object]Value) // needed for some synthetics, e.g. init
+	f.objects = make(map[Object]Value) // needed for some synthetics, e.g. init
 }
 
 // createSyntacticParams populates f.Params and generates code (spills
@@ -223,7 +223,7 @@ func (f *Function) startBody() {
 // Postcondition:
 // len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
 //
-func (f *Function) createSyntacticParams(recv *syntax.Field, functype *syntax.FuncType) {
+func (f *Function) createSyntacticParams(recv *Field, functype *FuncType) {
 	if recv != nil {
 		if recv.Name != nil {
 			f.addSpilledParam(f.Pkg.info.Defs[recv.Name])
@@ -390,23 +390,23 @@ func (f *Function) debugInfo() bool {
 // returns it.  Its name and type are taken from obj.  Subsequent
 // calls to f.lookup(obj) will return the same local.
 //
-func (f *Function) addNamedLocal(obj types.Object) *Alloc {
+func (f *Function) addNamedLocal(obj Object) *Alloc {
 	l := f.addLocal(obj.Type(), obj.Pos())
 	l.Comment = obj.Name()
 	f.objects[obj] = l
 	return l
 }
 
-func (f *Function) addLocalForIdent(id *syntax.Name) *Alloc {
+func (f *Function) addLocalForIdent(id *Name) *Alloc {
 	return f.addNamedLocal(f.Pkg.info.Defs[id])
 }
 
 // addLocal creates an anonymous local variable of type typ, adds it
 // to function f and returns it.  pos is the optional source location.
 //
-func (f *Function) addLocal(typ types.Type, pos syntax.Pos) *Alloc {
+func (f *Function) addLocal(typ Type, pos Pos) *Alloc {
 	v := &Alloc{}
-	v.setType(types.NewPointer(typ))
+	v.setType(NewPointer(typ))
 	v.setPos(pos)
 	f.Locals = append(f.Locals, v)
 	f.emit(v)
@@ -418,7 +418,7 @@ func (f *Function) addLocal(typ types.Type, pos syntax.Pos) *Alloc {
 // If escaping, the reference comes from a potentially escaping pointer
 // expression and the referent must be heap-allocated.
 //
-func (f *Function) lookup(obj types.Object, escaping bool) Value {
+func (f *Function) lookup(obj Object, escaping bool) Value {
 	if v, ok := f.objects[obj]; ok {
 		if alloc, ok := v.(*Alloc); ok && escaping {
 			alloc.Heap = true
@@ -472,7 +472,7 @@ func (f *Function) emit(instr Instruction) Value {
 // wrapper promoting a non-exported method "f" from another package; in
 // that case, the strings are equal but the identifiers "f" are distinct.)
 //
-func (f *Function) RelString(from *types.Package) string {
+func (f *Function) RelString(from *Package) string {
 	// Anonymous?
 	if f.parent != nil {
 		// An anonymous function's Name() looks like "parentName$1",
@@ -512,12 +512,12 @@ func (f *Function) RelString(from *types.Package) string {
 	return f.name
 }
 
-func (f *Function) relMethod(from *types.Package, recv types.Type) string {
+func (f *Function) relMethod(from *Package, recv Type) string {
 	return fmt.Sprintf("(%s).%s", relType(recv, from), f.name)
 }
 
 // writeSignature writes to buf the signature sig in declaration syntax.
-func writeSignature(buf *bytes.Buffer, from *types.Package, name string, sig *types.Signature, params []*Parameter) {
+func writeSignature(buf *bytes.Buffer, from *Package, name string, sig *Signature, params []*Parameter) {
 	buf.WriteString("func ")
 	if recv := sig.Recv(); recv != nil {
 		buf.WriteString("(")
@@ -525,14 +525,14 @@ func writeSignature(buf *bytes.Buffer, from *types.Package, name string, sig *ty
 			buf.WriteString(n)
 			buf.WriteString(" ")
 		}
-		types.WriteType(buf, params[0].Type(), types.RelativeTo(from))
+		WriteType(buf, params[0].Type(), RelativeTo(from))
 		buf.WriteString(") ")
 	}
 	buf.WriteString(name)
-	types.WriteSignature(buf, sig, types.RelativeTo(from))
+	WriteSignature(buf, sig, RelativeTo(from))
 }
 
-func (f *Function) pkg() *types.Package {
+func (f *Function) pkg() *Package {
 	if f.Pkg != nil {
 		return f.Pkg.Pkg
 	}
@@ -672,14 +672,14 @@ func (f *Function) newBasicBlock(comment string) *BasicBlock {
 //
 // TODO(adonovan): think harder about the API here.
 //
-func (prog *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
+func (prog *Program) NewFunction(name string, sig *Signature, provenance string) *Function {
 	return &Function{Prog: prog, name: name, Signature: sig, Synthetic: provenance}
 }
 
-type extentNode [2]syntax.Pos
+type extentNode [2]Pos
 
-func (n extentNode) Pos() syntax.Pos { return n[0] }
-func (n extentNode) End() syntax.Pos { return n[1] }
+func (n extentNode) Pos() Pos { return n[0] }
+func (n extentNode) End() Pos { return n[1] }
 
 // Syntax returns an syntax.Node whose Pos/End methods provide the
 // lexical extent of the function if it was defined by Go source code
@@ -690,4 +690,4 @@ func (n extentNode) End() syntax.Pos { return n[1] }
 // function.  Otherwise, it is an opaque Node providing only position
 // information; this avoids pinning the AST in memory.
 //
-func (f *Function) Syntax() syntax.Node { return f.syntax }
+func (f *Function) Syntax() Node { return f.syntax }

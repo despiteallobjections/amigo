@@ -13,7 +13,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/types"
 )
 
 type sanity struct {
@@ -135,8 +135,8 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 	case *ChangeType:
 	case *SliceToArrayPointer:
 	case *Convert:
-		if _, ok := instr.X.Type().Underlying().(*types.Basic); !ok {
-			if _, ok := instr.Type().Underlying().(*types.Basic); !ok {
+		if _, ok := instr.X.Type().Underlying().(*Basic); !ok {
+			if _, ok := instr.Type().Underlying().(*Basic); !ok {
 				s.errorf("convert %s -> %s: at least one type must be basic", instr.X.Type(), instr.Type())
 			}
 		}
@@ -158,7 +158,7 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 				numBind, instr.Fn, numFree)
 
 		}
-		if recv := instr.Type().(*types.Signature).Recv(); recv != nil {
+		if recv := instr.Type().(*Signature).Recv(); recv != nil {
 			s.errorf("MakeClosure's type includes receiver %s", recv.Type())
 		}
 
@@ -195,7 +195,7 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 			s.errorf("no type: %s = %s", v.Name(), v)
 		} else if t == tRangeIter {
 			// not a proper type; ignore.
-		} else if b, ok := t.Underlying().(*types.Basic); ok && b.Info()&types.IsUntyped != 0 {
+		} else if b, ok := t.Underlying().(*Basic); ok && b.Info()&IsUntyped != 0 {
 			s.errorf("instruction has 'untyped' result: %s = %s : %s", v.Name(), v, t)
 		}
 		s.checkReferrerList(v)
@@ -343,8 +343,8 @@ func (s *sanity) checkBlock(b *BasicBlock, index int) {
 
 			// Check that "untyped" types only appear on constant operands.
 			if _, ok := (*op).(*SSAConst); !ok {
-				if basic, ok := (*op).Type().(*types.Basic); ok {
-					if basic.Info()&types.IsUntyped != 0 {
+				if basic, ok := (*op).Type().(*Basic); ok {
+					if basic.Info()&IsUntyped != 0 {
 						s.errorf("operand #%d of %s is untyped: %s", i, instr, basic)
 					}
 				}
@@ -454,7 +454,7 @@ func (s *sanity) checkFunction(fn *Function) bool {
 			if j < 0 {
 				continue
 			}
-			if !types.Identical(p.Type(), sig.Params().At(j).Type()) {
+			if !Identical(p.Type(), sig.Params().At(j).Type()) {
 				s.errorf("Param %s at index %d has wrong type (%s, versus %s in Signature)", p.Name(), i, p.Type(), sig.Params().At(j).Type())
 
 			}

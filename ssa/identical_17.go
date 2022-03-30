@@ -7,6 +7,6 @@
 
 package ssa
 
-import "github.com/mdempsky/amigo/types"
+import . "github.com/mdempsky/amigo/types"
 
-var structTypesIdentical = types.Identical
+var structTypesIdentical = Identical

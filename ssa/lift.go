@@ -43,8 +43,8 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // If true, show diagnostic information at each step of lifting.
@@ -388,7 +388,7 @@ func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool
 	// Don't lift aggregates into registers, because we don't have
 	// a way to express their zero-constants.
 	switch deref(alloc.Type()).Underlying().(type) {
-	case *types.Array, *types.Struct:
+	case *Array, *Struct:
 		return false
 	}
 
@@ -419,7 +419,7 @@ func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool
 			}
 			defblocks.add(instr.Block())
 		case *UnOp:
-			if instr.Op != syntax.Mul {
+			if instr.Op != Mul {
 				return false // not a load
 			}
 			if instr.X != alloc {
@@ -576,7 +576,7 @@ func rename(u *BasicBlock, renaming []Value, newPhis newPhiMap) {
 			}
 
 		case *UnOp:
-			if instr.Op == syntax.Mul {
+			if instr.Op == Mul {
 				if alloc, ok := instr.X.(*Alloc); ok && alloc.index >= 0 { // load of Alloc cell
 					newval := renamed(renaming, alloc)
 					if debugLifting {

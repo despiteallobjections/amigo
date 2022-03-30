@@ -13,22 +13,22 @@ import (
 	"go/token"
 	"sync"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // A Program is a partial or complete Go program converted to SSA form.
 type Program struct {
-	imported   map[string]*SSAPackage         // all importable Packages, keyed by import path
-	packages   map[*types.Package]*SSAPackage // all loaded Packages, keyed by object
-	mode       BuilderMode                    // set of mode bits for SSA construction
-	MethodSets types.MethodSetCache           // cache of type-checker's method-sets
+	imported   map[string]*SSAPackage   // all importable Packages, keyed by import path
+	packages   map[*Package]*SSAPackage // all loaded Packages, keyed by object
+	mode       BuilderMode              // set of mode bits for SSA construction
+	MethodSets MethodSetCache           // cache of type-checker's method-sets
 
 	methodsMu    sync.Mutex                 // guards the following maps:
-	methodSets   types.TypeMap              // maps type to its concrete methodSet
-	runtimeTypes types.TypeMap              // types for which rtypes are needed
-	canon        types.TypeMap              // type canonicalization map
-	bounds       map[*types.Func]*Function  // bounds for curried x.Method closures
+	methodSets   TypeMap                    // maps type to its concrete methodSet
+	runtimeTypes TypeMap                    // types for which rtypes are needed
+	canon        TypeMap                    // type canonicalization map
+	bounds       map[*Func]*Function        // bounds for curried x.Method closures
 	thunks       map[selectionKey]*Function // thunks for T.Method expressions
 }
 
@@ -42,19 +42,19 @@ type Program struct {
 // and unspecified other things too.
 //
 type SSAPackage struct {
-	Prog    *Program               // the owning program
-	Pkg     *types.Package         // the corresponding github.com/mdempsky/amigo/types.Package
-	Members map[string]Member      // all package members keyed by name (incl. init and init#%d)
-	values  map[types.Object]Value // package members (incl. types and methods), keyed by object
-	init    *Function              // Func("init"); the package's init function
-	debug   bool                   // include full debug info in this package
+	Prog    *Program          // the owning program
+	Pkg     *Package          // the corresponding github.com/mdempsky/amigo/types.Package
+	Members map[string]Member // all package members keyed by name (incl. init and init#%d)
+	values  map[Object]Value  // package members (incl. types and methods), keyed by object
+	init    *Function         // Func("init"); the package's init function
+	debug   bool              // include full debug info in this package
 
 	// The following fields are set transiently, then cleared
 	// after building.
-	buildOnce sync.Once      // ensures package building occurs once
-	ninit     int32          // number of init functions
-	info      *types.Info    // package type information
-	files     []*syntax.File // package ASTs
+	buildOnce sync.Once // ensures package building occurs once
+	ninit     int32     // number of init functions
+	info      *Info     // package type information
+	files     []*File   // package ASTs
 }
 
 // A Member is a member of a Go package, implemented by *NamedConst,
@@ -62,19 +62,19 @@ type SSAPackage struct {
 // const, var, func and type declarations respectively.
 //
 type Member interface {
-	Name() string                    // declared name of the package member
-	String() string                  // package-qualified name of the package member
-	RelString(*types.Package) string // like String, but relative refs are unqualified
-	Object() types.Object            // typechecker's object for this member, if any
-	Pos() syntax.Pos                 // position of member's declaration, if known
-	Type() types.Type                // type of the package member
-	Token() token.Token              // token.{VAR,FUNC,CONST,TYPE}
-	Package() *SSAPackage            // the containing package
+	Name() string              // declared name of the package member
+	String() string            // package-qualified name of the package member
+	RelString(*Package) string // like String, but relative refs are unqualified
+	Object() Object            // typechecker's object for this member, if any
+	Pos() Pos                  // position of member's declaration, if known
+	Type() Type                // type of the package member
+	Token() token.Token        // token.{VAR,FUNC,CONST,TYPE}
+	Package() *SSAPackage      // the containing package
 }
 
 // A SSAType is a Member of a Package representing a package-level named type.
 type SSAType struct {
-	object *types.TypeName
+	object *TypeName
 	pkg    *SSAPackage
 }
 
@@ -88,7 +88,7 @@ type SSAType struct {
 // it augments with the name and position of its 'const' declaration.
 //
 type NamedConst struct {
-	object *types.Const
+	object *Const
 	Value  *SSAConst
 	pkg    *SSAPackage
 }
@@ -118,7 +118,7 @@ type Value interface {
 	// Type returns the type of this value.  Many instructions
 	// (e.g. IndexAddr) change their behaviour depending on the
 	// types of their operands.
-	Type() types.Type
+	Type() Type
 
 	// Parent returns the function to which this Value belongs.
 	// It returns nil for named Functions, Builtin, Const and Global.
@@ -153,7 +153,7 @@ type Value interface {
 	// corresponds to an syntax.Expr; use Function.ValueForExpr
 	// instead.  NB: it requires that the function was built with
 	// debug information.)
-	Pos() syntax.Pos
+	Pos() Pos
 }
 
 // An Instruction is an SSA instruction that computes a new Value or
@@ -226,7 +226,7 @@ type Instruction interface {
 	// This position may be used to determine which non-Value
 	// Instruction corresponds to some syntax.Stmts, but not all: If
 	// and Jump instructions have no Pos(), for example.)
-	Pos() syntax.Pos
+	Pos() Pos
 }
 
 // A SSANode is a node in the SSA value graph.  Every concrete type that
@@ -243,7 +243,7 @@ type Instruction interface {
 type SSANode interface {
 	// Common methods:
 	String() string
-	Pos() syntax.Pos
+	Pos() Pos
 	Parent() *Function
 
 	// Partial methods:
@@ -293,13 +293,13 @@ type SSANode interface {
 //
 type Function struct {
 	name      string
-	object    types.Object     // a declared *types.Func or one of its wrappers
-	method    *types.Selection // info about provenance of synthetic methods
-	Signature *types.Signature
-	pos       syntax.Pos
+	object    Object     // a declared *types.Func or one of its wrappers
+	method    *Selection // info about provenance of synthetic methods
+	Signature *Signature
+	pos       Pos
 
 	Synthetic string        // provenance of synthetic function; "" for true source functions
-	syntax    syntax.Node   // *syntax.Func{Decl,Lit}; replaced with simple syntax.Node after build, unless debug mode
+	syntax    Node          // *syntax.Func{Decl,Lit}; replaced with simple syntax.Node after build, unless debug mode
 	parent    *Function     // enclosing function if anon; nil if global
 	Pkg       *SSAPackage   // enclosing package; nil for shared funcs (wrappers and error.Error)
 	Prog      *Program      // enclosing program
@@ -313,11 +313,11 @@ type Function struct {
 
 	// The following fields are set transiently during building,
 	// then cleared.
-	currentBlock *BasicBlock            // where to emit code
-	objects      map[types.Object]Value // addresses of local variables
-	namedResults []*Alloc               // tuple of named results
-	targets      *targets               // linked stack of branch targets
-	lblocks      map[string]*lblock     // labelled blocks
+	currentBlock *BasicBlock        // where to emit code
+	objects      map[Object]Value   // addresses of local variables
+	namedResults []*Alloc           // tuple of named results
+	targets      *targets           // linked stack of branch targets
+	lblocks      map[string]*lblock // labelled blocks
 }
 
 // BasicBlock represents an SSA basic block.
@@ -372,8 +372,8 @@ type BasicBlock struct {
 //
 type FreeVar struct {
 	name      string
-	typ       types.Type
-	pos       syntax.Pos
+	typ       Type
+	pos       Pos
 	parent    *Function
 	referrers []Instruction
 
@@ -385,9 +385,9 @@ type FreeVar struct {
 //
 type Parameter struct {
 	name      string
-	object    types.Object // a *types.Var; nil for non-source locals
-	typ       types.Type
-	pos       syntax.Pos
+	object    Object // a *types.Var; nil for non-source locals
+	typ       Type
+	pos       Pos
 	parent    *Function
 	referrers []Instruction
 }
@@ -413,7 +413,7 @@ type Parameter struct {
 //	3+4i:MyComplex
 //
 type SSAConst struct {
-	typ   types.Type
+	typ   Type
 	Value constant.Value
 }
 
@@ -425,9 +425,9 @@ type SSAConst struct {
 //
 type Global struct {
 	name   string
-	object types.Object // a *types.Var; may be nil for synthetics e.g. init$guard
-	typ    types.Type
-	pos    syntax.Pos
+	object Object // a *types.Var; may be nil for synthetics e.g. init$guard
+	typ    Type
+	pos    Pos
 
 	Pkg *SSAPackage
 }
@@ -453,7 +453,7 @@ type Global struct {
 //
 type SSABuiltin struct {
 	name string
-	sig  *types.Signature
+	sig  *Signature
 }
 
 // Value-defining instructions  ----------------------------------------
@@ -546,7 +546,7 @@ type BinOp struct {
 	// ADD SUB MUL QUO REM          + - * / %
 	// AND OR XOR SHL SHR AND_NOT   & | ^ << >> &^
 	// EQL NEQ LSS LEQ GTR GEQ      == != < <= < >=
-	Op   syntax.Operator
+	Op   Operator
 	X, Y Value
 }
 
@@ -574,7 +574,7 @@ type BinOp struct {
 //
 type UnOp struct {
 	register
-	Op      syntax.Operator // One of: NOT SUB ARROW MUL XOR ! - <- * ^
+	Op      Operator // One of: NOT SUB ARROW MUL XOR ! - <- * ^
 	X       Value
 	CommaOk bool
 }
@@ -882,11 +882,11 @@ type Lookup struct {
 // It represents one goal state and its corresponding communication.
 //
 type SelectState struct {
-	Dir       syntax.ChanDir // direction of case (SendOnly or RecvOnly)
-	Chan      Value          // channel to use (for send or receive)
-	Send      Value          // value to send (for send)
-	Pos       syntax.Pos     // position of token.ARROW
-	DebugNode syntax.Node    // syntax.SendStmt or syntax.UnaryExpr(<-) [debug mode]
+	Dir       ChanDir // direction of case (SendOnly or RecvOnly)
+	Chan      Value   // channel to use (for send or receive)
+	Send      Value   // value to send (for send)
+	Pos       Pos     // position of token.ARROW
+	DebugNode Node    // syntax.SendStmt or syntax.UnaryExpr(<-) [debug mode]
 }
 
 // The Select instruction tests whether (or blocks until) one
@@ -1009,7 +1009,7 @@ type Next struct {
 type TypeAssert struct {
 	register
 	X            Value
-	AssertedType types.Type
+	AssertedType Type
 	CommaOk      bool
 }
 
@@ -1086,7 +1086,7 @@ type If struct {
 type Return struct {
 	anInstruction
 	Results []Value
-	pos     syntax.Pos
+	pos     Pos
 }
 
 // The RunDefers instruction pops and invokes the entire stack of
@@ -1122,7 +1122,7 @@ type RunDefers struct {
 type Panic struct {
 	anInstruction
 	X   Value // an interface{}
-	pos syntax.Pos
+	pos Pos
 }
 
 // The SSAGo instruction creates a new goroutine and calls the specified
@@ -1140,7 +1140,7 @@ type Panic struct {
 type SSAGo struct {
 	anInstruction
 	Call CallCommon
-	pos  syntax.Pos
+	pos  Pos
 }
 
 // The SSADefer instruction pushes the specified call onto a stack of
@@ -1158,7 +1158,7 @@ type SSAGo struct {
 type SSADefer struct {
 	anInstruction
 	Call CallCommon
-	pos  syntax.Pos
+	pos  Pos
 }
 
 // The Send instruction sends X on channel Chan.
@@ -1171,7 +1171,7 @@ type SSADefer struct {
 type Send struct {
 	anInstruction
 	Chan, X Value
-	pos     syntax.Pos
+	pos     Pos
 }
 
 // The Store instruction stores Val at address Addr.
@@ -1189,7 +1189,7 @@ type Store struct {
 	anInstruction
 	Addr Value
 	Val  Value
-	pos  syntax.Pos
+	pos  Pos
 }
 
 // The MapUpdate instruction updates the association of Map[Key] to
@@ -1206,7 +1206,7 @@ type MapUpdate struct {
 	Map   Value
 	Key   Value
 	Value Value
-	pos   syntax.Pos
+	pos   Pos
 }
 
 // A DebugRef instruction maps a source-level expression Expr to the
@@ -1244,10 +1244,10 @@ type MapUpdate struct {
 //
 type DebugRef struct {
 	anInstruction
-	Expr   syntax.Expr  // the referring expression (never *syntax.ParenExpr)
-	object types.Object // the identity of the source var/func
-	IsAddr bool         // Expr is addressable and X is the address it denotes
-	X      Value        // the value or address of Expr
+	Expr   Expr   // the referring expression (never *syntax.ParenExpr)
+	object Object // the identity of the source var/func
+	IsAddr bool   // Expr is addressable and X is the address it denotes
+	X      Value  // the value or address of Expr
 }
 
 // Embeddable mix-ins and helpers for common parts of other structs. -----------
@@ -1267,9 +1267,9 @@ type DebugRef struct {
 //
 type register struct {
 	anInstruction
-	num       int        // "name" of virtual register, e.g. "t0".  Not guaranteed unique.
-	typ       types.Type // type of virtual register
-	pos       syntax.Pos // position of source expression, or NoPos
+	num       int  // "name" of virtual register, e.g. "t0".  Not guaranteed unique.
+	typ       Type // type of virtual register
+	pos       Pos  // position of source expression, or NoPos
 	referrers []Instruction
 }
 
@@ -1331,10 +1331,10 @@ type anInstruction struct {
 // the last element of Args is a slice.
 //
 type CallCommon struct {
-	Value  Value       // receiver (invoke mode) or func value (call mode)
-	Method *types.Func // abstract method (invoke mode)
-	Args   []Value     // actual parameters (in static method call, includes receiver)
-	pos    syntax.Pos  // position of CallExpr.Lparen, iff explicit in source
+	Value  Value   // receiver (invoke mode) or func value (call mode)
+	Method *Func   // abstract method (invoke mode)
+	Args   []Value // actual parameters (in static method call, includes receiver)
+	pos    Pos     // position of CallExpr.Lparen, iff explicit in source
 }
 
 // IsInvoke returns true if this call has "invoke" (not "call") mode.
@@ -1342,7 +1342,7 @@ func (c *CallCommon) IsInvoke() bool {
 	return c.Method != nil
 }
 
-func (c *CallCommon) Pos() syntax.Pos { return c.pos }
+func (c *CallCommon) Pos() Pos { return c.pos }
 
 // Signature returns the signature of the called function.
 //
@@ -1352,11 +1352,11 @@ func (c *CallCommon) Pos() syntax.Pos { return c.pos }
 // In either "call" or "invoke" mode, if the callee is a method, its
 // receiver is represented by sig.Recv, not sig.Params().At(0).
 //
-func (c *CallCommon) Signature() *types.Signature {
+func (c *CallCommon) Signature() *Signature {
 	if c.Method != nil {
-		return c.Method.Type().(*types.Signature)
+		return c.Method.Type().(*Signature)
 	}
-	return c.Value.Type().Underlying().(*types.Signature)
+	return c.Value.Type().Underlying().(*Signature)
 }
 
 // StaticCallee returns the callee if this is a trivially static
@@ -1409,35 +1409,35 @@ func (s *Call) Value() *Call     { return s }
 func (s *SSADefer) Value() *Call { return nil }
 func (s *SSAGo) Value() *Call    { return nil }
 
-func (v *SSABuiltin) Type() types.Type        { return v.sig }
+func (v *SSABuiltin) Type() Type              { return v.sig }
 func (v *SSABuiltin) Name() string            { return v.name }
 func (*SSABuiltin) Referrers() *[]Instruction { return nil }
-func (v *SSABuiltin) Pos() syntax.Pos         { return syntax.NoPos }
-func (v *SSABuiltin) Object() types.Object    { return types.Universe.Lookup(v.name) }
+func (v *SSABuiltin) Pos() Pos                { return NoPos }
+func (v *SSABuiltin) Object() Object          { return Universe.Lookup(v.name) }
 func (v *SSABuiltin) Parent() *Function       { return nil }
 
-func (v *FreeVar) Type() types.Type          { return v.typ }
+func (v *FreeVar) Type() Type                { return v.typ }
 func (v *FreeVar) Name() string              { return v.name }
 func (v *FreeVar) Referrers() *[]Instruction { return &v.referrers }
-func (v *FreeVar) Pos() syntax.Pos           { return v.pos }
+func (v *FreeVar) Pos() Pos                  { return v.pos }
 func (v *FreeVar) Parent() *Function         { return v.parent }
 
-func (v *Global) Type() types.Type                     { return v.typ }
-func (v *Global) Name() string                         { return v.name }
-func (v *Global) Parent() *Function                    { return nil }
-func (v *Global) Pos() syntax.Pos                      { return v.pos }
-func (v *Global) Referrers() *[]Instruction            { return nil }
-func (v *Global) Token() token.Token                   { return token.VAR }
-func (v *Global) Object() types.Object                 { return v.object }
-func (v *Global) String() string                       { return v.RelString(nil) }
-func (v *Global) Package() *SSAPackage                 { return v.Pkg }
-func (v *Global) RelString(from *types.Package) string { return relString(v, from) }
+func (v *Global) Type() Type                     { return v.typ }
+func (v *Global) Name() string                   { return v.name }
+func (v *Global) Parent() *Function              { return nil }
+func (v *Global) Pos() Pos                       { return v.pos }
+func (v *Global) Referrers() *[]Instruction      { return nil }
+func (v *Global) Token() token.Token             { return token.VAR }
+func (v *Global) Object() Object                 { return v.object }
+func (v *Global) String() string                 { return v.RelString(nil) }
+func (v *Global) Package() *SSAPackage           { return v.Pkg }
+func (v *Global) RelString(from *Package) string { return relString(v, from) }
 
 func (v *Function) Name() string         { return v.name }
-func (v *Function) Type() types.Type     { return v.Signature }
-func (v *Function) Pos() syntax.Pos      { return v.pos }
+func (v *Function) Type() Type           { return v.Signature }
+func (v *Function) Pos() Pos             { return v.pos }
 func (v *Function) Token() token.Token   { return token.FUNC }
-func (v *Function) Object() types.Object { return v.object }
+func (v *Function) Object() Object       { return v.object }
 func (v *Function) String() string       { return v.RelString(nil) }
 func (v *Function) Package() *SSAPackage { return v.Pkg }
 func (v *Function) Parent() *Function    { return v.parent }
@@ -1448,49 +1448,49 @@ func (v *Function) Referrers() *[]Instruction {
 	return nil
 }
 
-func (v *Parameter) Type() types.Type          { return v.typ }
+func (v *Parameter) Type() Type                { return v.typ }
 func (v *Parameter) Name() string              { return v.name }
-func (v *Parameter) Object() types.Object      { return v.object }
+func (v *Parameter) Object() Object            { return v.object }
 func (v *Parameter) Referrers() *[]Instruction { return &v.referrers }
-func (v *Parameter) Pos() syntax.Pos           { return v.pos }
+func (v *Parameter) Pos() Pos                  { return v.pos }
 func (v *Parameter) Parent() *Function         { return v.parent }
 
-func (v *Alloc) Type() types.Type          { return v.typ }
+func (v *Alloc) Type() Type                { return v.typ }
 func (v *Alloc) Referrers() *[]Instruction { return &v.referrers }
-func (v *Alloc) Pos() syntax.Pos           { return v.pos }
+func (v *Alloc) Pos() Pos                  { return v.pos }
 
-func (v *register) Type() types.Type          { return v.typ }
-func (v *register) setType(typ types.Type)    { v.typ = typ }
+func (v *register) Type() Type                { return v.typ }
+func (v *register) setType(typ Type)          { v.typ = typ }
 func (v *register) Name() string              { return fmt.Sprintf("t%d", v.num) }
 func (v *register) setNum(num int)            { v.num = num }
 func (v *register) Referrers() *[]Instruction { return &v.referrers }
-func (v *register) Pos() syntax.Pos           { return v.pos }
-func (v *register) setPos(pos syntax.Pos)     { v.pos = pos }
+func (v *register) Pos() Pos                  { return v.pos }
+func (v *register) setPos(pos Pos)            { v.pos = pos }
 
 func (v *anInstruction) Parent() *Function          { return v.block.parent }
 func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
-func (t *SSAType) Name() string                         { return t.object.Name() }
-func (t *SSAType) Pos() syntax.Pos                      { return t.object.Pos() }
-func (t *SSAType) Type() types.Type                     { return t.object.Type() }
-func (t *SSAType) Token() token.Token                   { return token.TYPE }
-func (t *SSAType) Object() types.Object                 { return t.object }
-func (t *SSAType) String() string                       { return t.RelString(nil) }
-func (t *SSAType) Package() *SSAPackage                 { return t.pkg }
-func (t *SSAType) RelString(from *types.Package) string { return relString(t, from) }
+func (t *SSAType) Name() string                   { return t.object.Name() }
+func (t *SSAType) Pos() Pos                       { return t.object.Pos() }
+func (t *SSAType) Type() Type                     { return t.object.Type() }
+func (t *SSAType) Token() token.Token             { return token.TYPE }
+func (t *SSAType) Object() Object                 { return t.object }
+func (t *SSAType) String() string                 { return t.RelString(nil) }
+func (t *SSAType) Package() *SSAPackage           { return t.pkg }
+func (t *SSAType) RelString(from *Package) string { return relString(t, from) }
 
-func (c *NamedConst) Name() string                         { return c.object.Name() }
-func (c *NamedConst) Pos() syntax.Pos                      { return c.object.Pos() }
-func (c *NamedConst) String() string                       { return c.RelString(nil) }
-func (c *NamedConst) Type() types.Type                     { return c.object.Type() }
-func (c *NamedConst) Token() token.Token                   { return token.CONST }
-func (c *NamedConst) Object() types.Object                 { return c.object }
-func (c *NamedConst) Package() *SSAPackage                 { return c.pkg }
-func (c *NamedConst) RelString(from *types.Package) string { return relString(c, from) }
+func (c *NamedConst) Name() string                   { return c.object.Name() }
+func (c *NamedConst) Pos() Pos                       { return c.object.Pos() }
+func (c *NamedConst) String() string                 { return c.RelString(nil) }
+func (c *NamedConst) Type() Type                     { return c.object.Type() }
+func (c *NamedConst) Token() token.Token             { return token.CONST }
+func (c *NamedConst) Object() Object                 { return c.object }
+func (c *NamedConst) Package() *SSAPackage           { return c.pkg }
+func (c *NamedConst) RelString(from *Package) string { return relString(c, from) }
 
-func (d *DebugRef) Object() types.Object { return d.object }
+func (d *DebugRef) Object() Object { return d.object }
 
 // Func returns the package-level function of the specified name,
 // or nil if not found.
@@ -1524,18 +1524,18 @@ func (p *SSAPackage) Type(name string) (t *SSAType) {
 	return
 }
 
-func (v *Call) Pos() syntax.Pos      { return v.Call.pos }
-func (s *SSADefer) Pos() syntax.Pos  { return s.pos }
-func (s *SSAGo) Pos() syntax.Pos     { return s.pos }
-func (s *MapUpdate) Pos() syntax.Pos { return s.pos }
-func (s *Panic) Pos() syntax.Pos     { return s.pos }
-func (s *Return) Pos() syntax.Pos    { return s.pos }
-func (s *Send) Pos() syntax.Pos      { return s.pos }
-func (s *Store) Pos() syntax.Pos     { return s.pos }
-func (s *If) Pos() syntax.Pos        { return syntax.NoPos }
-func (s *Jump) Pos() syntax.Pos      { return syntax.NoPos }
-func (s *RunDefers) Pos() syntax.Pos { return syntax.NoPos }
-func (s *DebugRef) Pos() syntax.Pos  { return s.Expr.Pos() }
+func (v *Call) Pos() Pos      { return v.Call.pos }
+func (s *SSADefer) Pos() Pos  { return s.pos }
+func (s *SSAGo) Pos() Pos     { return s.pos }
+func (s *MapUpdate) Pos() Pos { return s.pos }
+func (s *Panic) Pos() Pos     { return s.pos }
+func (s *Return) Pos() Pos    { return s.pos }
+func (s *Send) Pos() Pos      { return s.pos }
+func (s *Store) Pos() Pos     { return s.pos }
+func (s *If) Pos() Pos        { return NoPos }
+func (s *Jump) Pos() Pos      { return NoPos }
+func (s *RunDefers) Pos() Pos { return NoPos }
+func (s *DebugRef) Pos() Pos  { return s.Expr.Pos() }
 
 // Operands.
 

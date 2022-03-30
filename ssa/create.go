@@ -12,8 +12,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // NewProgram returns a new SSA Program.
@@ -23,13 +23,13 @@ import (
 func NewProgram(mode BuilderMode) *Program {
 	prog := &Program{
 		imported: make(map[string]*SSAPackage),
-		packages: make(map[*types.Package]*SSAPackage),
+		packages: make(map[*Package]*SSAPackage),
 		thunks:   make(map[selectionKey]*Function),
-		bounds:   make(map[*types.Func]*Function),
+		bounds:   make(map[*Func]*Function),
 		mode:     mode,
 	}
 
-	h := types.MakeHasher() // protected by methodsMu, in effect
+	h := MakeHasher() // protected by methodsMu, in effect
 	prog.methodSets.SetHasher(h)
 	prog.canon.SetHasher(h)
 
@@ -43,21 +43,21 @@ func NewProgram(mode BuilderMode) *Program {
 // tree (for funcs and vars only); it will be used during the build
 // phase.
 //
-func memberFromObject(pkg *SSAPackage, obj types.Object, syntax syntax.Node) {
+func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 	name := obj.Name()
 	switch obj := obj.(type) {
-	case *types.Builtin:
-		if pkg.Pkg != types.Unsafe {
+	case *Builtin:
+		if pkg.Pkg != Unsafe {
 			panic("unexpected builtin object: " + obj.String())
 		}
 
-	case *types.TypeName:
+	case *TypeName:
 		pkg.Members[name] = &SSAType{
 			object: obj,
 			pkg:    pkg,
 		}
 
-	case *types.Const:
+	case *Const:
 		c := &NamedConst{
 			object: obj,
 			Value:  NewSSAConst(obj.Val(), obj.Type()),
@@ -66,19 +66,19 @@ func memberFromObject(pkg *SSAPackage, obj types.Object, syntax syntax.Node) {
 		pkg.values[obj] = c.Value
 		pkg.Members[name] = c
 
-	case *types.Var:
+	case *Var:
 		g := &Global{
 			Pkg:    pkg,
 			name:   name,
 			object: obj,
-			typ:    types.NewPointer(obj.Type()), // address
+			typ:    NewPointer(obj.Type()), // address
 			pos:    obj.Pos(),
 		}
 		pkg.values[obj] = g
 		pkg.Members[name] = g
 
-	case *types.Func:
-		sig := obj.Type().(*types.Signature)
+	case *Func:
+		sig := obj.Type().(*Signature)
 		if sig.Recv() == nil && name == "init" {
 			pkg.ninit++
 			name = fmt.Sprintf("init#%d", pkg.ninit)
@@ -110,26 +110,26 @@ func memberFromObject(pkg *SSAPackage, obj types.Object, syntax syntax.Node) {
 // typechecker object (var, func, const or type) associated with the
 // specified decl.
 //
-func membersFromDecl(pkg *SSAPackage, decl syntax.Decl) {
+func membersFromDecl(pkg *SSAPackage, decl Decl) {
 	switch decl := decl.(type) {
-	case *syntax.GenDecl:
+	case *GenDecl:
 		for _, spec := range decl.SpecList {
 			switch spec := spec.(type) {
-			case *syntax.ConstSpec:
+			case *ConstSpec:
 				for _, id := range spec.NameList {
 					if !isBlankIdent(id) {
 						memberFromObject(pkg, pkg.info.Defs[id], nil)
 					}
 				}
 
-			case *syntax.VarSpec:
+			case *VarSpec:
 				for _, id := range spec.NameList {
 					if !isBlankIdent(id) {
 						memberFromObject(pkg, pkg.info.Defs[id], decl)
 					}
 				}
 
-			case *syntax.TypeSpec:
+			case *TypeSpec:
 				id := spec.Name
 				if !isBlankIdent(id) {
 					memberFromObject(pkg, pkg.info.Defs[id], nil)
@@ -137,7 +137,7 @@ func membersFromDecl(pkg *SSAPackage, decl syntax.Decl) {
 			}
 		}
 
-	case *syntax.FuncDecl:
+	case *FuncDecl:
 		id := decl.Name
 		if !isBlankIdent(id) {
 			memberFromObject(pkg, pkg.info.Defs[id], decl)
@@ -155,11 +155,11 @@ func membersFromDecl(pkg *SSAPackage, decl syntax.Decl) {
 // The real work of building SSA form for each function is not done
 // until a subsequent call to Package.Build().
 //
-func (prog *Program) CreatePackage(pkg *types.Package, files []*syntax.File, info *types.Info, importable bool) *SSAPackage {
+func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, importable bool) *SSAPackage {
 	p := &SSAPackage{
 		Prog:    prog,
 		Members: make(map[string]Member),
-		values:  make(map[types.Object]Value),
+		values:  make(map[Object]Value),
 		Pkg:     pkg,
 		info:    info,  // transient (CREATE and BUILD phases)
 		files:   files, // transient (CREATE and BUILD phases)
@@ -168,7 +168,7 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*syntax.File, inf
 	// Add init() function.
 	p.init = &Function{
 		name:      "init",
-		Signature: new(types.Signature),
+		Signature: new(Signature),
 		Synthetic: "package initializer",
 		Pkg:       p,
 		Prog:      prog,
@@ -192,8 +192,8 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*syntax.File, inf
 		for _, name := range scope.Names() {
 			obj := scope.Lookup(name)
 			memberFromObject(p, obj, nil)
-			if obj, ok := obj.(*types.TypeName); ok {
-				if named, ok := obj.Type().(*types.Named); ok {
+			if obj, ok := obj.(*TypeName); ok {
+				if named, ok := obj.Type().(*Named); ok {
 					for i, n := 0, named.NumMethods(); i < n; i++ {
 						memberFromObject(p, named.Method(i), nil)
 					}
@@ -207,7 +207,7 @@ func (prog *Program) CreatePackage(pkg *types.Package, files []*syntax.File, inf
 		initguard := &Global{
 			Pkg:  p,
 			name: "init$guard",
-			typ:  types.NewPointer(tBool),
+			typ:  NewPointer(tBool),
 		}
 		p.Members[initguard.Name()] = initguard
 	}

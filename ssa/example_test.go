@@ -16,8 +16,8 @@ import (
 	"github.com/mdempsky/amigo/importer"
 	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 const hello = `
@@ -52,20 +52,20 @@ func main() {
 //
 func Example_buildPackage() {
 	// Parse the source files.
-	f, err := syntax.ParseString("hello.go", hello)
+	f, err := ParseString("hello.go", hello)
 	if err != nil {
 		fmt.Print(err) // parse error
 		return
 	}
-	files := []*syntax.File{f}
+	files := []*File{f}
 
 	// Create the type-checker's package.
-	pkg := types.NewPackage("hello", "")
+	pkg := NewPackage("hello", "")
 
 	// Type-check the package, load dependencies.
 	// Create and build the SSA program.
 	hello, _, err := ssautil.BuildPackage(
-		&types.Config{Importer: importer.Default()}, pkg, files, ssa.SanityCheckFunctions)
+		&Config{Importer: importer.Default()}, pkg, files, ssa.SanityCheckFunctions)
 	if err != nil {
 		fmt.Print(err) // type error in some package
 		return

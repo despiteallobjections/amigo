@@ -16,8 +16,8 @@ import (
 	"github.com/mdempsky/amigo/loader"
 	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 func isEmpty(f *ssa.Function) bool { return f.Blocks == nil }
@@ -46,7 +46,7 @@ func main() {
 `
 
 	// Parse the file.
-	f, err := syntax.ParseString("input.go", input)
+	f, err := ParseString("input.go", input)
 	if err != nil {
 		t.Error(err)
 		return
@@ -54,8 +54,8 @@ func main() {
 
 	// Build an SSA program from the parsed file.
 	// Load its dependencies from gc binary export data.
-	mainPkg, _, err := ssautil.BuildPackage(&types.Config{Importer: importer.Default()},
-		types.NewPackage("main", ""), []*syntax.File{f}, ssa.SanityCheckFunctions)
+	mainPkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
+		NewPackage("main", ""), []*File{f}, ssa.SanityCheckFunctions)
 	if err != nil {
 		t.Error(err)
 		return
@@ -108,7 +108,7 @@ func main() {
 				if !isExt {
 					t.Fatalf("unexpected name type in main package: %s", mem)
 				}
-				mset := prog.MethodSets.MethodSet(types.NewPointer(mem.Type()))
+				mset := prog.MethodSets.MethodSet(NewPointer(mem.Type()))
 				for i, n := 0, mset.Len(); i < n; i++ {
 					m := prog.MethodValue(mset.At(i))
 					// For external types, only synthetic wrappers have code.
@@ -214,7 +214,7 @@ func TestRuntimeTypes(t *testing.T) {
 	}
 	for _, test := range tests {
 		// Parse the file.
-		f, err := syntax.ParseString("input.go", test.input)
+		f, err := ParseString("input.go", test.input)
 		if err != nil {
 			t.Errorf("test %q: %s", test.input[:15], err)
 			continue
@@ -222,8 +222,8 @@ func TestRuntimeTypes(t *testing.T) {
 
 		// Create a single-file main package.
 		// Load dependencies from gc binary export data.
-		ssapkg, _, err := ssautil.BuildPackage(&types.Config{Importer: importer.Default()},
-			types.NewPackage("p", ""), []*syntax.File{f}, ssa.SanityCheckFunctions)
+		ssapkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
+			NewPackage("p", ""), []*File{f}, ssa.SanityCheckFunctions)
 		if err != nil {
 			t.Errorf("test %q: %s", test.input[:15], err)
 			continue

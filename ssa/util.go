@@ -11,8 +11,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 //// AST utilities
@@ -20,32 +20,32 @@ import (
 // isBlankIdent returns true iff e is an Ident with name "_".
 // They have no associated types.Object, and thus no type.
 //
-func isBlankIdent(e syntax.Expr) bool {
-	id, ok := e.(*syntax.Name)
+func isBlankIdent(e Expr) bool {
+	id, ok := e.(*Name)
 	return ok && id.Value == "_"
 }
 
 //// Type utilities.  Some of these belong in github.com/mdempsky/amigo/types.
 
 // isPointer returns true for types whose underlying type is a pointer.
-func isPointer(typ types.Type) bool {
-	_, ok := typ.Underlying().(*types.Pointer)
+func isPointer(typ Type) bool {
+	_, ok := typ.Underlying().(*Pointer)
 	return ok
 }
 
-func isInterface(T types.Type) bool { return types.IsInterface(T) }
+func isInterface(T Type) bool { return IsInterface(T) }
 
 // deref returns a pointer's element type; otherwise it returns typ.
-func deref(typ types.Type) types.Type {
-	if p, ok := typ.Underlying().(*types.Pointer); ok {
+func deref(typ Type) Type {
+	if p, ok := typ.Underlying().(*Pointer); ok {
 		return p.Elem()
 	}
 	return typ
 }
 
 // recvType returns the receiver type of method obj.
-func recvType(obj *types.Func) types.Type {
-	return obj.Type().(*types.Signature).Recv().Type()
+func recvType(obj *Func) Type {
+	return obj.Type().(*Signature).Recv().Type()
 }
 
 // logStack prints the formatted "start" message to stderr and
@@ -64,22 +64,22 @@ func logStack(format string, args ...interface{}) func() {
 }
 
 // newVar creates a 'var' for use in a types.Tuple.
-func newVar(name string, typ types.Type) *types.Var {
-	return types.NewParam(syntax.NoPos, nil, name, typ)
+func newVar(name string, typ Type) *Var {
+	return NewParam(NoPos, nil, name, typ)
 }
 
 // anonVar creates an anonymous 'var' for use in a types.Tuple.
-func anonVar(typ types.Type) *types.Var {
+func anonVar(typ Type) *Var {
 	return newVar("", typ)
 }
 
-var lenResults = types.NewTuple(anonVar(tInt))
+var lenResults = NewTuple(anonVar(tInt))
 
 // makeLen returns the len builtin specialized to type func(T)int.
-func makeLen(T types.Type) *SSABuiltin {
-	lenParams := types.NewTuple(anonVar(T))
+func makeLen(T Type) *SSABuiltin {
+	lenParams := NewTuple(anonVar(T))
 	return &SSABuiltin{
 		name: "len",
-		sig:  types.NewSignatureType(nil, nil, nil, lenParams, lenResults, false),
+		sig:  NewSignatureType(nil, nil, nil, lenParams, lenResults, false),
 	}
 }

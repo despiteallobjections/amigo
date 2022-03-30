@@ -11,8 +11,8 @@ package ssa
 // the originating syntax, as specified.
 
 import (
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/mdempsky/amigo/types"
 )
 
 // EnclosingFunction returns the function that contains the syntax
@@ -27,7 +27,7 @@ import (
 //      its SSA function has not been created yet
 //      (pkg.Build() has not yet been called).
 //
-func EnclosingFunction(pkg *SSAPackage, path []syntax.Node) *Function {
+func EnclosingFunction(pkg *SSAPackage, path []Node) *Function {
 	// Start with package-level function...
 	fn := findEnclosingPackageLevelFunction(pkg, path)
 	if fn == nil {
@@ -38,7 +38,7 @@ func EnclosingFunction(pkg *SSAPackage, path []syntax.Node) *Function {
 	n := len(path)
 outer:
 	for i := range path {
-		if lit, ok := path[n-1-i].(*syntax.FuncLit); ok {
+		if lit, ok := path[n-1-i].(*FuncLit); ok {
 			for _, anon := range fn.AnonFuncs {
 				if anon.Pos() == lit.Type.Pos() /*Func*/ {
 					fn = anon
@@ -65,23 +65,23 @@ outer:
 // used to quickly reject check inputs that will cause
 // EnclosingFunction to fail, prior to SSA building.
 //
-func HasEnclosingFunction(pkg *SSAPackage, path []syntax.Node) bool {
+func HasEnclosingFunction(pkg *SSAPackage, path []Node) bool {
 	return findEnclosingPackageLevelFunction(pkg, path) != nil
 }
 
 // findEnclosingPackageLevelFunction returns the Function
 // corresponding to the package-level function enclosing path.
 //
-func findEnclosingPackageLevelFunction(pkg *SSAPackage, path []syntax.Node) *Function {
+func findEnclosingPackageLevelFunction(pkg *SSAPackage, path []Node) *Function {
 	if n := len(path); n >= 2 { // [... {Gen,Func}Decl File]
 		switch decl := path[n-2].(type) {
-		case *syntax.VarSpec:
+		case *VarSpec:
 			if n >= 3 {
 				// Package-level 'var' initializer.
 				return pkg.init
 			}
 
-		case *syntax.FuncDecl:
+		case *FuncDecl:
 			if decl.Recv == nil && decl.Name.Value == "init" {
 				// Explicit init() function.
 				for _, b := range pkg.init.Blocks {
@@ -107,7 +107,7 @@ func findEnclosingPackageLevelFunction(pkg *SSAPackage, path []syntax.Node) *Fun
 // findNamedFunc returns the named function whose FuncDecl.Ident is at
 // position pos.
 //
-func findNamedFunc(pkg *SSAPackage, pos syntax.Pos) *Function {
+func findNamedFunc(pkg *SSAPackage, pos Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
 	for _, mem := range pkg.Members {
@@ -117,10 +117,10 @@ func findNamedFunc(pkg *SSAPackage, pos syntax.Pos) *Function {
 				return mem
 			}
 		case *SSAType:
-			mset := pkg.Prog.MethodSets.MethodSet(types.NewPointer(mem.Type()))
+			mset := pkg.Prog.MethodSets.MethodSet(NewPointer(mem.Type()))
 			for i, n := 0, mset.Len(); i < n; i++ {
 				// Don't call Program.Method: avoid creating wrappers.
-				obj := mset.At(i).Obj().(*types.Func)
+				obj := mset.At(i).Obj().(*Func)
 				if obj.Pos() == pos {
 					return pkg.values[obj].(*Function)
 				}
@@ -153,9 +153,9 @@ func findNamedFunc(pkg *SSAPackage, pos syntax.Pos) *Function {
 // EnclosingFunction to locate the Function, then ValueForExpr to find
 // the ssa.Value.)
 //
-func (f *Function) ValueForExpr(e syntax.Expr) (value Value, isAddr bool) {
+func (f *Function) ValueForExpr(e Expr) (value Value, isAddr bool) {
 	if f.debugInfo() { // (opt)
-		e = syntax.Unparen(e)
+		e = Unparen(e)
 		for _, b := range f.Blocks {
 			for _, instr := range b.Instrs {
 				if ref, ok := instr.(*DebugRef); ok {
@@ -175,7 +175,7 @@ func (f *Function) ValueForExpr(e syntax.Expr) (value Value, isAddr bool) {
 // type-checker package object.
 // It returns nil if no such SSA package has been created.
 //
-func (prog *Program) Package(obj *types.Package) *SSAPackage {
+func (prog *Program) Package(obj *Package) *SSAPackage {
 	return prog.packages[obj]
 }
 
@@ -184,7 +184,7 @@ func (prog *Program) Package(obj *types.Package) *SSAPackage {
 // (*Const), var (*Global) or func (*Function) of some package in
 // prog.  It returns nil if the object is not found.
 //
-func (prog *Program) packageLevelValue(obj types.Object) Value {
+func (prog *Program) packageLevelValue(obj Object) Value {
 	if pkg, ok := prog.packages[obj.Pkg()]; ok {
 		return pkg.values[obj]
 	}
@@ -197,7 +197,7 @@ func (prog *Program) packageLevelValue(obj types.Object) Value {
 // TODO(adonovan): check the invariant that obj.Type() matches the
 // result's Signature, both in the params/results and in the receiver.
 //
-func (prog *Program) FuncValue(obj *types.Func) *Function {
+func (prog *Program) FuncValue(obj *Func) *Function {
 	fn, _ := prog.packageLevelValue(obj).(*Function)
 	return fn
 }
@@ -205,12 +205,12 @@ func (prog *Program) FuncValue(obj *types.Func) *Function {
 // ConstValue returns the SSA Value denoted by the source-level named
 // constant obj.
 //
-func (prog *Program) ConstValue(obj *types.Const) *SSAConst {
+func (prog *Program) ConstValue(obj *Const) *SSAConst {
 	// TODO(adonovan): opt: share (don't reallocate)
 	// Consts for const objects and constant syntax.Exprs.
 
 	// Universal constant? {true,false,nil}
-	if obj.Parent() == types.Universe {
+	if obj.Parent() == Universe {
 		return NewSSAConst(obj.Val(), obj.Type())
 	}
 	// Package-level named constant?
@@ -254,14 +254,14 @@ func (prog *Program) ConstValue(obj *types.Const) *SSAConst {
 // during SSA code generation, such as registerization, constant
 // folding, avoidance of materialization of subexpressions, etc.
 //
-func (prog *Program) VarValue(obj *types.Var, pkg *SSAPackage, ref []syntax.Node) (value Value, isAddr bool) {
+func (prog *Program) VarValue(obj *Var, pkg *SSAPackage, ref []Node) (value Value, isAddr bool) {
 	// All references to a var are local to some function, possibly init.
 	fn := EnclosingFunction(pkg, ref)
 	if fn == nil {
 		return // e.g. def of struct field; SSA not built?
 	}
 
-	id := ref[0].(*syntax.Name)
+	id := ref[0].(*Name)
 
 	// Defining ident of a parameter?
 	if id.Pos() == obj.Pos() {
