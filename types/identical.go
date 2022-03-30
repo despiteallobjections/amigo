@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !go1.8
-// +build !go1.8
+//go:build go1.8
+// +build go1.8
 
-package ssa
+package types
 
-import . "github.com/mdempsky/amigo/types"
-
-var structTypesIdentical = Identical
+var structTypesIdentical = IdenticalIgnoreTags

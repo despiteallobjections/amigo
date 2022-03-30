@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	. "github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -67,7 +66,7 @@ func TestDependencies(t *testing.T) {
 			pkgs = append(pkgs, packages[string(r)])
 		}
 		var got string
-		for _, p := range types.Dependencies(pkgs...) {
+		for _, p := range Dependencies(pkgs...) {
 			got += p.Path()
 		}
 		if got != test.want {

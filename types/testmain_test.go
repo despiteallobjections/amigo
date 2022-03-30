@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa_test
+package types_test
 
 // Tests of FindTests.  CreateTestMainPackage is tested via the interpreter.
 // TODO(adonovan): test the 'pkgs' result from FindTests.
@@ -13,11 +13,11 @@ import (
 	"testing"
 
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
+	"github.com/mdempsky/amigo/types"
 )
 
-func create(t *testing.T, content string) *ssa.SSAPackage {
+func create(t *testing.T, content string) *types.SSAPackage {
 	var conf loader.Config
 	f, err := conf.ParseFile("foo_test.go", content)
 	if err != nil {
@@ -32,7 +32,7 @@ func create(t *testing.T, content string) *ssa.SSAPackage {
 
 	// We needn't call Build.
 	foo := lprog.Package("foo").Pkg
-	return ssautil.CreateProgram(lprog, ssa.SanityCheckFunctions).Package(foo)
+	return ssautil.CreateProgram(lprog, types.SanityCheckFunctions).Package(foo)
 }
 
 func TestFindTests(t *testing.T) {
@@ -76,7 +76,7 @@ func exampleE() int { return 0 }
 func (T) Example() {}
 `
 	pkg := create(t, test)
-	tests, benchmarks, examples, _ := ssa.FindTests(pkg)
+	tests, benchmarks, examples, _ := types.FindTests(pkg)
 
 	sort.Sort(funcsByPos(tests))
 	if got, want := fmt.Sprint(tests), "[foo.Test foo.TestA foo.TestB]"; got != want {
@@ -104,7 +104,7 @@ func Example() {}
 func ExampleA() {}
 `
 	pkg := create(t, test)
-	tests, benchmarks, examples, _ := ssa.FindTests(pkg)
+	tests, benchmarks, examples, _ := types.FindTests(pkg)
 	if len(tests) > 0 {
 		t.Errorf("FindTests.tests = %s, want none", tests)
 	}
@@ -117,7 +117,7 @@ func ExampleA() {}
 	}
 }
 
-type funcsByPos []*ssa.Function
+type funcsByPos []*types.Function
 
 func (p funcsByPos) Len() int           { return len(p) }
 func (p funcsByPos) Less(i, j int) bool { return p[i].Pos().Cmp(p[j].Pos()) < 0 }

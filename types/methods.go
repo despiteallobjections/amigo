@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file defines utilities for population of method sets.
 
 import (
 	"fmt"
-
-	. "github.com/mdempsky/amigo/types"
 )
 
 // MethodValue returns the Function implementing method sel, building
@@ -52,25 +50,25 @@ func (prog *Program) LookupMethod(T Type, pkg *Package, name string) *Function {
 	return prog.MethodValue(sel)
 }
 
-// methodSet contains the (concrete) methods of a non-interface type.
-type methodSet struct {
+// ssaMethodSet contains the (concrete) methods of a non-interface type.
+type ssaMethodSet struct {
 	mapping  map[string]*Function // populated lazily
 	complete bool                 // mapping contains all methods
 }
 
 // Precondition: !isInterface(T).
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
-func (prog *Program) createMethodSet(T Type) *methodSet {
-	mset, ok := prog.methodSets.At(T).(*methodSet)
+func (prog *Program) createMethodSet(T Type) *ssaMethodSet {
+	mset, ok := prog.methodSets.At(T).(*ssaMethodSet)
 	if !ok {
-		mset = &methodSet{mapping: make(map[string]*Function)}
+		mset = &ssaMethodSet{mapping: make(map[string]*Function)}
 		prog.methodSets.Set(T, mset)
 	}
 	return mset
 }
 
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
-func (prog *Program) addMethod(mset *methodSet, sel *Selection) *Function {
+func (prog *Program) addMethod(mset *ssaMethodSet, sel *Selection) *Function {
 	if sel.Kind() == MethodExpr {
 		panic(sel)
 	}
@@ -108,7 +106,7 @@ func (prog *Program) RuntimeTypes() []Type {
 
 	var res []Type
 	prog.methodSets.Iterate(func(T Type, v interface{}) {
-		if v.(*methodSet).complete {
+		if v.(*ssaMethodSet).complete {
 			res = append(res, T)
 		}
 	})

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa_test
+package types_test
 
 import (
 	"bytes"
@@ -14,13 +14,13 @@ import (
 
 	"github.com/mdempsky/amigo/importer"
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
 	. "github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/types"
 	. "github.com/mdempsky/amigo/types"
 )
 
-func isEmpty(f *ssa.Function) bool { return f.Blocks == nil }
+func isEmpty(f *types.Function) bool { return f.Blocks == nil }
 
 // Tests that programs partially loaded from gc object files contain
 // functions with no code for the external portions, but are otherwise ok.
@@ -55,7 +55,7 @@ func main() {
 	// Build an SSA program from the parsed file.
 	// Load its dependencies from gc binary export data.
 	mainPkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
-		NewPackage("main", ""), []*File{f}, ssa.SanityCheckFunctions)
+		NewPackage("main", ""), []*File{f}, types.SanityCheckFunctions)
 	if err != nil {
 		t.Error(err)
 		return
@@ -94,7 +94,7 @@ func main() {
 
 		for _, mem := range pkg.Members {
 			switch mem := mem.(type) {
-			case *ssa.Function:
+			case *types.Function:
 				// Functions at package level.
 				if isExt && !isEmpty(mem) {
 					t.Errorf("external function %s is non-empty", mem)
@@ -102,7 +102,7 @@ func main() {
 					t.Errorf("function %s is empty", mem)
 				}
 
-			case *ssa.SSAType:
+			case *types.SSAType:
 				// Methods of named types T.
 				// (In this test, all exported methods belong to *T not T.)
 				if !isExt {
@@ -135,7 +135,7 @@ func main() {
 	for _, b := range mainPkg.Func("main").Blocks {
 		for _, instr := range b.Instrs {
 			switch instr := instr.(type) {
-			case ssa.CallInstruction:
+			case types.CallInstruction:
 				call := instr.Common()
 				if want := expectedCallee[callNum]; want != "N/A" {
 					got := call.StaticCallee().String()
@@ -223,7 +223,7 @@ func TestRuntimeTypes(t *testing.T) {
 		// Create a single-file main package.
 		// Load dependencies from gc binary export data.
 		ssapkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
-			NewPackage("p", ""), []*File{f}, ssa.SanityCheckFunctions)
+			NewPackage("p", ""), []*File{f}, types.SanityCheckFunctions)
 		if err != nil {
 			t.Errorf("test %q: %s", test.input[:15], err)
 			continue
@@ -254,7 +254,7 @@ func TestInit(t *testing.T) {
 	t.Skip("TODO")
 
 	tests := []struct {
-		mode        ssa.BuilderMode
+		mode        types.BuilderMode
 		input, want string
 	}{
 		{0, `package A; import _ "errors"; var i int = 42`,
@@ -274,7 +274,7 @@ func init():
 	return
 
 `},
-		{ssa.BareInits, `package B; import _ "errors"; var i int = 42`,
+		{types.BareInits, `package B; import _ "errors"; var i int = 42`,
 			`# Name: B.init
 # Package: B
 # Synthetic: package initializer
@@ -489,7 +489,7 @@ func h(error)
 	phis := 0
 	for _, b := range g.Blocks {
 		for _, instr := range b.Instrs {
-			if _, ok := instr.(*ssa.Phi); ok {
+			if _, ok := instr.(*types.Phi); ok {
 				phis++
 			}
 		}

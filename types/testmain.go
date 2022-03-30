@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // CreateTestMainPackage synthesizes a main package that runs all the
 // tests of the supplied packages.
@@ -21,7 +21,6 @@ import (
 	"text/template"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // FindTests returns the Test, Benchmark, and Example functions

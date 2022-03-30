@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
@@ -30,18 +29,18 @@ import (
 // A ConstCase represents a single constant comparison.
 // It is part of a Switch.
 type ConstCase struct {
-	Block *ssa.BasicBlock // block performing the comparison
-	Body  *ssa.BasicBlock // body of the case
-	Value *ssa.SSAConst   // case comparand
+	Block *types.BasicBlock // block performing the comparison
+	Body  *types.BasicBlock // body of the case
+	Value *types.SSAConst   // case comparand
 }
 
 // A TypeCase represents a single type assertion.
 // It is part of a Switch.
 type TypeCase struct {
-	Block   *ssa.BasicBlock // block performing the type assert
-	Body    *ssa.BasicBlock // body of the case
-	Type    types.Type      // case type
-	Binding ssa.Value       // value bound by this case
+	Block   *types.BasicBlock // block performing the type assert
+	Body    *types.BasicBlock // body of the case
+	Type    types.Type        // case type
+	Binding types.Value       // value bound by this case
 }
 
 // A Switch is a logical high-level control flow operation
@@ -57,11 +56,11 @@ type TypeCase struct {
 // TODO(adonovan): eliminate such duplicates.
 //
 type Switch struct {
-	Start      *ssa.BasicBlock // block containing start of if/else chain
-	X          ssa.Value       // the switch operand
-	ConstCases []ConstCase     // ordered list of constant comparisons
-	TypeCases  []TypeCase      // ordered list of type assertions
-	Default    *ssa.BasicBlock // successor if all comparisons fail
+	Start      *types.BasicBlock // block containing start of if/else chain
+	X          types.Value       // the switch operand
+	ConstCases []ConstCase       // ordered list of constant comparisons
+	TypeCases  []TypeCase        // ordered list of type assertions
+	Default    *types.BasicBlock // successor if all comparisons fail
 }
 
 func (sw *Switch) String() string {
@@ -104,11 +103,11 @@ func (sw *Switch) String() string {
 // (In general, the control flow constructs of the source program
 // cannot be faithfully reproduced from the SSA representation.)
 //
-func Switches(fn *ssa.Function) []Switch {
+func Switches(fn *types.Function) []Switch {
 	// Traverse the CFG in dominance order, so we don't
 	// enter an if/else-chain in the middle.
 	var switches []Switch
-	seen := make(map[*ssa.BasicBlock]bool) // TODO(adonovan): opt: use ssa.blockSet
+	seen := make(map[*types.BasicBlock]bool) // TODO(adonovan): opt: use ssa.blockSet
 	for _, b := range fn.DomPreorder() {
 		if x, k := isComparisonBlock(b); x != nil {
 			// Block b starts a switch.
@@ -131,7 +130,7 @@ func Switches(fn *ssa.Function) []Switch {
 	return switches
 }
 
-func valueSwitch(sw *Switch, k *ssa.SSAConst, seen map[*ssa.BasicBlock]bool) {
+func valueSwitch(sw *Switch, k *types.SSAConst, seen map[*types.BasicBlock]bool) {
 	b := sw.Start
 	x := sw.X
 	for x == sw.X {
@@ -162,7 +161,7 @@ func valueSwitch(sw *Switch, k *ssa.SSAConst, seen map[*ssa.BasicBlock]bool) {
 	sw.Default = b
 }
 
-func typeSwitch(sw *Switch, y ssa.Value, T types.Type, seen map[*ssa.BasicBlock]bool) {
+func typeSwitch(sw *Switch, y types.Value, T types.Type, seen map[*types.BasicBlock]bool) {
 	b := sw.Start
 	x := sw.X
 	for x == sw.X {
@@ -198,14 +197,14 @@ func typeSwitch(sw *Switch, y ssa.Value, T types.Type, seen map[*ssa.BasicBlock]
 // isComparisonBlock returns the operands (v, k) if a block ends with
 // a comparison v==k, where k is a compile-time constant.
 //
-func isComparisonBlock(b *ssa.BasicBlock) (v ssa.Value, k *ssa.SSAConst) {
+func isComparisonBlock(b *types.BasicBlock) (v types.Value, k *types.SSAConst) {
 	if n := len(b.Instrs); n >= 2 {
-		if i, ok := b.Instrs[n-1].(*ssa.If); ok {
-			if binop, ok := i.Cond.(*ssa.BinOp); ok && binop.Block() == b && binop.Op == syntax.Eql {
-				if k, ok := binop.Y.(*ssa.SSAConst); ok {
+		if i, ok := b.Instrs[n-1].(*types.If); ok {
+			if binop, ok := i.Cond.(*types.BinOp); ok && binop.Block() == b && binop.Op == syntax.Eql {
+				if k, ok := binop.Y.(*types.SSAConst); ok {
 					return binop.X, k
 				}
-				if k, ok := binop.X.(*ssa.SSAConst); ok {
+				if k, ok := binop.X.(*types.SSAConst); ok {
 					return binop.Y, k
 				}
 			}
@@ -217,13 +216,13 @@ func isComparisonBlock(b *ssa.BasicBlock) (v ssa.Value, k *ssa.SSAConst) {
 // isTypeAssertBlock returns the operands (y, x, T) if a block ends with
 // a type assertion "if y, ok := x.(T); ok {".
 //
-func isTypeAssertBlock(b *ssa.BasicBlock) (y, x ssa.Value, T types.Type) {
+func isTypeAssertBlock(b *types.BasicBlock) (y, x types.Value, T types.Type) {
 	if n := len(b.Instrs); n >= 4 {
-		if i, ok := b.Instrs[n-1].(*ssa.If); ok {
-			if ext1, ok := i.Cond.(*ssa.Extract); ok && ext1.Block() == b && ext1.Index == 1 {
-				if ta, ok := ext1.Tuple.(*ssa.TypeAssert); ok && ta.Block() == b {
+		if i, ok := b.Instrs[n-1].(*types.If); ok {
+			if ext1, ok := i.Cond.(*types.Extract); ok && ext1.Block() == b && ext1.Index == 1 {
+				if ta, ok := ext1.Tuple.(*types.TypeAssert); ok && ta.Block() == b {
 					// hack: relies upon instruction ordering.
-					if ext0, ok := b.Instrs[n-3].(*ssa.Extract); ok {
+					if ext0, ok := b.Instrs[n-3].(*types.Extract); ok {
 						return ext0, ta.X, ta.AssertedType
 					}
 				}

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file implements the BUILD phase of SSA construction.
 //
@@ -37,7 +37,6 @@ import (
 	"sync"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 type opaqueType struct {
@@ -285,7 +284,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 		}
 
 	case "new":
-		alloc := emitNew(fn, deref(typ), pos)
+		alloc := emitNew(fn, ssaDeref(typ), pos)
 		alloc.Comment = "new"
 		return alloc
 
@@ -295,7 +294,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 		// We must still evaluate the value, though.  (If it
 		// was side-effect free, the whole call would have
 		// been constant-folded.)
-		t := deref(fn.Pkg.typeOf(args[0])).Underlying()
+		t := ssaDeref(fn.Pkg.typeOf(args[0])).Underlying()
 		if at, ok := t.(*Array); ok {
 			b.expr(fn, args[0]) // for effects only
 			return intConst(at.Len())
@@ -350,7 +349,7 @@ func (b *builder) addr(fn *Function, e Expr, escaping bool) lvalue {
 		return &address{addr: v, pos: e.Pos(), expr: e}
 
 	case *CompositeLit:
-		t := deref(fn.Pkg.typeOf(e))
+		t := ssaDeref(fn.Pkg.typeOf(e))
 		var v *Alloc
 		if escaping {
 			v = emitNew(fn, t, e.Pos() /*Lbrace*/)
@@ -1112,13 +1111,13 @@ func (b *builder) arrayLen(fn *Function, elts []Expr) int64 {
 // In that case, addr must hold a T, not a *T.
 //
 func (b *builder) compLit(fn *Function, addr Value, e *CompositeLit, isZero bool, sb *storebuf) {
-	typ := deref(fn.Pkg.typeOf(e))
+	typ := ssaDeref(fn.Pkg.typeOf(e))
 	switch t := typ.Underlying().(type) {
 	case *Struct:
 		if !isZero && len(e.ElemList) != t.NumFields() {
 			// memclear
 			sb.store(&address{addr, e.Pos() /*Lbrace*/, nil},
-				zeroValue(fn, deref(addr.Type())))
+				zeroValue(fn, ssaDeref(addr.Type())))
 			isZero = true
 		}
 		for i, e := range e.ElemList {
@@ -1162,7 +1161,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *CompositeLit, isZero bool
 			if !isZero && int64(len(e.ElemList)) != at.Len() {
 				// memclear
 				sb.store(&address{array, e.Pos() /*Lbrace*/, nil},
-					zeroValue(fn, deref(array.Type())))
+					zeroValue(fn, ssaDeref(array.Type())))
 			}
 		}
 
@@ -1713,7 +1712,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 
 	// Determine number of iterations.
 	var length Value
-	if arr, ok := deref(x.Type()).Underlying().(*Array); ok {
+	if arr, ok := ssaDeref(x.Type()).Underlying().(*Array); ok {
 		// For array or *array, the number of iterations is
 		// known statically thanks to the type.  We avoid a
 		// data dependence upon x, permitting later dead-code

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file defines the lifting pass which tries to "lift" Alloc
 // cells (new/local variables) into SSA registers, replacing loads
@@ -44,7 +44,6 @@ import (
 	"os"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // If true, show diagnostic information at each step of lifting.
@@ -387,7 +386,7 @@ type newPhiMap map[*BasicBlock][]newPhi
 func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool {
 	// Don't lift aggregates into registers, because we don't have
 	// a way to express their zero-constants.
-	switch deref(alloc.Type()).Underlying().(type) {
+	switch ssaDeref(alloc.Type()).Underlying().(type) {
 	case *Array, *Struct:
 		return false
 	}
@@ -472,7 +471,7 @@ func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool
 				*fresh++
 
 				phi.pos = alloc.Pos()
-				phi.setType(deref(alloc.Type()))
+				phi.setType(ssaDeref(alloc.Type()))
 				phi.block = v
 				if debugLifting {
 					fmt.Fprintf(os.Stderr, "\tplace %s = %s at block %s\n", phi.Name(), phi, v)
@@ -519,7 +518,7 @@ func replaceAll(x, y Value) {
 func renamed(renaming []Value, alloc *Alloc) Value {
 	v := renaming[alloc.index]
 	if v == nil {
-		v = zeroConst(deref(alloc.Type()))
+		v = zeroConst(ssaDeref(alloc.Type()))
 		renaming[alloc.index] = v
 	}
 	return v

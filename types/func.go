@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file implements the Function and BasicBlock types.
 
@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // addEdge adds a control-flow graph edge from from to to.
@@ -581,7 +580,7 @@ func WriteFunction(buf *bytes.Buffer, f *Function) {
 	if len(f.Locals) > 0 {
 		buf.WriteString("# Locals:\n")
 		for i, l := range f.Locals {
-			fmt.Fprintf(buf, "# % 3d:\t%s %s\n", i, l.Name(), relType(deref(l.Type()), from))
+			fmt.Fprintf(buf, "# % 3d:\t%s %s\n", i, l.Name(), relType(ssaDeref(l.Type()), from))
 		}
 	}
 	writeSignature(buf, from, f.Name(), f.Signature, f.Params)

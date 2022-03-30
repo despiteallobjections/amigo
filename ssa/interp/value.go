@@ -43,8 +43,6 @@ import (
 	"unsafe"
 
 	"github.com/mdempsky/amigo/types"
-
-	"github.com/mdempsky/amigo/ssa"
 )
 
 type value interface{}
@@ -68,7 +66,7 @@ type iter interface {
 }
 
 type closure struct {
-	Fn  *ssa.Function
+	Fn  *types.Function
 	Env []value
 }
 
@@ -439,7 +437,7 @@ func writeValue(buf *bytes.Buffer, v value) {
 		}
 		buf.WriteString("]")
 
-	case *ssa.Function, *ssa.SSABuiltin, *closure:
+	case *types.Function, *types.SSABuiltin, *closure:
 		fmt.Fprintf(buf, "%p", v) // (an address)
 
 	case rtype:

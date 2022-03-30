@@ -17,8 +17,6 @@ import (
 
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
-
-	"github.com/mdempsky/amigo/ssa"
 )
 
 type opaqueType struct {
@@ -362,7 +360,7 @@ func ext۰reflect۰Value۰Pointer(fr *frame, args []value) value {
 		return reflect.ValueOf(v.entries()).Pointer()
 	case map[value]value:
 		return reflect.ValueOf(v).Pointer()
-	case *ssa.Function:
+	case *types.Function:
 		return uintptr(unsafe.Pointer(v))
 	case *closure:
 		return uintptr(unsafe.Pointer(v))
@@ -470,9 +468,9 @@ func ext۰reflect۰Value۰IsNil(fr *frame, args []value) value {
 		return x.t == nil
 	case []value:
 		return x == nil
-	case *ssa.Function:
+	case *types.Function:
 		return x == nil
-	case *ssa.SSABuiltin:
+	case *types.SSABuiltin:
 		return x == nil
 	case *closure:
 		return x == nil
@@ -502,7 +500,7 @@ func ext۰reflect۰error۰Error(fr *frame, args []value) value {
 }
 
 // newMethod creates a new method of the specified name, package and receiver type.
-func newMethod(pkg *ssa.SSAPackage, recvType types.Type, name string) *ssa.Function {
+func newMethod(pkg *types.SSAPackage, recvType types.Type, name string) *types.Function {
 	// TODO(adonovan): fix: hack: currently the only part of Signature
 	// that is needed is the "pointerness" of Recv.Type, and for
 	// now, we'll set it to always be false since we're only
@@ -514,10 +512,10 @@ func newMethod(pkg *ssa.SSAPackage, recvType types.Type, name string) *ssa.Funct
 }
 
 func initReflect(i *interpreter) {
-	i.reflectPackage = &ssa.SSAPackage{
+	i.reflectPackage = &types.SSAPackage{
 		Prog:    i.prog,
 		Pkg:     reflectTypesPackage,
-		Members: make(map[string]ssa.Member),
+		Members: make(map[string]types.Member),
 	}
 
 	// Clobber the type-checker's notion of reflect.Value's

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file defines utilities for working with source positions
 // or source-level named entities ("objects").
@@ -12,7 +12,6 @@ package ssa
 
 import (
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // EnclosingFunction returns the function that contains the syntax

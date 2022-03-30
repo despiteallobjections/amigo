@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	. "github.com/mdempsky/amigo/syntax"
-
 	. "github.com/mdempsky/amigo/types"
 )
 

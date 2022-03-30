@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // lvalues are the union of addressable expressions and map-index
 // expressions.
 
 import (
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // An lvalue represents an assignable location that may appear on the
@@ -52,7 +51,7 @@ func (a *address) address(fn *Function) Value {
 }
 
 func (a *address) typ() Type {
-	return deref(a.addr.Type())
+	return ssaDeref(a.addr.Type())
 }
 
 // An element is an lvalue represented by m[k], the location of an

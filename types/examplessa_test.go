@@ -4,7 +4,7 @@
 
 //go:build go1.18
 
-package ssa_test
+package types_test
 
 import (
 	"fmt"
@@ -14,9 +14,9 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/mdempsky/amigo/importer"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
 	. "github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/types"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -65,7 +65,7 @@ func Example_buildPackage() {
 	// Type-check the package, load dependencies.
 	// Create and build the SSA program.
 	hello, _, err := ssautil.BuildPackage(
-		&Config{Importer: importer.Default()}, pkg, files, ssa.SanityCheckFunctions)
+		&Config{Importer: importer.Default()}, pkg, files, types.SanityCheckFunctions)
 	if err != nil {
 		fmt.Print(err) // type error in some package
 		return
@@ -133,7 +133,7 @@ func Example_loadPackages() {
 	}
 
 	// Create SSA packages for all well-typed packages.
-	prog, pkgs := ssautil.Packages(initial, ssa.PrintPackages)
+	prog, pkgs := ssautil.Packages(initial, types.PrintPackages)
 	_ = prog
 
 	// Build SSA code for the well-typed initial packages.
@@ -156,7 +156,7 @@ func Example_loadWholeProgram() {
 	}
 
 	// Create SSA packages for well-typed packages and their dependencies.
-	prog, pkgs := ssautil.AllPackages(initial, ssa.PrintPackages)
+	prog, pkgs := ssautil.AllPackages(initial, types.PrintPackages)
 	_ = pkgs
 
 	// Build SSA code for the whole program.

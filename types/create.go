@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file implements the CREATE phase of SSA construction.
 // See builder.go for explanation.
@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // NewProgram returns a new SSA Program.

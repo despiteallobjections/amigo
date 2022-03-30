@@ -6,7 +6,7 @@
 
 // TODO(mdempsky): Need to port expect over too, ugh.
 
-package ssa_test
+package types_test
 
 // This file defines tests of source-level debugging utilities.
 
@@ -23,10 +23,9 @@ import (
 
 	"github.com/mdempsky/amigo/astutil"
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
+	"github.com/mdempsky/amigo/types"
 	"golang.org/x/tools/go/expect"
 )
 
@@ -145,7 +144,7 @@ func TestObjValueLookup(t *testing.T) {
 	}
 }
 
-func checkFuncValue(t *testing.T, prog *ssa.Program, obj *Func) {
+func checkFuncValue(t *testing.T, prog *types.Program, obj *Func) {
 	fn := prog.FuncValue(obj)
 	// fmt.Printf("FuncValue(%s) = %s\n", obj, fn) // debugging
 	if fn == nil {
@@ -165,7 +164,7 @@ func checkFuncValue(t *testing.T, prog *ssa.Program, obj *Func) {
 	}
 }
 
-func checkConstValue(t *testing.T, prog *ssa.Program, obj *Const) {
+func checkConstValue(t *testing.T, prog *types.Program, obj *Const) {
 	c := prog.ConstValue(obj)
 	// fmt.Printf("ConstValue(%s) = %s\n", obj, c) // debugging
 	if c == nil {
@@ -185,7 +184,7 @@ func checkConstValue(t *testing.T, prog *ssa.Program, obj *Const) {
 	}
 }
 
-func checkVarValue(t *testing.T, prog *ssa.Program, pkg *ssa.Package, ref []Node, obj *Var, expKind string, wantAddr bool) {
+func checkVarValue(t *testing.T, prog *types.Program, pkg *types.Package, ref []Node, obj *Var, expKind string, wantAddr bool) {
 	// The prefix of all assertions messages.
 	prefix := fmt.Sprintf("VarValue(%s @ L%d)",
 		obj, ref[0].Pos().Line)
@@ -259,7 +258,7 @@ func testValueForExpr(t *testing.T, testfile string) {
 	if false {
 		// debugging
 		for _, mem := range mainPkg.Members {
-			if fn, ok := mem.(*ssa.Function); ok {
+			if fn, ok := mem.(*types.Function); ok {
 				fn.WriteTo(os.Stderr)
 			}
 		}
@@ -303,7 +302,7 @@ func testValueForExpr(t *testing.T, testfile string) {
 			continue
 		}
 
-		fn := ssa.EnclosingFunction(mainPkg, path)
+		fn := types.EnclosingFunction(mainPkg, path)
 		if fn == nil {
 			t.Errorf("%s: can't find enclosing function", position)
 			continue
@@ -413,7 +412,7 @@ func TestEnclosingFunction(t *testing.T) {
 		pkg.Build()
 
 		name := "(none)"
-		fn := ssa.EnclosingFunction(pkg, path)
+		fn := types.EnclosingFunction(pkg, path)
 		if fn != nil {
 			name = fn.String()
 		}
@@ -425,7 +424,7 @@ func TestEnclosingFunction(t *testing.T) {
 		}
 
 		// While we're here: test HasEnclosingFunction.
-		if has := ssa.HasEnclosingFunction(pkg, path); has != (fn != nil) {
+		if has := types.HasEnclosingFunction(pkg, path); has != (fn != nil) {
 			t.Errorf("HasEnclosingFunction(%q in %q) got %v, want %v",
 				test.substr, test.input, has, fn != nil)
 			continue

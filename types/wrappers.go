@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file defines synthesis of Functions that delegate to declared
 // methods; they come in three kinds:
@@ -21,8 +21,6 @@ package ssa
 
 import (
 	"fmt"
-
-	. "github.com/mdempsky/amigo/types"
 )
 
 // -- wrappers -----------------------------------------------------------
@@ -95,7 +93,7 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 			}
 			c.Call.Args = []Value{
 				v,
-				stringConst(deref(sel.Recv()).String()),
+				stringConst(ssaDeref(sel.Recv()).String()),
 				stringConst(sel.Obj().Name()),
 			}
 			c.setType(v.Type())

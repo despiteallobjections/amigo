@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/interp"
 	"github.com/mdempsky/amigo/ssa/ssautil"
 	"github.com/mdempsky/amigo/types"
@@ -168,7 +167,7 @@ func run(t *testing.T, input string) bool {
 		return false
 	}
 
-	prog := ssautil.CreateProgram(iprog, ssa.SanityCheckFunctions)
+	prog := ssautil.CreateProgram(iprog, types.SanityCheckFunctions)
 	prog.Build()
 
 	mainPkg := prog.Package(iprog.Created[0].Pkg)

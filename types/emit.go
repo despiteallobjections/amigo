@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // Helpers for emitting SSA instructions.
 
@@ -10,7 +10,6 @@ import (
 	"fmt"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // emitNew emits to f a new (heap Alloc) instruction allocating an
@@ -29,7 +28,7 @@ func emitNew(f *Function, typ Type, pos Pos) *Alloc {
 //
 func emitLoad(f *Function, addr Value) *UnOp {
 	v := &UnOp{Op: Mul, X: addr}
-	v.setType(deref(addr.Type()))
+	v.setType(ssaDeref(addr.Type()))
 	f.emit(v)
 	return v
 }
@@ -258,7 +257,7 @@ func emitConv(f *Function, val Value, typ Type) Value {
 func emitStore(f *Function, addr, val Value, pos Pos) *Store {
 	s := &Store{
 		Addr: addr,
-		Val:  emitConv(f, val, deref(addr.Type())),
+		Val:  emitConv(f, val, ssaDeref(addr.Type())),
 		pos:  pos,
 	}
 	f.emit(s)
@@ -368,7 +367,7 @@ func emitTailCall(f *Function, call *Call) {
 //
 func emitImplicitSelections(f *Function, v Value, indices []int) Value {
 	for _, index := range indices {
-		fld := deref(v.Type()).Underlying().(*Struct).Field(index)
+		fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 
 		if isPointer(v.Type()) {
 			instr := &FieldAddr{
@@ -401,7 +400,7 @@ func emitImplicitSelections(f *Function, v Value, indices []int) Value {
 // Ident id is used for position and debug info.
 //
 func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *Name) Value {
-	fld := deref(v.Type()).Underlying().(*Struct).Field(index)
+	fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 	if isPointer(v.Type()) {
 		instr := &FieldAddr{
 			X:     v,

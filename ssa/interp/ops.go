@@ -14,7 +14,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
@@ -33,7 +32,7 @@ type exitPanic int
 
 // constValue returns the value of the constant with the
 // dynamic type tag appropriate for c.Type().
-func constValue(c *ssa.SSAConst) value {
+func constValue(c *types.SSAConst) value {
 	if c.IsNil() {
 		return zero(c.Type()) // typed nil
 	}
@@ -228,7 +227,7 @@ func zero(t types.Type) value {
 		}
 		return (*hashmap)(nil)
 	case *types.Signature:
-		return (*ssa.Function)(nil)
+		return (*types.Function)(nil)
 	}
 	panic(fmt.Sprint("zero: unexpected ", t))
 }
@@ -276,7 +275,7 @@ func slice(x, lo, hi, max value) value {
 }
 
 // lookup returns x[idx] where x is a map or string.
-func lookup(instr *ssa.Lookup, x, idx value) value {
+func lookup(instr *types.Lookup, x, idx value) value {
 	switch x := x.(type) { // map or string
 	case map[value]value, *hashmap:
 		var v value
@@ -781,15 +780,15 @@ func eqnil(t types.Type, x, y value) bool {
 			return (x != nil) == (y.(*hashmap) != nil)
 		case map[value]value:
 			return (x != nil) == (y.(map[value]value) != nil)
-		case *ssa.Function:
+		case *types.Function:
 			switch y := y.(type) {
-			case *ssa.Function:
+			case *types.Function:
 				return (x != nil) == (y != nil)
 			case *closure:
 				return true
 			}
 		case *closure:
-			return (x != nil) == (y.(*ssa.Function) != nil)
+			return (x != nil) == (y.(*types.Function) != nil)
 		case []value:
 			return (x != nil) == (y.([]value) != nil)
 		}
@@ -799,7 +798,7 @@ func eqnil(t types.Type, x, y value) bool {
 	return equals(t, x, y)
 }
 
-func unop(instr *ssa.UnOp, x value) value {
+func unop(instr *types.UnOp, x value) value {
 	switch instr.Op {
 	case syntax.Recv: // receive
 		v, ok := <-x.(chan value)
@@ -880,7 +879,7 @@ func unop(instr *ssa.UnOp, x value) value {
 // It returns the extracted value on success, and panics on failure,
 // unless instr.CommaOk, in which case it always returns a "value,ok" tuple.
 //
-func typeAssert(i *interpreter, instr *ssa.TypeAssert, itf iface) value {
+func typeAssert(i *interpreter, instr *types.TypeAssert, itf iface) value {
 	var v value
 	err := ""
 	if itf.t == nil {
@@ -934,7 +933,7 @@ func print(b []byte) (int, error) {
 
 // callBuiltin interprets a call to builtin fn with arguments args,
 // returning its result.
-func callBuiltin(caller *frame, callpos syntax.Pos, fn *ssa.SSABuiltin, args []value) value {
+func callBuiltin(caller *frame, callpos syntax.Pos, fn *types.SSABuiltin, args []value) value {
 	switch fn.Name() {
 	case "append":
 		if len(args) == 1 {

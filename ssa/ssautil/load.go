@@ -10,7 +10,6 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
@@ -33,7 +32,7 @@ import (
 //
 // The mode parameter controls diagnostics and checking during SSA construction.
 //
-func Packages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, []*ssa.SSAPackage) {
+func Packages(initial []*packages.Package, mode types.BuilderMode) (*types.Program, []*types.SSAPackage) {
 	return doPackages(initial, mode, false)
 }
 
@@ -55,20 +54,20 @@ func Packages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, 
 //
 // The mode parameter controls diagnostics and checking during SSA construction.
 //
-func AllPackages(initial []*packages.Package, mode ssa.BuilderMode) (*ssa.Program, []*ssa.SSAPackage) {
+func AllPackages(initial []*packages.Package, mode types.BuilderMode) (*types.Program, []*types.SSAPackage) {
 	return doPackages(initial, mode, true)
 }
 
-func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*ssa.Program, []*ssa.SSAPackage) {
+func doPackages(initial []*packages.Package, mode types.BuilderMode, deps bool) (*types.Program, []*types.SSAPackage) {
 
-	prog := ssa.NewProgram(mode)
+	prog := types.NewProgram(mode)
 
 	isInitial := make(map[*packages.Package]bool, len(initial))
 	for _, p := range initial {
 		isInitial[p] = true
 	}
 
-	ssamap := make(map[*packages.Package]*ssa.SSAPackage)
+	ssamap := make(map[*packages.Package]*types.SSAPackage)
 	packages.Visit(initial, nil, func(p *packages.Package) {
 		panic("TODO: need to manually parse and type check packages ourselves")
 		/*
@@ -82,7 +81,7 @@ func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*
 		*/
 	})
 
-	var ssapkgs []*ssa.SSAPackage
+	var ssapkgs []*types.SSAPackage
 	for _, p := range initial {
 		ssapkgs = append(ssapkgs, ssamap[p]) // may be nil
 	}
@@ -101,8 +100,8 @@ func doPackages(initial []*packages.Package, mode ssa.BuilderMode, deps bool) (*
 // Deprecated: Use golang.org/x/tools/go/packages and the Packages
 // function instead; see ssa.ExampleLoadPackages.
 //
-func CreateProgram(lprog *loader.Program, mode ssa.BuilderMode) *ssa.Program {
-	prog := ssa.NewProgram(mode)
+func CreateProgram(lprog *loader.Program, mode types.BuilderMode) *types.Program {
+	prog := types.NewProgram(mode)
 
 	for _, info := range lprog.AllPackages {
 		if info.TransitivelyErrorFree {
@@ -128,7 +127,7 @@ func CreateProgram(lprog *loader.Program, mode ssa.BuilderMode) *ssa.Program {
 //
 // See ../example_test.go for an example.
 //
-func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mode ssa.BuilderMode) (*ssa.SSAPackage, *types.Info, error) {
+func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mode types.BuilderMode) (*types.SSAPackage, *types.Info, error) {
 	if pkg.Path() == "" {
 		panic("package has no import path")
 	}
@@ -145,7 +144,7 @@ func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mo
 		return nil, nil, err
 	}
 
-	prog := ssa.NewProgram(mode)
+	prog := types.NewProgram(mode)
 
 	// Create SSA packages for all imports.
 	// Order is not significant.

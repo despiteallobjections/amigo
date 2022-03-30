@@ -7,7 +7,7 @@
 //go:build !android
 // +build !android
 
-package ssa_test
+package types_test
 
 // This file runs the SSA builder in sanity-checking mode on all
 // packages beneath $GOROOT and prints some summary information.
@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
 	"github.com/mdempsky/amigo/testenv"
+	"github.com/mdempsky/amigo/types"
 	"golang.org/x/tools/go/buildutil"
 )
 
@@ -35,7 +35,7 @@ func bytesAllocated() uint64 {
 	return stats.Alloc
 }
 
-func TestStdlib(t *testing.T) {
+func TestStdlibSSA(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode; too slow (https://golang.org/issue/14113)")
 	}
@@ -67,10 +67,10 @@ func TestStdlib(t *testing.T) {
 	alloc1 := bytesAllocated()
 
 	// Create SSA packages.
-	var mode ssa.BuilderMode
+	var mode types.BuilderMode
 	// Comment out these lines during benchmarking.  Approx SSA build costs are noted.
-	mode |= ssa.SanityCheckFunctions // + 2% space, + 4% time
-	mode |= ssa.GlobalDebug          // +30% space, +18% time
+	mode |= types.SanityCheckFunctions // + 2% space, + 4% time
+	mode |= types.GlobalDebug          // +30% space, +18% time
 	prog := ssautil.CreateProgram(iprog, mode)
 
 	t2 := time.Now()
@@ -96,7 +96,7 @@ func TestStdlib(t *testing.T) {
 	// Check that all non-synthetic functions have distinct names.
 	// Synthetic wrappers for exported methods should be distinct too,
 	// except for unexported ones (explained at (*Function).RelString).
-	byName := make(map[string]*ssa.Function)
+	byName := make(map[string]*types.Function)
 	for fn := range allFuncs {
 		if fn.Synthetic == "" || token.IsExported(fn.Name()) {
 			str := fn.String()

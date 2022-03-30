@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
+	"github.com/mdempsky/amigo/types"
 )
 
 func TestSwitches(t *testing.T) {
@@ -46,7 +46,7 @@ func TestSwitches(t *testing.T) {
 	mainPkg.Build()
 
 	for _, mem := range mainPkg.Members {
-		if fn, ok := mem.(*ssa.Function); ok {
+		if fn, ok := mem.(*types.Function); ok {
 			if fn.Synthetic != "" {
 				continue // e.g. init()
 			}

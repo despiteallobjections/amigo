@@ -51,7 +51,6 @@ import (
 	"runtime"
 	"sync/atomic"
 
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/syntax"
 	"github.com/mdempsky/amigo/types"
 )
@@ -72,35 +71,35 @@ const (
 	EnableTracing                   // Print a trace of all instructions as they are interpreted.
 )
 
-type methodSet map[string]*ssa.Function
+type methodSet map[string]*types.Function
 
 // State shared between all interpreted goroutines.
 type interpreter struct {
-	osArgs             []value              // the value of os.Args
-	prog               *ssa.Program         // the SSA program
-	globals            map[ssa.Value]*value // addresses of global variables (immutable)
-	mode               Mode                 // interpreter options
-	reflectPackage     *ssa.SSAPackage      // the fake reflect package
-	errorMethods       methodSet            // the method set of reflect.error, which implements the error interface.
-	rtypeMethods       methodSet            // the method set of rtype, which implements the reflect.Type interface.
-	runtimeErrorString types.Type           // the runtime.errorString type
-	sizes              types.Sizes          // the effective type-sizing function
-	goroutines         int32                // atomically updated
+	osArgs             []value                // the value of os.Args
+	prog               *types.Program         // the SSA program
+	globals            map[types.Value]*value // addresses of global variables (immutable)
+	mode               Mode                   // interpreter options
+	reflectPackage     *types.SSAPackage      // the fake reflect package
+	errorMethods       methodSet              // the method set of reflect.error, which implements the error interface.
+	rtypeMethods       methodSet              // the method set of rtype, which implements the reflect.Type interface.
+	runtimeErrorString types.Type             // the runtime.errorString type
+	sizes              types.Sizes            // the effective type-sizing function
+	goroutines         int32                  // atomically updated
 }
 
 type deferred struct {
 	fn    value
 	args  []value
-	instr *ssa.SSADefer
+	instr *types.SSADefer
 	tail  *deferred
 }
 
 type frame struct {
 	i                *interpreter
 	caller           *frame
-	fn               *ssa.Function
-	block, prevBlock *ssa.BasicBlock
-	env              map[ssa.Value]value // dynamic values of SSA variables
+	fn               *types.Function
+	block, prevBlock *types.BasicBlock
+	env              map[types.Value]value // dynamic values of SSA variables
 	locals           []value
 	defers           *deferred
 	result           value
@@ -108,17 +107,17 @@ type frame struct {
 	panic            interface{}
 }
 
-func (fr *frame) get(key ssa.Value) value {
+func (fr *frame) get(key types.Value) value {
 	switch key := key.(type) {
 	case nil:
 		// Hack; simplifies handling of optional attributes
 		// such as ssa.Slice.{Low,High}.
 		return nil
-	case *ssa.Function, *ssa.SSABuiltin:
+	case *types.Function, *types.SSABuiltin:
 		return key
-	case *ssa.SSAConst:
+	case *types.SSAConst:
 		return constValue(key)
-	case *ssa.Global:
+	case *types.Global:
 		if r, ok := fr.i.globals[key]; ok {
 			return r
 		}
@@ -172,7 +171,7 @@ func (fr *frame) runDefers() {
 
 // lookupMethod returns the method set for type typ, which may be one
 // of the interpreter's fake types.
-func lookupMethod(i *interpreter, typ types.Type, meth *types.Func) *ssa.Function {
+func lookupMethod(i *interpreter, typ types.Type, meth *types.Func) *types.Function {
 	switch typ {
 	case rtypeType:
 		return i.rtypeMethods[meth.Id()]
@@ -185,43 +184,43 @@ func lookupMethod(i *interpreter, typ types.Type, meth *types.Func) *ssa.Functio
 // visitInstr interprets a single ssa.Instruction within the activation
 // record frame.  It returns a continuation value indicating where to
 // read the next instruction from.
-func visitInstr(fr *frame, instr ssa.Instruction) continuation {
+func visitInstr(fr *frame, instr types.Instruction) continuation {
 	switch instr := instr.(type) {
-	case *ssa.DebugRef:
+	case *types.DebugRef:
 		// no-op
 
-	case *ssa.UnOp:
+	case *types.UnOp:
 		fr.env[instr] = unop(instr, fr.get(instr.X))
 
-	case *ssa.BinOp:
+	case *types.BinOp:
 		fr.env[instr] = binop(instr.Op, instr.X.Type(), fr.get(instr.X), fr.get(instr.Y))
 
-	case *ssa.Call:
+	case *types.Call:
 		fn, args := prepareCall(fr, &instr.Call)
 		fr.env[instr] = call(fr.i, fr, instr.Pos(), fn, args)
 
-	case *ssa.ChangeInterface:
+	case *types.ChangeInterface:
 		fr.env[instr] = fr.get(instr.X)
 
-	case *ssa.ChangeType:
+	case *types.ChangeType:
 		fr.env[instr] = fr.get(instr.X) // (can't fail)
 
-	case *ssa.Convert:
+	case *types.Convert:
 		fr.env[instr] = conv(instr.Type(), instr.X.Type(), fr.get(instr.X))
 
-	case *ssa.SliceToArrayPointer:
+	case *types.SliceToArrayPointer:
 		fr.env[instr] = sliceToArrayPointer(instr.Type(), instr.X.Type(), fr.get(instr.X))
 
-	case *ssa.MakeInterface:
+	case *types.MakeInterface:
 		fr.env[instr] = iface{t: instr.X.Type(), v: fr.get(instr.X)}
 
-	case *ssa.Extract:
+	case *types.Extract:
 		fr.env[instr] = fr.get(instr.Tuple).(tuple)[instr.Index]
 
-	case *ssa.SSASlice:
+	case *types.SSASlice:
 		fr.env[instr] = slice(fr.get(instr.X), fr.get(instr.Low), fr.get(instr.High), fr.get(instr.Max))
 
-	case *ssa.Return:
+	case *types.Return:
 		switch len(instr.Results) {
 		case 0:
 		case 1:
@@ -236,19 +235,19 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		fr.block = nil
 		return kReturn
 
-	case *ssa.RunDefers:
+	case *types.RunDefers:
 		fr.runDefers()
 
-	case *ssa.Panic:
+	case *types.Panic:
 		panic(targetPanic{fr.get(instr.X)})
 
-	case *ssa.Send:
+	case *types.Send:
 		fr.get(instr.Chan).(chan value) <- fr.get(instr.X)
 
-	case *ssa.Store:
+	case *types.Store:
 		store(deref(instr.Addr.Type()), fr.get(instr.Addr).(*value), fr.get(instr.Val))
 
-	case *ssa.If:
+	case *types.If:
 		succ := 1
 		if fr.get(instr.Cond).(bool) {
 			succ = 0
@@ -256,11 +255,11 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		fr.prevBlock, fr.block = fr.block, fr.block.Succs[succ]
 		return kJump
 
-	case *ssa.Jump:
+	case *types.Jump:
 		fr.prevBlock, fr.block = fr.block, fr.block.Succs[0]
 		return kJump
 
-	case *ssa.SSADefer:
+	case *types.SSADefer:
 		fn, args := prepareCall(fr, &instr.Call)
 		fr.defers = &deferred{
 			fn:    fn,
@@ -269,7 +268,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			tail:  fr.defers,
 		}
 
-	case *ssa.SSAGo:
+	case *types.SSAGo:
 		fn, args := prepareCall(fr, &instr.Call)
 		atomic.AddInt32(&fr.i.goroutines, 1)
 		go func() {
@@ -277,10 +276,10 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			atomic.AddInt32(&fr.i.goroutines, -1)
 		}()
 
-	case *ssa.MakeChan:
+	case *types.MakeChan:
 		fr.env[instr] = make(chan value, asInt(fr.get(instr.Size)))
 
-	case *ssa.Alloc:
+	case *types.Alloc:
 		var addr *value
 		if instr.Heap {
 			// new
@@ -292,7 +291,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		*addr = zero(deref(instr.Type()))
 
-	case *ssa.MakeSlice:
+	case *types.MakeSlice:
 		slice := make([]value, asInt(fr.get(instr.Cap)))
 		tElt := instr.Type().Underlying().(*types.Slice).Elem()
 		for i := range slice {
@@ -300,26 +299,26 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 		}
 		fr.env[instr] = slice[:asInt(fr.get(instr.Len))]
 
-	case *ssa.MakeMap:
+	case *types.MakeMap:
 		reserve := 0
 		if instr.Reserve != nil {
 			reserve = asInt(fr.get(instr.Reserve))
 		}
 		fr.env[instr] = makeMap(instr.Type().Underlying().(*types.Map).Key(), reserve)
 
-	case *ssa.Range:
+	case *types.Range:
 		fr.env[instr] = rangeIter(fr.get(instr.X), instr.X.Type())
 
-	case *ssa.Next:
+	case *types.Next:
 		fr.env[instr] = fr.get(instr.Iter).(iter).next()
 
-	case *ssa.FieldAddr:
+	case *types.FieldAddr:
 		fr.env[instr] = &(*fr.get(instr.X).(*value)).(structure)[instr.Field]
 
-	case *ssa.SSAField:
+	case *types.SSAField:
 		fr.env[instr] = fr.get(instr.X).(structure)[instr.Field]
 
-	case *ssa.IndexAddr:
+	case *types.IndexAddr:
 		x := fr.get(instr.X)
 		idx := fr.get(instr.Index)
 		switch x := x.(type) {
@@ -331,13 +330,13 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			panic(fmt.Sprintf("unexpected x type in IndexAddr: %T", x))
 		}
 
-	case *ssa.Index:
+	case *types.Index:
 		fr.env[instr] = fr.get(instr.X).(array)[asInt(fr.get(instr.Index))]
 
-	case *ssa.Lookup:
+	case *types.Lookup:
 		fr.env[instr] = lookup(instr, fr.get(instr.X), fr.get(instr.Index))
 
-	case *ssa.MapUpdate:
+	case *types.MapUpdate:
 		m := fr.get(instr.Map)
 		key := fr.get(instr.Key)
 		v := fr.get(instr.Value)
@@ -350,17 +349,17 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			panic(fmt.Sprintf("illegal map type: %T", m))
 		}
 
-	case *ssa.TypeAssert:
+	case *types.TypeAssert:
 		fr.env[instr] = typeAssert(fr.i, instr, fr.get(instr.X).(iface))
 
-	case *ssa.MakeClosure:
+	case *types.MakeClosure:
 		var bindings []value
 		for _, binding := range instr.Bindings {
 			bindings = append(bindings, fr.get(binding))
 		}
-		fr.env[instr] = &closure{instr.Fn.(*ssa.Function), bindings}
+		fr.env[instr] = &closure{instr.Fn.(*types.Function), bindings}
 
-	case *ssa.Phi:
+	case *types.Phi:
 		for i, pred := range instr.Block().Preds {
 			if fr.prevBlock == pred {
 				fr.env[instr] = fr.get(instr.Edges[i])
@@ -368,7 +367,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 			}
 		}
 
-	case *ssa.Select:
+	case *types.Select:
 		var cases []reflect.SelectCase
 		if !instr.Blocking {
 			cases = append(cases, reflect.SelectCase{
@@ -426,7 +425,7 @@ func visitInstr(fr *frame, instr ssa.Instruction) continuation {
 // function call in a Call, Go or Defer instruction, performing
 // interface method lookup if needed.
 //
-func prepareCall(fr *frame, call *ssa.CallCommon) (fn value, args []value) {
+func prepareCall(fr *frame, call *types.CallCommon) (fn value, args []value) {
 	v := fr.get(call.Value)
 	if call.Method == nil {
 		// Function call.
@@ -457,14 +456,14 @@ func prepareCall(fr *frame, call *ssa.CallCommon) (fn value, args []value) {
 //
 func call(i *interpreter, caller *frame, callpos syntax.Pos, fn value, args []value) value {
 	switch fn := fn.(type) {
-	case *ssa.Function:
+	case *types.Function:
 		if fn == nil {
 			panic("call of nil function") // nil of func type
 		}
 		return callSSA(i, caller, callpos, fn, args, nil)
 	case *closure:
 		return callSSA(i, caller, callpos, fn.Fn, args, fn.Env)
-	case *ssa.SSABuiltin:
+	case *types.SSABuiltin:
 		return callBuiltin(caller, callpos, fn, args)
 	}
 	panic(fmt.Sprintf("cannot call %T", fn))
@@ -481,7 +480,7 @@ func loc(pos syntax.Pos) string {
 // and lexical environment env, returning its result.
 // callpos is the position of the callsite.
 //
-func callSSA(i *interpreter, caller *frame, callpos syntax.Pos, fn *ssa.Function, args []value, env []value) value {
+func callSSA(i *interpreter, caller *frame, callpos syntax.Pos, fn *types.Function, args []value, env []value) value {
 	if i.mode&EnableTracing != 0 {
 		// TODO(adonovan): fix: loc() lies for external functions.
 		fmt.Fprintf(os.Stderr, "Entering %s%s.\n", fn, loc(fn.Pos()))
@@ -508,7 +507,7 @@ func callSSA(i *interpreter, caller *frame, callpos syntax.Pos, fn *ssa.Function
 			panic("no code for function: " + name)
 		}
 	}
-	fr.env = make(map[ssa.Value]value)
+	fr.env = make(map[types.Value]value)
 	fr.block = fn.Blocks[0]
 	fr.locals = make([]value, len(fn.Locals))
 	for i, l := range fn.Locals {
@@ -571,7 +570,7 @@ func runFrame(fr *frame) {
 	block:
 		for _, instr := range fr.block.Instrs {
 			if fr.i.mode&EnableTracing != 0 {
-				if v, ok := instr.(ssa.Value); ok {
+				if v, ok := instr.(types.Value); ok {
 					fmt.Fprintln(os.Stderr, "\t", v.Name(), "=", instr)
 				} else {
 					fmt.Fprintln(os.Stderr, "\t", instr)
@@ -621,7 +620,7 @@ func doRecover(caller *frame) value {
 }
 
 // setGlobal sets the value of a system-initialized global variable.
-func setGlobal(i *interpreter, pkg *ssa.SSAPackage, name string, v value) {
+func setGlobal(i *interpreter, pkg *types.SSAPackage, name string, v value) {
 	if g, ok := i.globals[pkg.Var(name)]; ok {
 		*g = v
 		return
@@ -639,10 +638,10 @@ func setGlobal(i *interpreter, pkg *ssa.SSAPackage, name string, v value) {
 //
 // The SSA program must include the "runtime" package.
 //
-func Interpret(mainpkg *ssa.SSAPackage, mode Mode, sizes types.Sizes, filename string, args []string) (exitCode int) {
+func Interpret(mainpkg *types.SSAPackage, mode Mode, sizes types.Sizes, filename string, args []string) (exitCode int) {
 	i := &interpreter{
 		prog:       mainpkg.Prog,
-		globals:    make(map[ssa.Value]*value),
+		globals:    make(map[types.Value]*value),
 		mode:       mode,
 		sizes:      sizes,
 		goroutines: 1,
@@ -664,7 +663,7 @@ func Interpret(mainpkg *ssa.SSAPackage, mode Mode, sizes types.Sizes, filename s
 		// Initialize global storage.
 		for _, m := range pkg.Members {
 			switch v := m.(type) {
-			case *ssa.Global:
+			case *types.Global:
 				cell := zero(deref(v.Type()))
 				i.globals[v] = &cell
 			}

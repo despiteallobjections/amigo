@@ -12,7 +12,6 @@ import (
 	"time"
 
 	. "github.com/mdempsky/amigo/syntax"
-
 	. "github.com/mdempsky/amigo/types"
 )
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file defines a number of miscellaneous utility functions.
 
@@ -12,7 +12,6 @@ import (
 	"os"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 //// AST utilities
@@ -27,16 +26,10 @@ func isBlankIdent(e Expr) bool {
 
 //// Type utilities.  Some of these belong in github.com/mdempsky/amigo/types.
 
-// isPointer returns true for types whose underlying type is a pointer.
-func isPointer(typ Type) bool {
-	_, ok := typ.Underlying().(*Pointer)
-	return ok
-}
-
 func isInterface(T Type) bool { return IsInterface(T) }
 
 // deref returns a pointer's element type; otherwise it returns typ.
-func deref(typ Type) Type {
+func ssaDeref(typ Type) Type {
 	if p, ok := typ.Underlying().(*Pointer); ok {
 		return p.Elem()
 	}

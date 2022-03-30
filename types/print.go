@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ssa
+package types
 
 // This file implements the String() methods for all Value and
 // Instruction types.
@@ -15,7 +15,6 @@ import (
 	"sort"
 
 	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
 )
 
 // relName returns the name of v relative to i.
@@ -78,7 +77,7 @@ func (v *Alloc) String() string {
 		op = "new"
 	}
 	from := v.Parent().pkg()
-	return fmt.Sprintf("%s %s (%s)", op, relType(deref(v.Type()), from), v.Comment)
+	return fmt.Sprintf("%s %s (%s)", op, relType(ssaDeref(v.Type()), from), v.Comment)
 }
 
 func (v *Phi) String() string {
@@ -224,7 +223,7 @@ func (v *MakeChan) String() string {
 }
 
 func (v *FieldAddr) String() string {
-	st := deref(v.X.Type()).Underlying().(*Struct)
+	st := ssaDeref(v.X.Type()).Underlying().(*Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {

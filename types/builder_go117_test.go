@@ -5,15 +5,15 @@
 //go:build go1.17
 // +build go1.17
 
-package ssa_test
+package types_test
 
 import (
 	"testing"
 
 	"github.com/mdempsky/amigo/importer"
-	"github.com/mdempsky/amigo/ssa"
 	"github.com/mdempsky/amigo/ssa/ssautil"
 	. "github.com/mdempsky/amigo/syntax"
+	"github.com/mdempsky/amigo/types"
 	. "github.com/mdempsky/amigo/types"
 )
 
@@ -40,7 +40,7 @@ func TestBuildPackageGo117(t *testing.T) {
 
 			pkg := NewPackage("p", "")
 			conf := &Config{Importer: tc.importer}
-			if _, _, err := ssautil.BuildPackage(conf, pkg, files, ssa.SanityCheckFunctions); err != nil {
+			if _, _, err := ssautil.BuildPackage(conf, pkg, files, types.SanityCheckFunctions); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
@@ -70,7 +70,7 @@ func TestBuildPackageFailuresGo117(t *testing.T) {
 
 			pkg := NewPackage("p", "")
 			conf := &Config{Importer: tc.importer}
-			if _, _, err := ssautil.BuildPackage(conf, pkg, files, ssa.SanityCheckFunctions); err == nil {
+			if _, _, err := ssautil.BuildPackage(conf, pkg, files, types.SanityCheckFunctions); err == nil {
 				t.Error("want error, but got nil")
 			}
 		})
