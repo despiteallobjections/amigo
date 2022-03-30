@@ -152,7 +152,7 @@ func TestValuesInfo(t *testing.T) {
 		// look for expression
 		var expr syntax.Expr
 		for e := range info.Types {
-			if syntax.String(e) == test.expr {
+			if syntax.NodeString(e) == test.expr {
 				expr = e
 				break
 			}
@@ -387,7 +387,7 @@ func TestTypesInfo(t *testing.T) {
 		// look for expression type
 		var typ Type
 		for e, tv := range info.Types {
-			if syntax.String(e) == test.expr {
+			if syntax.NodeString(e) == test.expr {
 				typ = tv.Type
 				break
 			}
@@ -1015,7 +1015,7 @@ func TestPredicatesInfo(t *testing.T) {
 		got := "<missing>"
 		for e, tv := range info.Types {
 			//println(name, syntax.String(e))
-			if syntax.String(e) == test.expr {
+			if syntax.NodeString(e) == test.expr {
 				got = predString(tv)
 				break
 			}

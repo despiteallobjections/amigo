@@ -122,7 +122,7 @@ func TestPrintString(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		if got := String(ast); got != test[1] {
+		if got := NodeString(ast); got != test[1] {
 			t.Errorf("%q: got %q", test[1], got)
 		}
 	}
@@ -243,7 +243,7 @@ func TestShortString(t *testing.T) {
 			continue
 		}
 		x := ast.DeclList[0].(*GenDecl).SpecList[0].(*VarSpec).Values
-		if got := String(x); got != test[1] {
+		if got := NodeString(x); got != test[1] {
 			t.Errorf("%s: got %s, want %s", test[0], got, test[1])
 		}
 	}

@@ -44,9 +44,9 @@ func Fprint(w io.Writer, x Node, form Form) (n int, err error) {
 	return
 }
 
-// String is a convenience function that prints n in ShortForm
+// NodeString is a convenience function that prints n in ShortForm
 // and returns the printed string.
-func String(n Node) string {
+func NodeString(n Node) string {
 	var buf bytes.Buffer
 	_, err := Fprint(&buf, n, ShortForm)
 	if err != nil {

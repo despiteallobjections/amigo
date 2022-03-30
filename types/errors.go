@@ -98,7 +98,7 @@ func sprintf(qf Qualifier, debug bool, format string, args ...interface{}) strin
 		case syntax.Pos:
 			arg = a.String()
 		case syntax.Expr:
-			arg = syntax.String(a)
+			arg = syntax.NodeString(a)
 		case []syntax.Expr:
 			var buf bytes.Buffer
 			buf.WriteByte('[')
@@ -106,7 +106,7 @@ func sprintf(qf Qualifier, debug bool, format string, args ...interface{}) strin
 				if i > 0 {
 					buf.WriteString(", ")
 				}
-				buf.WriteString(syntax.String(x))
+				buf.WriteString(syntax.NodeString(x))
 			}
 			buf.WriteByte(']')
 			arg = buf.String()

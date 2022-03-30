@@ -828,7 +828,7 @@ func (p *parser) unaryExpr() Expr {
 			if dir == SendOnly {
 				// channel dir is <- but channel element E is not a channel
 				// (report same error as for "type _ <-chan<-E")
-				p.syntaxError(fmt.Sprintf("unexpected %s, expecting chan", String(t)))
+				p.syntaxError(fmt.Sprintf("unexpected %s, expecting chan", NodeString(t)))
 				// already progressed, no need to advance
 			}
 			return x
@@ -2380,9 +2380,9 @@ done:
 			// Emphasize Lhs and Rhs of assignment with parentheses to highlight '='.
 			// Do it always - it's not worth going through the trouble of doing it
 			// only for "complex" left and right sides.
-			str = "assignment (" + String(as.Lhs) + ") = (" + String(as.Rhs) + ")"
+			str = "assignment (" + NodeString(as.Lhs) + ") = (" + NodeString(as.Rhs) + ")"
 		} else {
-			str = String(s)
+			str = NodeString(s)
 		}
 		p.syntaxErrorAt(s.Pos(), fmt.Sprintf("cannot use %s as value", str))
 	}

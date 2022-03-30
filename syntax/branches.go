@@ -189,7 +189,7 @@ func (ls *labelScope) blockBranches(parent *block, ctxt targets, lstmt *LabeledS
 							ls.err(
 								fwd.Label.Pos(),
 								"goto %s jumps over declaration of %s at %s",
-								name, String(varName), varPos,
+								name, NodeString(varName), varPos,
 							)
 						}
 					} else {
