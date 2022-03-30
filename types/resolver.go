@@ -229,39 +229,39 @@ func (check *Checker) collectObjects() {
 
 			switch s := decl.(type) {
 			case *syntax.GenDecl:
-				var last *syntax.ConstSpec // last ConstDecl with init expressions, or nil
+				last := new(syntax.ConstSpec) // last ConstSpec with init expressions, or zero val
 
-				for index, decl := range s.SpecList {
-					switch s := decl.(type) {
+				for index, spec := range s.SpecList {
+					switch spec := spec.(type) {
 					case *syntax.ImportSpec:
 						// import package
-						if s.Path == nil || s.Path.Bad {
+						if spec.Path == nil || spec.Path.Bad {
 							continue // error reported during parsing
 						}
-						path, err := validatedImportPath(s.Path.Value)
+						path, err := validatedImportPath(spec.Path.Value)
 						if err != nil {
-							check.errorf(s.Path, "invalid import path (%s)", err)
+							check.errorf(spec.Path, "invalid import path (%s)", err)
 							continue
 						}
 
-						imp := check.importPackage(s.Path.Pos(), path, fileDir)
+						imp := check.importPackage(spec.Path.Pos(), path, fileDir)
 						if imp == nil {
 							continue
 						}
 
 						// local name overrides imported package name
 						name := imp.name
-						if s.LocalPkgName != nil {
-							name = s.LocalPkgName.Value
+						if spec.LocalPkgName != nil {
+							name = spec.LocalPkgName.Value
 							if path == "C" {
 								// match cmd/compile (not prescribed by spec)
-								check.error(s.LocalPkgName, `cannot rename import "C"`)
+								check.error(spec.LocalPkgName, `cannot rename import "C"`)
 								continue
 							}
 						}
 
 						if name == "init" {
-							check.error(s, "cannot import package as init - init must be a func")
+							check.error(spec, "cannot import package as init - init must be a func")
 							continue
 						}
 
@@ -273,12 +273,12 @@ func (check *Checker) collectObjects() {
 							pkg.imports = append(pkg.imports, imp)
 						}
 
-						pkgName := NewPkgName(s.Pos(), pkg, name, imp)
-						if s.LocalPkgName != nil {
+						pkgName := NewPkgName(spec.Pos(), pkg, name, imp)
+						if spec.LocalPkgName != nil {
 							// in a dot-import, the dot represents the package
-							check.recordDef(s.LocalPkgName, pkgName)
+							check.recordDef(spec.LocalPkgName, pkgName)
 						} else {
-							check.recordImplicit(s, pkgName)
+							check.recordImplicit(spec, pkgName)
 						}
 
 						if path == "C" {
@@ -308,7 +308,7 @@ func (check *Checker) collectObjects() {
 									// concurrently. See issue #32154.)
 									if alt := fileScope.Lookup(name); alt != nil {
 										var err error_
-										err.errorf(s.LocalPkgName, "%s redeclared in this block", alt.Name())
+										err.errorf(spec.LocalPkgName, "%s redeclared in this block", alt.Name())
 										err.recordAltDecl(alt)
 										check.report(&err)
 									} else {
@@ -328,19 +328,14 @@ func (check *Checker) collectObjects() {
 						iota := constant.MakeInt64(int64(index))
 
 						// determine which initialization expressions to use
-						inherited := true
-						switch {
-						case s.Type != nil || s.Values != nil:
-							last = s
-							inherited = false
-						case last == nil:
-							last = new(syntax.ConstSpec) // make sure last exists
-							inherited = false
+						inherited := spec.Type == nil && spec.Values == nil
+						if !inherited {
+							last = spec
 						}
 
 						// declare all constants
 						values := unpackExpr(last.Values)
-						for i, name := range s.NameList {
+						for i, name := range spec.NameList {
 							obj := NewConst(name.Pos(), pkg, name.Value, nil, iota)
 
 							var init syntax.Expr
@@ -353,25 +348,25 @@ func (check *Checker) collectObjects() {
 						}
 
 						// Constants must always have init values.
-						check.arity(s.Pos(), s.NameList, values, true, inherited)
+						check.arity(spec.Pos(), spec.NameList, values, true, inherited)
 
 					case *syntax.VarSpec:
-						lhs := make([]*Var, len(s.NameList))
+						lhs := make([]*Var, len(spec.NameList))
 						// If there's exactly one rhs initializer, use
 						// the same declInfo d1 for all lhs variables
 						// so that each lhs variable depends on the same
 						// rhs initializer (n:1 var declaration).
 						var d1 *declInfo
-						if _, ok := s.Values.(*syntax.ListExpr); !ok {
+						if _, ok := spec.Values.(*syntax.ListExpr); !ok {
 							// The lhs elements are only set up after the for loop below,
 							// but that's ok because declarePkgObj only collects the declInfo
 							// for a later phase.
-							d1 = &declInfo{file: fileScope, lhs: lhs, vtyp: s.Type, init: s.Values}
+							d1 = &declInfo{file: fileScope, lhs: lhs, vtyp: spec.Type, init: spec.Values}
 						}
 
 						// declare all variables
-						values := unpackExpr(s.Values)
-						for i, name := range s.NameList {
+						values := unpackExpr(spec.Values)
+						for i, name := range spec.NameList {
 							obj := NewVar(name.Pos(), pkg, name.Value, nil)
 							lhs[i] = obj
 
@@ -382,23 +377,23 @@ func (check *Checker) collectObjects() {
 								if i < len(values) {
 									init = values[i]
 								}
-								d = &declInfo{file: fileScope, vtyp: s.Type, init: init}
+								d = &declInfo{file: fileScope, vtyp: spec.Type, init: init}
 							}
 
 							check.declarePkgObj(name, obj, d)
 						}
 
 						// If we have no type, we must have values.
-						if s.Type == nil || values != nil {
-							check.arity(s.Pos(), s.NameList, values, false, false)
+						if spec.Type == nil || values != nil {
+							check.arity(spec.Pos(), spec.NameList, values, false, false)
 						}
 
 					case *syntax.TypeSpec:
-						if len(s.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) {
-							check.versionErrorf(s.TParamList[0], "go1.18", "type parameter")
+						if len(spec.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) {
+							check.versionErrorf(spec.TParamList[0], "go1.18", "type parameter")
 						}
-						obj := NewTypeName(s.Name.Pos(), pkg, s.Name.Value, nil)
-						check.declarePkgObj(s.Name, obj, &declInfo{file: fileScope, tdecl: s})
+						obj := NewTypeName(spec.Name.Pos(), pkg, spec.Name.Value, nil)
+						check.declarePkgObj(spec.Name, obj, &declInfo{file: fileScope, tdecl: spec})
 					}
 				}
 

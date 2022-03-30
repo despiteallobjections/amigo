@@ -721,44 +721,29 @@ func (check *Checker) funcDecl(obj *Func, decl *declInfo) {
 	}
 }
 
-func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
+func (check *Checker) declStmt(decl *syntax.GenDecl) {
 	pkg := check.pkg
 
-	first := -1                // index of first ConstDecl in the current group, or -1
-	var last *syntax.ConstSpec // last ConstDecl with init expressions, or nil
+	last := new(syntax.ConstSpec) // last ConstDecl with init expressions
 
-	list := decl0.SpecList
-	for index, decl := range list {
-		if _, ok := decl.(*syntax.ConstSpec); !ok {
-			first = -1 // we're not in a constant declaration
-		}
-
-		switch s := decl.(type) {
+	for index, spec := range decl.SpecList {
+		switch spec := spec.(type) {
 		case *syntax.ConstSpec:
 			top := len(check.delayed)
 
 			// iota is the index of the current constDecl within the group
-			if first < 0 || false {
-				first = index
-				last = nil
-			}
-			iota := constant.MakeInt64(int64(index - first))
+			iota := constant.MakeInt64(int64(index))
 
 			// determine which initialization expressions to use
-			inherited := true
-			switch {
-			case s.Type != nil || s.Values != nil:
-				last = s
-				inherited = false
-			case last == nil:
-				last = new(syntax.ConstSpec) // make sure last exists
-				inherited = false
+			inherited := spec.Type == nil && spec.Values == nil
+			if !inherited {
+				last = spec
 			}
 
 			// declare all constants
-			lhs := make([]*Const, len(s.NameList))
+			lhs := make([]*Const, len(spec.NameList))
 			values := unpackExpr(last.Values)
-			for i, name := range s.NameList {
+			for i, name := range spec.NameList {
 				obj := NewConst(name.Pos(), pkg, name.Value, nil, iota)
 				lhs[i] = obj
 
@@ -771,7 +756,7 @@ func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
 			}
 
 			// Constants must always have init values.
-			check.arity(s.Pos(), s.NameList, values, true, inherited)
+			check.arity(spec.Pos(), spec.NameList, values, true, inherited)
 
 			// process function literals in init expressions before scope changes
 			check.processDelayed(top)
@@ -780,26 +765,26 @@ func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
 			// inside a function begins at the end of the ConstSpec or VarSpec
 			// (ShortVarDecl for short variable declarations) and ends at the
 			// end of the innermost containing block."
-			scopePos := syntax.EndPos(s)
-			for i, name := range s.NameList {
+			scopePos := syntax.EndPos(spec)
+			for i, name := range spec.NameList {
 				check.declare(check.scope, name, lhs[i], scopePos)
 			}
 
 		case *syntax.VarSpec:
 			top := len(check.delayed)
 
-			lhs0 := make([]*Var, len(s.NameList))
-			for i, name := range s.NameList {
+			lhs0 := make([]*Var, len(spec.NameList))
+			for i, name := range spec.NameList {
 				lhs0[i] = NewVar(name.Pos(), pkg, name.Value, nil)
 			}
 
 			// initialize all variables
-			values := unpackExpr(s.Values)
+			values := unpackExpr(spec.Values)
 			for i, obj := range lhs0 {
 				var lhs []*Var
 				var init syntax.Expr
 				switch len(values) {
-				case len(s.NameList):
+				case len(spec.NameList):
 					// lhs and rhs match
 					init = values[i]
 				case 1:
@@ -811,7 +796,7 @@ func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
 						init = values[i]
 					}
 				}
-				check.varDecl(obj, lhs, s.Type, init)
+				check.varDecl(obj, lhs, spec.Type, init)
 				if len(values) == 1 {
 					// If we have a single lhs variable we are done either way.
 					// If we have a single rhs expression, it must be a multi-
@@ -828,8 +813,8 @@ func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
 			}
 
 			// If we have no type, we must have values.
-			if s.Type == nil || values != nil {
-				check.arity(s.Pos(), s.NameList, values, false, false)
+			if spec.Type == nil || values != nil {
+				check.arity(spec.Pos(), spec.NameList, values, false, false)
 			}
 
 			// process function literals in init expressions before scope changes
@@ -837,26 +822,26 @@ func (check *Checker) declStmt(decl0 *syntax.GenDecl) {
 
 			// declare all variables
 			// (only at this point are the variable scopes (parents) set)
-			scopePos := syntax.EndPos(s) // see constant declarations
-			for i, name := range s.NameList {
+			scopePos := syntax.EndPos(spec) // see constant declarations
+			for i, name := range spec.NameList {
 				// see constant declarations
 				check.declare(check.scope, name, lhs0[i], scopePos)
 			}
 
 		case *syntax.TypeSpec:
-			obj := NewTypeName(s.Name.Pos(), pkg, s.Name.Value, nil)
+			obj := NewTypeName(spec.Name.Pos(), pkg, spec.Name.Value, nil)
 			// spec: "The scope of a type identifier declared inside a function
 			// begins at the identifier in the TypeSpec and ends at the end of
 			// the innermost containing block."
-			scopePos := s.Name.Pos()
-			check.declare(check.scope, s.Name, obj, scopePos)
+			scopePos := spec.Name.Pos()
+			check.declare(check.scope, spec.Name, obj, scopePos)
 			// mark and unmark type before calling typeDecl; its type is still nil (see Checker.objDecl)
 			obj.setColor(grey + color(check.push(obj)))
-			check.typeDecl(obj, s, nil)
+			check.typeDecl(obj, spec, nil)
 			check.pop().setColor(black)
 
 		default:
-			check.errorf(s, invalidAST+"unknown syntax.Decl node %T", s)
+			check.errorf(spec, invalidAST+"unknown syntax.Decl node %T", spec)
 		}
 	}
 }
