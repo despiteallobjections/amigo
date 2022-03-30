@@ -841,7 +841,7 @@ func (check *Checker) declStmt(decl *syntax.GenDecl) {
 			check.pop().setColor(black)
 
 		default:
-			check.errorf(spec, invalidAST+"unknown syntax.Decl node %T", spec)
+			check.errorf(spec, invalidAST+"unknown syntax.Spec node %T", spec)
 		}
 	}
 }

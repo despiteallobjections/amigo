@@ -204,12 +204,6 @@ func (check *Checker) collectObjects() {
 		pkgImports[imp] = true
 	}
 
-	type methodInfo struct {
-		obj  *Func        // method
-		ptr  bool         // true if pointer receiver
-		recv *syntax.Name // receiver type name
-	}
-	var methods []methodInfo // collected methods with valid receivers and non-blank _ names
 	var fileScopes []*Scope
 	for fileNo, file := range check.files {
 		// The package identifier denotes the current package,
@@ -226,103 +220,127 @@ func (check *Checker) collectObjects() {
 		fileDir := dir(file.PkgName.Pos().RelFilename()) // TODO(gri) should this be filename?
 
 		for _, decl := range file.DeclList {
+			decl, ok := decl.(*syntax.GenDecl)
+			if !ok || decl.Tok != syntax.Import {
+				break
+			}
 
-			switch s := decl.(type) {
+			for _, spec := range decl.SpecList {
+				spec := spec.(*syntax.ImportSpec)
+				if spec.Path == nil || spec.Path.Bad {
+					continue // error reported during parsing
+				}
+				path, err := validatedImportPath(spec.Path.Value)
+				if err != nil {
+					check.errorf(spec.Path, "invalid import path (%s)", err)
+					continue
+				}
+
+				imp := check.importPackage(spec.Path.Pos(), path, fileDir)
+				if imp == nil {
+					continue
+				}
+
+				// local name overrides imported package name
+				name := imp.name
+				if spec.LocalPkgName != nil {
+					name = spec.LocalPkgName.Value
+					if path == "C" {
+						// match cmd/compile (not prescribed by spec)
+						check.error(spec.LocalPkgName, `cannot rename import "C"`)
+						continue
+					}
+				}
+
+				if name == "init" {
+					check.error(spec, "cannot import package as init - init must be a func")
+					continue
+				}
+
+				// add package to list of explicit imports
+				// (this functionality is provided as a convenience
+				// for clients; it is not needed for type-checking)
+				if !pkgImports[imp] {
+					pkgImports[imp] = true
+					pkg.imports = append(pkg.imports, imp)
+				}
+
+				pkgName := NewPkgName(spec.Pos(), pkg, name, imp)
+				if spec.LocalPkgName != nil {
+					// in a dot-import, the dot represents the package
+					check.recordDef(spec.LocalPkgName, pkgName)
+				} else {
+					check.recordImplicit(spec, pkgName)
+				}
+
+				if path == "C" {
+					// match cmd/compile (not prescribed by spec)
+					pkgName.used = true
+				}
+
+				// add import to file scope
+				check.imports = append(check.imports, pkgName)
+				if name == "." {
+					// dot-import
+					if check.dotImportMap == nil {
+						check.dotImportMap = make(map[dotImportKey]*PkgName)
+					}
+					// merge imported scope with file scope
+					for name, obj := range imp.scope.elems {
+						// Note: Avoid eager resolve(name, obj) here, so we only
+						// resolve dot-imported objects as needed.
+
+						// A package scope may contain non-exported objects,
+						// do not import them!
+						if !isExported(name) {
+							continue
+						}
+
+						// declare dot-imported object
+						// (Do not use check.declare because it modifies the object
+						// via Object.setScopePos, which leads to a race condition;
+						// the object may be imported into more than one file scope
+						// concurrently. See issue #32154.)
+						if alt := fileScope.Lookup(name); alt != nil {
+							var err error_
+							err.errorf(spec.LocalPkgName, "%s redeclared in this block", alt.Name())
+							err.recordAltDecl(alt)
+							check.report(&err)
+						} else {
+							fileScope.insert(name, obj)
+							check.dotImportMap[dotImportKey{fileScope, name}] = pkgName
+						}
+					}
+				} else {
+					// declare imported package object in file scope
+					// (no need to provide s.LocalPkgName since we called check.recordDef earlier)
+					check.declare(fileScope, nil, pkgName, nopos)
+				}
+			}
+		}
+	}
+
+	type methodInfo struct {
+		obj  *Func        // method
+		ptr  bool         // true if pointer receiver
+		recv *syntax.Name // receiver type name
+	}
+	var methods []methodInfo // collected methods with valid receivers and non-blank _ names
+
+	for fileNo, file := range check.files {
+		fileScope := fileScopes[fileNo]
+
+		for _, decl := range file.DeclList {
+			switch decl := decl.(type) {
 			case *syntax.GenDecl:
+				if decl.Tok == syntax.Import {
+					continue // handled above
+				}
+
 				last := new(syntax.ConstSpec) // last ConstSpec with init expressions, or zero val
 
-				for index, spec := range s.SpecList {
+				for index, spec := range decl.SpecList {
 					switch spec := spec.(type) {
-					case *syntax.ImportSpec:
-						// import package
-						if spec.Path == nil || spec.Path.Bad {
-							continue // error reported during parsing
-						}
-						path, err := validatedImportPath(spec.Path.Value)
-						if err != nil {
-							check.errorf(spec.Path, "invalid import path (%s)", err)
-							continue
-						}
-
-						imp := check.importPackage(spec.Path.Pos(), path, fileDir)
-						if imp == nil {
-							continue
-						}
-
-						// local name overrides imported package name
-						name := imp.name
-						if spec.LocalPkgName != nil {
-							name = spec.LocalPkgName.Value
-							if path == "C" {
-								// match cmd/compile (not prescribed by spec)
-								check.error(spec.LocalPkgName, `cannot rename import "C"`)
-								continue
-							}
-						}
-
-						if name == "init" {
-							check.error(spec, "cannot import package as init - init must be a func")
-							continue
-						}
-
-						// add package to list of explicit imports
-						// (this functionality is provided as a convenience
-						// for clients; it is not needed for type-checking)
-						if !pkgImports[imp] {
-							pkgImports[imp] = true
-							pkg.imports = append(pkg.imports, imp)
-						}
-
-						pkgName := NewPkgName(spec.Pos(), pkg, name, imp)
-						if spec.LocalPkgName != nil {
-							// in a dot-import, the dot represents the package
-							check.recordDef(spec.LocalPkgName, pkgName)
-						} else {
-							check.recordImplicit(spec, pkgName)
-						}
-
-						if path == "C" {
-							// match cmd/compile (not prescribed by spec)
-							pkgName.used = true
-						}
-
-						// add import to file scope
-						check.imports = append(check.imports, pkgName)
-						if name == "." {
-							// dot-import
-							if check.dotImportMap == nil {
-								check.dotImportMap = make(map[dotImportKey]*PkgName)
-							}
-							// merge imported scope with file scope
-							for name, obj := range imp.scope.elems {
-								// Note: Avoid eager resolve(name, obj) here, so we only
-								// resolve dot-imported objects as needed.
-
-								// A package scope may contain non-exported objects,
-								// do not import them!
-								if isExported(name) {
-									// declare dot-imported object
-									// (Do not use check.declare because it modifies the object
-									// via Object.setScopePos, which leads to a race condition;
-									// the object may be imported into more than one file scope
-									// concurrently. See issue #32154.)
-									if alt := fileScope.Lookup(name); alt != nil {
-										var err error_
-										err.errorf(spec.LocalPkgName, "%s redeclared in this block", alt.Name())
-										err.recordAltDecl(alt)
-										check.report(&err)
-									} else {
-										fileScope.insert(name, obj)
-										check.dotImportMap[dotImportKey{fileScope, name}] = pkgName
-									}
-								}
-							}
-						} else {
-							// declare imported package object in file scope
-							// (no need to provide s.LocalPkgName since we called check.recordDef earlier)
-							check.declare(fileScope, nil, pkgName, nopos)
-						}
-
 					case *syntax.ConstSpec:
 						// iota is the index of the current constDecl within the group
 						iota := constant.MakeInt64(int64(index))
@@ -394,52 +412,55 @@ func (check *Checker) collectObjects() {
 						}
 						obj := NewTypeName(spec.Name.Pos(), pkg, spec.Name.Value, nil)
 						check.declarePkgObj(spec.Name, obj, &declInfo{file: fileScope, tdecl: spec})
+
+					default:
+						check.errorf(decl, invalidAST+"unknown syntax.Spec node %T", spec)
 					}
 				}
 
 			case *syntax.FuncDecl:
-				name := s.Name.Value
-				obj := NewFunc(s.Name.Pos(), pkg, name, nil)
+				name := decl.Name.Value
+				obj := NewFunc(decl.Name.Pos(), pkg, name, nil)
 				hasTParamError := false // avoid duplicate type parameter errors
-				if s.Recv == nil {
+				if decl.Recv == nil {
 					// regular function
 					if name == "init" || name == "main" && pkg.name == "main" {
-						if len(s.TParamList) != 0 {
-							check.softErrorf(s.TParamList[0], "func %s must have no type parameters", name)
+						if len(decl.TParamList) != 0 {
+							check.softErrorf(decl.TParamList[0], "func %s must have no type parameters", name)
 							hasTParamError = true
 						}
-						if t := s.Type; len(t.ParamList) != 0 || len(t.ResultList) != 0 {
-							check.softErrorf(s, "func %s must have no arguments and no return values", name)
+						if t := decl.Type; len(t.ParamList) != 0 || len(t.ResultList) != 0 {
+							check.softErrorf(decl, "func %s must have no arguments and no return values", name)
 						}
 					}
 					// don't declare init functions in the package scope - they are invisible
 					if name == "init" {
 						obj.parent = pkg.scope
-						check.recordDef(s.Name, obj)
+						check.recordDef(decl.Name, obj)
 						// init functions must have a body
-						if s.Body == nil {
+						if decl.Body == nil {
 							// TODO(gri) make this error message consistent with the others above
 							check.softErrorf(obj.pos, "missing function body")
 						}
 					} else {
-						check.declare(pkg.scope, s.Name, obj, nopos)
+						check.declare(pkg.scope, decl.Name, obj, nopos)
 					}
 				} else {
 					// method
 					// d.Recv != nil
-					ptr, recv, _ := check.unpackRecv(s.Recv.Type, false)
+					ptr, recv, _ := check.unpackRecv(decl.Recv.Type, false)
 					// Methods with invalid receiver cannot be associated to a type, and
 					// methods with blank _ names are never found; no need to collect any
 					// of them. They will still be type-checked with all the other functions.
 					if recv != nil && name != "_" {
 						methods = append(methods, methodInfo{obj, ptr, recv})
 					}
-					check.recordDef(s.Name, obj)
+					check.recordDef(decl.Name, obj)
 				}
-				if len(s.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) && !hasTParamError {
-					check.versionErrorf(s.TParamList[0], "go1.18", "type parameter")
+				if len(decl.TParamList) != 0 && !check.allowVersion(pkg, 1, 18) && !hasTParamError {
+					check.versionErrorf(decl.TParamList[0], "go1.18", "type parameter")
 				}
-				info := &declInfo{file: fileScope, fdecl: s}
+				info := &declInfo{file: fileScope, fdecl: decl}
 				// Methods are not package-level objects but we still track them in the
 				// object map so that we can handle them like regular functions (if the
 				// receiver is invalid); also we need their fdecl info when associating
@@ -448,7 +469,7 @@ func (check *Checker) collectObjects() {
 				obj.setOrder(uint32(len(check.objMap)))
 
 			default:
-				check.errorf(s, invalidAST+"unknown syntax.Decl node %T", s)
+				check.errorf(decl, invalidAST+"unknown syntax.Decl node %T", decl)
 			}
 		}
 	}
