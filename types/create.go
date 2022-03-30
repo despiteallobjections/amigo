@@ -10,6 +10,7 @@ package types
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	. "github.com/mdempsky/amigo/syntax"
@@ -51,27 +52,28 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 		}
 
 	case *TypeName:
-		pkg.Members[name] = &SSAType{
+		t := &SSAType{
 			object: obj,
-			pkg:    pkg,
 		}
+		obj.member = t
+		pkg.Members[name] = t
 
 	case *Const:
 		c := &NamedConst{
 			object: obj,
 			Value:  NewSSAConst(obj.Val(), obj.Type()),
-			pkg:    pkg,
 		}
+		obj.member = c
 		pkg.Members[name] = c
 
 	case *Var:
 		g := &Global{
-			Pkg:    pkg,
 			name:   name,
 			object: obj,
 			typ:    NewPointer(obj.Type()), // address
 			pos:    obj.Pos(),
 		}
+		obj.member = g
 		pkg.values[obj] = g
 		pkg.Members[name] = g
 
@@ -94,6 +96,7 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			fn.Synthetic = "loaded from gc object file"
 		}
 
+		obj.member = fn
 		pkg.values[obj] = fn
 		if sig.Recv() == nil {
 			pkg.Members[name] = fn // package-level function
@@ -164,14 +167,19 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 	}
 
 	// Add init() function.
-	p.init = &Function{
+	obj := NewFunc(NoPos, pkg, "init", new(Signature))
+	fn := &Function{
 		name:      "init",
-		Signature: new(Signature),
+		object:    obj,
+		Signature: obj.Type().(*Signature),
 		Synthetic: "package initializer",
+		pos:       obj.Pos(),
 		Pkg:       p,
 		Prog:      prog,
 	}
-	p.Members[p.init.name] = p.init
+	obj.member = fn
+	p.init = fn
+	p.Members[p.init.name] = fn
 
 	// CREATE phase.
 	// Allocate all package members: vars, funcs, consts and types.
@@ -203,7 +211,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 	if prog.mode&BareInits == 0 {
 		// Add initializer guard variable.
 		initguard := &Global{
-			Pkg:  p,
 			name: "init$guard",
 			typ:  NewPointer(tBool),
 		}
@@ -224,6 +231,34 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		prog.imported[p.Pkg.Path()] = p
 	}
 	prog.packages[p.Pkg] = p
+
+	const validate = true
+	if validate {
+		// Check that p.Pkg.Scope() and p.Members are consistent.
+		//
+		// TODO(mdempsky): How do we want to update existing uses of
+		// p.Members, particularly regarding the synthetic "init" objects?
+		// Do we just declare them in p.Pkg.Scope() directly?
+
+		for name, mem := range p.Members {
+			if name == "init" || name == "init$guard" || strings.HasPrefix(name, "init#") {
+				// ok
+			} else if obj := mem.Object(); obj == nil {
+				panic(fmt.Errorf("member %q (%v) has nil Object", name, mem))
+			} else if obj.Member() != mem {
+				panic(fmt.Errorf("member %q (%v) has Object %v, which has member %v", name, mem, obj, obj.Member()))
+			} else if obj2 := p.Pkg.Scope().Lookup(name); obj2 != obj {
+				panic(fmt.Errorf("member %q (%v) has Object %v, but Pkg.Scope has Object %v", name, mem, obj, obj2))
+			}
+		}
+
+		for _, name := range p.Pkg.Scope().Names() {
+			obj := p.Pkg.Scope().Lookup(name)
+			if obj.Member() != p.Members[name] {
+				panic(fmt.Errorf("object %q (%v) has Member %v, but p.Members has %v", name, obj, obj.Member(), p.Members[name]))
+			}
+		}
+	}
 
 	return p
 }

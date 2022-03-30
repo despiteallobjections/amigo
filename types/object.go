@@ -30,6 +30,9 @@ type Object interface {
 	// String returns a human-readable string of the object.
 	String() string
 
+	// Member returns the object's Member representation, if any.
+	Member() Member
+
 	// order reflects a package-level object's source order: if object
 	// a is before object b in the source, then a.order() < b.order().
 	// order returns a value > 0 for package-level objects; it returns
@@ -154,6 +157,8 @@ func (obj *object) Exported() bool { return isExported(obj.name) }
 // Id is a wrapper for Id(obj.Pkg(), obj.Name()).
 func (obj *object) Id() string { return Id(obj.pkg, obj.name) }
 
+func (obj *object) Member() Member { return nil } // overriden by *Const, *Func, *TypeName, and *Var
+
 func (obj *object) String() string { panic("abstract") }
 func (obj *object) order() uint32  { return obj.order_ }
 func (obj *object) color() color   { return obj.color_ }
@@ -244,13 +249,16 @@ func (obj *PkgName) Imported() *Package { return obj.imported }
 // A Const represents a declared constant.
 type Const struct {
 	object
-	val constant.Value
+	member *NamedConst
+	val    constant.Value
 }
+
+func (obj *Const) Member() Member { return obj.member }
 
 // NewConst returns a new constant with value val.
 // The remaining arguments set the attributes found with all Objects.
 func NewConst(pos Pos, pkg *Package, name string, typ Type, val constant.Value) *Const {
-	return &Const{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, val}
+	return &Const{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, val}
 }
 
 // Val returns the constant's value.
@@ -261,7 +269,10 @@ func (*Const) isDependency() {} // a constant may be a dependency of an initiali
 // A TypeName represents a name for a (defined or alias) type.
 type TypeName struct {
 	object
+	member *SSAType
 }
+
+func (obj *TypeName) Member() Member { return obj.member }
 
 // NewTypeName returns a new type name denoting the given typ.
 // The remaining arguments set the attributes found with all Objects.
@@ -271,7 +282,7 @@ type TypeName struct {
 // argument for NewNamed, which will set the TypeName's type as a side-
 // effect.
 func NewTypeName(pos Pos, pkg *Package, name string, typ Type) *TypeName {
-	return &TypeName{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}}
+	return &TypeName{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil}
 }
 
 // NewTypeNameLazy returns a new defined type like NewTypeName, but it
@@ -323,6 +334,7 @@ func (obj *TypeName) IsAlias() bool {
 // A Variable represents a declared variable (including function parameters and results, and struct fields).
 type Var struct {
 	object
+	member   *Global
 	embedded bool // if set, the variable is an embedded struct field, and name is the type name
 	isField  bool // var is struct field
 	used     bool // set if the variable was used
@@ -356,6 +368,8 @@ func (obj *Var) Embedded() bool { return obj.embedded }
 // IsField reports whether the variable is a struct field.
 func (obj *Var) IsField() bool { return obj.isField }
 
+func (obj *Var) Member() Member { return obj.member }
+
 func (*Var) isDependency() {} // a variable may be a dependency of an initialization expression
 
 // A Func represents a declared function, concrete method, or abstract
@@ -363,8 +377,11 @@ func (*Var) isDependency() {} // a variable may be a dependency of an initializa
 // An abstract method may belong to many interfaces due to embedding.
 type Func struct {
 	object
+	member      *Function
 	hasPtrRecv_ bool // only valid for methods that don't have a type yet; use hasPtrRecv() to read
 }
+
+func (obj *Func) Member() Member { return obj.member }
 
 // NewFunc returns a new function with the given signature, representing
 // the function's type.
@@ -374,7 +391,7 @@ func NewFunc(pos Pos, pkg *Package, name string, sig *Signature) *Func {
 	if sig != nil {
 		typ = sig
 	}
-	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, false}
+	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, false}
 }
 
 // FullName returns the package- or receiver-type-qualified name of

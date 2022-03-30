@@ -283,6 +283,7 @@ func (*lazyObject) Type() Type                            { panic("unreachable")
 func (*lazyObject) Exported() bool                        { panic("unreachable") }
 func (*lazyObject) Id() string                            { panic("unreachable") }
 func (*lazyObject) String() string                        { panic("unreachable") }
+func (*lazyObject) Member() Member                        { panic("unreachable") }
 func (*lazyObject) order() uint32                         { panic("unreachable") }
 func (*lazyObject) color() color                          { panic("unreachable") }
 func (*lazyObject) setType(Type)                          { panic("unreachable") }

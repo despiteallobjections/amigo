@@ -10,7 +10,6 @@ package types
 import (
 	"fmt"
 	"go/constant"
-	"go/token"
 	"sync"
 
 	. "github.com/mdempsky/amigo/syntax"
@@ -67,14 +66,11 @@ type Member interface {
 	Object() Object            // typechecker's object for this member, if any
 	Pos() Pos                  // position of member's declaration, if known
 	Type() Type                // type of the package member
-	Token() token.Token        // token.{VAR,FUNC,CONST,TYPE}
-	Package() *SSAPackage      // the containing package
 }
 
 // A SSAType is a Member of a Package representing a package-level named type.
 type SSAType struct {
 	object *TypeName
-	pkg    *SSAPackage
 }
 
 // A NamedConst is a Member of a Package representing a package-level
@@ -89,7 +85,6 @@ type SSAType struct {
 type NamedConst struct {
 	object *Const
 	Value  *SSAConst
-	pkg    *SSAPackage
 }
 
 // A Value is an SSA value that can be referenced by an instruction.
@@ -427,8 +422,6 @@ type Global struct {
 	object Object // a *types.Var; may be nil for synthetics e.g. init$guard
 	typ    Type
 	pos    Pos
-
-	Pkg *SSAPackage
 }
 
 // A SSABuiltin represents a specific use of a built-in function, e.g. len.
@@ -1426,20 +1419,16 @@ func (v *Global) Name() string                   { return v.name }
 func (v *Global) Parent() *Function              { return nil }
 func (v *Global) Pos() Pos                       { return v.pos }
 func (v *Global) Referrers() *[]Instruction      { return nil }
-func (v *Global) Token() token.Token             { return token.VAR }
 func (v *Global) Object() Object                 { return v.object }
 func (v *Global) String() string                 { return v.RelString(nil) }
-func (v *Global) Package() *SSAPackage           { return v.Pkg }
 func (v *Global) RelString(from *Package) string { return relString(v, from) }
 
-func (v *Function) Name() string         { return v.name }
-func (v *Function) Type() Type           { return v.Signature }
-func (v *Function) Pos() Pos             { return v.pos }
-func (v *Function) Token() token.Token   { return token.FUNC }
-func (v *Function) Object() Object       { return v.object }
-func (v *Function) String() string       { return v.RelString(nil) }
-func (v *Function) Package() *SSAPackage { return v.Pkg }
-func (v *Function) Parent() *Function    { return v.parent }
+func (v *Function) Name() string      { return v.name }
+func (v *Function) Type() Type        { return v.Signature }
+func (v *Function) Pos() Pos          { return v.pos }
+func (v *Function) Object() Object    { return v.object }
+func (v *Function) String() string    { return v.RelString(nil) }
+func (v *Function) Parent() *Function { return v.parent }
 func (v *Function) Referrers() *[]Instruction {
 	if v.parent != nil {
 		return &v.referrers
@@ -1474,19 +1463,15 @@ func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 func (t *SSAType) Name() string                   { return t.object.Name() }
 func (t *SSAType) Pos() Pos                       { return t.object.Pos() }
 func (t *SSAType) Type() Type                     { return t.object.Type() }
-func (t *SSAType) Token() token.Token             { return token.TYPE }
 func (t *SSAType) Object() Object                 { return t.object }
 func (t *SSAType) String() string                 { return t.RelString(nil) }
-func (t *SSAType) Package() *SSAPackage           { return t.pkg }
 func (t *SSAType) RelString(from *Package) string { return relString(t, from) }
 
 func (c *NamedConst) Name() string                   { return c.object.Name() }
 func (c *NamedConst) Pos() Pos                       { return c.object.Pos() }
 func (c *NamedConst) String() string                 { return c.RelString(nil) }
 func (c *NamedConst) Type() Type                     { return c.object.Type() }
-func (c *NamedConst) Token() token.Token             { return token.CONST }
 func (c *NamedConst) Object() Object                 { return c.object }
-func (c *NamedConst) Package() *SSAPackage           { return c.pkg }
 func (c *NamedConst) RelString(from *Package) string { return relString(c, from) }
 
 func (d *DebugRef) Object() Object { return d.object }

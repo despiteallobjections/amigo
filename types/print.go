@@ -44,7 +44,7 @@ func relType(t Type, from *Package) string {
 func relString(m Member, from *Package) string {
 	// NB: not all globals have an Object (e.g. init$guard),
 	// so use Package().Object not Object.Package().
-	if pkg := m.Package().Pkg; pkg != nil && pkg != from {
+	if pkg := m.Object().Pkg(); pkg != nil && pkg != from {
 		return fmt.Sprintf("%s.%s", pkg.Path(), m.Name())
 	}
 	return m.Name()
