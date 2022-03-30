@@ -62,7 +62,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			Value:  NewSSAConst(obj.Val(), obj.Type()),
 			pkg:    pkg,
 		}
-		pkg.values[obj] = c.Value
 		pkg.Members[name] = c
 
 	case *Var:
