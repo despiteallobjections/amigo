@@ -66,6 +66,16 @@ func (s *tapescanner) init(src string, mode uint) {
 		// TODO(mdempsky): Record additional links for _Semi, _Comma, and
 		// (maybe) _Colon too, to allow asynchronous parsing of the
 		// individual elements within a delimited region too?
+		//
+		// TODO(mdempsky): Is the backward link actually useful? The
+		// simdjson paper (https://arxiv.org/pdf/1902.08318.pdf) details
+		// having backward links in the tape, but the text doesn't seem to
+		// mention why they're useful. It only mentions: "To ensure fast
+		// navigation, the words on the tape corresponding to braces or
+		// brackets are annotated so that we can go **from the word at the
+		// start** of an object or array **to the word at the end** of the
+		// array without reading the content of the array or object."
+		// [emphasis added]
 
 		switch old.tok {
 		case _Lparen, _Lbrack, _Lbrace:
