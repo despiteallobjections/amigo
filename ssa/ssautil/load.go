@@ -7,6 +7,8 @@ package ssautil
 // This file defines utility functions for constructing programs in SSA form.
 
 import (
+	"fmt"
+
 	"golang.org/x/tools/go/packages"
 
 	"github.com/mdempsky/amigo/loader"
@@ -59,7 +61,6 @@ func AllPackages(initial []*packages.Package, mode types.BuilderMode) (*types.Pr
 }
 
 func doPackages(initial []*packages.Package, mode types.BuilderMode, deps bool) (*types.Program, []*types.SSAPackage) {
-
 	prog := types.NewProgram(mode)
 
 	isInitial := make(map[*packages.Package]bool, len(initial))
@@ -69,16 +70,47 @@ func doPackages(initial []*packages.Package, mode types.BuilderMode, deps bool) 
 
 	ssamap := make(map[*packages.Package]*types.SSAPackage)
 	packages.Visit(initial, nil, func(p *packages.Package) {
-		panic("TODO: need to manually parse and type check packages ourselves")
-		/*
-			if p.Types != nil && !p.IllTyped {
-				var files []*syntax.File
-				if deps || isInitial[p] {
-					files = p.Syntax
-				}
-				ssamap[p] = prog.CreatePackage(p.Types, files, p.TypesInfo, true)
-			}
-		*/
+		if p.PkgPath == "unsafe" {
+			ssamap[p] = prog.CreatePackage(types.Unsafe, nil, nil, true)
+			return
+		}
+
+		if len(p.CompiledGoFiles) == 0 {
+			// TODO(mdempsky): Use srcimporter or import from p.ExportFile.
+			panic(fmt.Errorf("missing source files for package %q", p.PkgPath))
+		}
+
+		files := make([]*syntax.File, len(p.CompiledGoFiles))
+		for i, filename := range p.CompiledGoFiles {
+			files[i], _ = syntax.ParseFile(filename, nil, nil, syntax.CheckBranches|syntax.AllowGenerics)
+		}
+
+		cfg := types.Config{
+			Importer: &importer{
+				imports: p.Imports,
+				ssamap:  ssamap,
+			},
+		}
+
+		info := types.Info{
+			Types:      make(map[syntax.Expr]types.TypeAndValue),
+			Defs:       make(map[*syntax.Name]types.Object),
+			Uses:       make(map[*syntax.Name]types.Object),
+			Implicits:  make(map[syntax.Node]types.Object),
+			Scopes:     make(map[syntax.Node]*types.Scope),
+			Selections: make(map[*syntax.SelectorExpr]*types.Selection),
+		}
+
+		pkg, err := cfg.Check(p.PkgPath, files, &info)
+		if err != nil {
+			panic(fmt.Errorf("checking package %q failed: %w", p.PkgPath, err))
+		}
+
+		if !deps && !isInitial[p] {
+			files = nil
+		}
+
+		ssamap[p] = prog.CreatePackage(pkg, files, &info, true)
 	})
 
 	var ssapkgs []*types.SSAPackage
@@ -86,6 +118,18 @@ func doPackages(initial []*packages.Package, mode types.BuilderMode, deps bool) 
 		ssapkgs = append(ssapkgs, ssamap[p]) // may be nil
 	}
 	return prog, ssapkgs
+}
+
+type importer struct {
+	imports map[string]*packages.Package
+	ssamap  map[*packages.Package]*types.SSAPackage
+}
+
+func (m *importer) Import(path, srcDir string) (*types.Package, error) {
+	if pkg := m.ssamap[m.imports[path]]; pkg != nil {
+		return pkg.Pkg, nil
+	}
+	return nil, fmt.Errorf("missing package for import path %q", path)
 }
 
 // CreateProgram returns a new program in SSA form, given a program
@@ -148,18 +192,9 @@ func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mo
 
 	// Create SSA packages for all imports.
 	// Order is not significant.
-	created := make(map[*types.Package]bool)
-	var createAll func(pkgs []*types.Package)
-	createAll = func(pkgs []*types.Package) {
-		for _, p := range pkgs {
-			if !created[p] {
-				created[p] = true
-				prog.CreatePackage(p, nil, nil, true)
-				createAll(p.Imports())
-			}
-		}
+	for _, imp := range types.Dependencies(pkg.Imports()...) {
+		prog.CreatePackage(imp, nil, nil, true)
 	}
-	createAll(pkg.Imports())
 
 	// Create and build the primary package.
 	ssapkg := prog.CreatePackage(pkg, files, info, false)
