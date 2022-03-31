@@ -195,10 +195,42 @@ the C compiler, which in the common case would allow us to emit
 
 ## Prior art
 
+### Turbine
+
 Java has similar build dependency issues, which Google's Javac Team
 has experience optimizing around. The current state of art there is
-Turbine, which is available at https://github.com/google/turbine.
+Turbine, which is available at https://github.com/google/turbine. (A
+similar idea was previously used from 2008--2014, but turned down
+because of maintenance costs.)
 
 A design doc for Turbine is available to Googlers at
 go/java-header-compilation. I've asked the Javac Team if there are any
 publicly available copies of this documentation.
+
+Short summary (as I understand it): the OpenJDK javac compiler
+compiles .java source files into .class files (generally collected
+into a .jar archive). The .class files contain both typing information
+needed for subsequent javac invocations, and byte code instructions
+needed for execution by the JVM. (The JVM additionally relies on
+typing information from the .class files, but we can ignore that for
+present discussion.)
+
+The Turbine project implements a "Java header compiler," which emits
+"header" .class files containing only typing information. These files
+aren't usable by JVM (because of missing byte code), but are usable by
+javac (and Turbine itself) for handling imported types. Moreover, the
+Turbine compiler is much faster than javac (because it does a minimal
+subset of the work).
+
+The intended use case is a build system like Bazel can compile all
+Java targets first (and along the critical path) with Turbine, and
+then recompile all of them (in parallel) with javac. This increases
+the total amount of work done (i.e., each Java target is compiled
+twice, although the additional compilation is relatively cheap), but
+greatly increases how much work can be scheduled in parallel. For
+projects with large code bases (e.g.,
+https://dl.acm.org/doi/10.1145/2854146) and highly parallel build
+capacity (e.g.,
+https://mike-bland.com/2012/10/01/tools.html#blaze-forge-srcfs-objfs),
+this tradeoff can be valuable for reducing the wall-clock time that
+human developers spend waiting for builds to finish.
