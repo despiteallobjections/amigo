@@ -1,5 +1,7 @@
 # Amigo
 
+[![Go](https://github.com/mdempsky/amigo/actions/workflows/go.yml/badge.svg)](https://github.com/mdempsky/amigo/actions/workflows/go.yml)
+
 Amigo is an experiment to radically reinvision the Go tools ecosystem,
 including cmd/compile, cmd/vet, x/tools/gopls, and users of the go/*
 and x/tools/go/* APIs.
