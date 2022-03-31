@@ -191,7 +191,7 @@ package's exported API, I believe this is relatively uncommon in
 practice. If we integrate the cmd/cgo logic directly into the type
 checker, then it seems likely we could be lazy about actually invoking
 the C compiler, which in the common case would allow us to emit
-`__.PKGDEF` (and unblock downstream Go compilations) must sooner.
+`__.PKGDEF` (and unblock downstream Go compilations) much sooner.
 
 ## Prior art
 
