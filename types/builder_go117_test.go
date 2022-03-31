@@ -17,6 +17,13 @@ import (
 	. "github.com/mdempsky/amigo/types"
 )
 
+// Because of the object.member field, it's not currently safe to
+// concurrently analyze multiple SSA packages. However, it should be
+// safe again once we finish unifying Object and Member.
+//
+// TODO(mdempsky): Change to true and remove.
+const parallelOK = false
+
 func TestBuildPackageGo117(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -31,7 +38,9 @@ func TestBuildPackageGo117(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+			if parallelOK {
+				t.Parallel()
+			}
 			f, err := ParseString("p.go", tc.src)
 			if err != nil {
 				t.Error(err)
@@ -61,7 +70,9 @@ func TestBuildPackageFailuresGo117(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+			if parallelOK {
+				t.Parallel()
+			}
 			f, err := ParseString("p.go", tc.src)
 			if err != nil {
 				t.Error(err)
