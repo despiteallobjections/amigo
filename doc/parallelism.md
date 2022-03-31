@@ -94,7 +94,11 @@ reading linker artifacts from the Go 1.18 compiler.
 The one important exception here is that x/tools/go/gcexportdata is
 versioned separated from the gc toolchain, and it intentionally
 supports reading export data from many past Go compiler releases.
-Notably, this complicates evolving the export data format.
+Notably, this complicates evolving the export data format, because new
+features (e.g., support for generics) need to be added in a
+backwards-compatible way, existing importers updated to support the
+new features, tools updated to use the new importers and re-deployed,
+etc.
 
 ## Limited parallelism
 
@@ -131,7 +135,7 @@ package runtime, and it has a very large linker object. So the entire
 build graph stalls waiting for package runtime's linker object, even
 though `go build -a -v std` never even invokes cmd/link.
 
-## Example: `go build -a -n runtime/cgo`
+### Example: `go build -a -n runtime/cgo`
 
 A related issue affects packages that use cgo and contain .c source
 files. Currently, all of the .c files need to be compiled into .o
