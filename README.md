@@ -53,11 +53,15 @@ advance, and amigo is no exception.
    flow between them, I anticipate we could further improve build
    concurrency.
 
+   This hypothesis is further elaborated in doc/parallelism.md.
+
 ## Questions
 
-Should amigo incorporate cmd/asm and/or cmd/cgo too? I think yes, but
-cmd/asm seems especially challenging to incorporate, without pulling
-in all of cmd/internal/obj.
+### cmd/asm
+
+Should amigo incorporate cmd/asm/asm too? I think yes, but cmd/asm
+seems especially challenging to incorporate, without pulling in all of
+cmd/internal/obj.
 
 I suspect something like LLVM bitstream's "abbreviations" will be
 applicable here. For each unique instruction shape, we can define a
