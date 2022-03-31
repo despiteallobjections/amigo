@@ -131,6 +131,29 @@ package runtime, and it has a very large linker object. So the entire
 build graph stalls waiting for package runtime's linker object, even
 though `go build -a -v std` never even invokes cmd/link.
 
+## Example: `go build -a -n runtime/cgo`
+
+A related issue affects packages that use cgo and contain .c source
+files. Currently, all of the .c files need to be compiled into .o
+files, which are then analyzed by `cgo -dynimport` to produce a
+`_cgo_import.go` source file that's compiled by cmd/compile.
+
+The `_cgo_import.go` file only contains compiler directives, which are
+in turn passed through verbatim in the `_go_.o` linker artifact for
+use by cmd/link. It isn't relevant to type checking or even the rest
+of the compiler.
+
+However, because of the current design of cmd/compile, compiling all
+of those .c files is on the critical path towards emitting the
+`__.PKGDEF` compiler artifact needed to compile dependent
+packages. For example, in `go build -a -n runtime/cgo`, you'll see
+that `runtime/cgo/gcc_util.c` is compiled before `cmd/compile` is
+invoked to compile runtime/cgo's Go source files.
+
+N.B., few Go packages actually import runtime/cgo, so this particular
+example isn't really a concern in practice. But it demonstrates a more
+general problem that can easily manifest in user packages.
+
 ## Solution
 
 The problem is dependency analysis between build steps is too coarse
@@ -149,6 +172,22 @@ linker artifacts, but aren't needed for type checking.
 Perhaps instead we split the "compiler artifact" into the
 "type-checker artifact" and the "inter-package optimization artifact",
 with additional phases for producing these artifacts.
+
+### cmd/cgo
+
+Similarly, `cgo -dynimport` could just directly create another linker
+artifact, rather than a Go source file. This would decouple the C
+compiles from the critical path of emitting the `__.PKGDEF` compiler
+artifact. (See go.dev/cl/328712.)
+
+That still leaves the C compiler invocations necessary for processing
+`import "C"` declarations and analyzing `C.xxx` references on the
+critical path for `__.PKGDEF`. While cgo types can appear in a
+package's exported API, I believe this is relatively uncommon in
+practice. If we integrate the cmd/cgo logic directly into the type
+checker, then it seems likely we could be lazy about actually invoking
+the C compiler, which in the common case would allow us to emit
+`__.PKGDEF` (and unblock downstream Go compilations) must sooner.
 
 ## Prior art
 
