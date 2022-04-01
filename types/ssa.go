@@ -68,25 +68,6 @@ type Member interface {
 	Type() Type                // type of the package member
 }
 
-// A SSAType is a Member of a Package representing a package-level named type.
-type SSAType struct {
-	object *TypeName
-}
-
-// A NamedConst is a Member of a Package representing a package-level
-// named constant.
-//
-// Pos() returns the position of the declaring syntax.ValueSpec.Names[*]
-// identifier.
-//
-// NB: a NamedConst is not a Value; it contains a constant Value, which
-// it augments with the name and position of its 'const' declaration.
-//
-type NamedConst struct {
-	object *Const
-	Value  *SSAConst
-}
-
 // A Value is an SSA value that can be referenced by an instruction.
 type Value interface {
 	// Name returns the name of this value, and determines how
@@ -1456,20 +1437,6 @@ func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
-func (t *SSAType) Name() string                   { return t.object.Name() }
-func (t *SSAType) Pos() Pos                       { return t.object.Pos() }
-func (t *SSAType) Type() Type                     { return t.object.Type() }
-func (t *SSAType) Object() Object                 { return t.object }
-func (t *SSAType) String() string                 { return t.RelString(nil) }
-func (t *SSAType) RelString(from *Package) string { return relString(t, from) }
-
-func (c *NamedConst) Name() string                   { return c.object.Name() }
-func (c *NamedConst) Pos() Pos                       { return c.object.Pos() }
-func (c *NamedConst) String() string                 { return c.RelString(nil) }
-func (c *NamedConst) Type() Type                     { return c.object.Type() }
-func (c *NamedConst) Object() Object                 { return c.object }
-func (c *NamedConst) RelString(from *Package) string { return relString(c, from) }
-
 func (d *DebugRef) Object() Object { return d.object }
 
 // Func returns the package-level function of the specified name,
@@ -1485,22 +1452,6 @@ func (p *SSAPackage) Func(name string) (f *Function) {
 //
 func (p *SSAPackage) Var(name string) (g *Global) {
 	g, _ = p.Members[name].(*Global)
-	return
-}
-
-// Const returns the package-level constant of the specified name,
-// or nil if not found.
-//
-func (p *SSAPackage) Const(name string) (c *NamedConst) {
-	c, _ = p.Members[name].(*NamedConst)
-	return
-}
-
-// Type returns the package-level type of the specified name,
-// or nil if not found.
-//
-func (p *SSAPackage) Type(name string) (t *SSAType) {
-	t, _ = p.Members[name].(*SSAType)
 	return
 }
 

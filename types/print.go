@@ -399,20 +399,20 @@ func WritePackage(buf *bytes.Buffer, p *SSAPackage) {
 	sort.Strings(names)
 	for _, name := range names {
 		switch mem := p.Members[name].(type) {
-		case *NamedConst:
-			fmt.Fprintf(buf, "  const %-*s %s = %s\n",
-				maxname, name, mem.Name(), mem.Value.RelString(from))
+		// case *NamedConst:
+		// 	fmt.Fprintf(buf, "  const %-*s %s = %s\n",
+		// 		maxname, name, mem.Name(), mem.Value.RelString(from))
 
 		case *Function:
 			fmt.Fprintf(buf, "  func  %-*s %s\n",
 				maxname, name, relType(mem.Type(), from))
 
-		case *SSAType:
-			fmt.Fprintf(buf, "  type  %-*s %s\n",
-				maxname, name, relType(mem.Type().Underlying(), from))
-			for _, meth := range IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {
-				fmt.Fprintf(buf, "    %s\n", SelectionString(meth, RelativeTo(from)))
-			}
+		// case *SSAType:
+		// 	fmt.Fprintf(buf, "  type  %-*s %s\n",
+		// 		maxname, name, relType(mem.Type().Underlying(), from))
+		// 	for _, meth := range IntuitiveMethodSet(mem.Type(), &p.Prog.MethodSets) {
+		// 		fmt.Fprintf(buf, "    %s\n", SelectionString(meth, RelativeTo(from)))
+		// 	}
 
 		case *Global:
 			fmt.Fprintf(buf, "  var   %-*s %s\n",

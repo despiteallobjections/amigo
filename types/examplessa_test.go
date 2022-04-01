@@ -84,7 +84,6 @@ func Example_buildPackage() {
 	//   func  init       func()
 	//   var   init$guard bool
 	//   func  main       func()
-	//   const message    message = "Hello, World!":untyped string
 	//
 	// # Name: hello.init
 	// # Package: hello

@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/mdempsky/amigo/importer"
@@ -102,25 +101,25 @@ func main() {
 					t.Errorf("function %s is empty", mem)
 				}
 
-			case *types.SSAType:
-				// Methods of named types T.
-				// (In this test, all exported methods belong to *T not T.)
-				if !isExt {
-					t.Fatalf("unexpected name type in main package: %s", mem)
-				}
-				mset := prog.MethodSets.MethodSet(NewPointer(mem.Type()))
-				for i, n := 0, mset.Len(); i < n; i++ {
-					m := prog.MethodValue(mset.At(i))
-					// For external types, only synthetic wrappers have code.
-					expExt := !strings.Contains(m.Synthetic, "wrapper")
-					if expExt && !isEmpty(m) {
-						t.Errorf("external method %s is non-empty: %s",
-							m, m.Synthetic)
-					} else if !expExt && isEmpty(m) {
-						t.Errorf("method function %s is empty: %s",
-							m, m.Synthetic)
-					}
-				}
+				// case *types.SSAType:
+				// 	// Methods of named types T.
+				// 	// (In this test, all exported methods belong to *T not T.)
+				// 	if !isExt {
+				// 		t.Fatalf("unexpected name type in main package: %s", mem)
+				// 	}
+				// 	mset := prog.MethodSets.MethodSet(NewPointer(mem.Type()))
+				// 	for i, n := 0, mset.Len(); i < n; i++ {
+				// 		m := prog.MethodValue(mset.At(i))
+				// 		// For external types, only synthetic wrappers have code.
+				// 		expExt := !strings.Contains(m.Synthetic, "wrapper")
+				// 		if expExt && !isEmpty(m) {
+				// 			t.Errorf("external method %s is non-empty: %s",
+				// 				m, m.Synthetic)
+				// 		} else if !expExt && isEmpty(m) {
+				// 			t.Errorf("method function %s is empty: %s",
+				// 				m, m.Synthetic)
+				// 		}
+				// 	}
 			}
 		}
 	}

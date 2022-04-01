@@ -51,20 +51,8 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			panic("unexpected builtin object: " + obj.String())
 		}
 
-	case *TypeName:
-		t := &SSAType{
-			object: obj,
-		}
-		obj.member = t
-		pkg.Members[name] = t
-
-	case *Const:
-		c := &NamedConst{
-			object: obj,
-			Value:  NewSSAConst(obj.Val(), obj.Type()),
-		}
-		obj.member = c
-		pkg.Members[name] = c
+	case *Const, *TypeName:
+		// ignore
 
 	case *Var:
 		g := &Global{

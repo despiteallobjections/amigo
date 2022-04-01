@@ -650,7 +650,7 @@ func Interpret(mainpkg *types.SSAPackage, mode Mode, sizes types.Sizes, filename
 	if runtimePkg == nil {
 		panic("ssa.Program doesn't include runtime package")
 	}
-	i.runtimeErrorString = runtimePkg.Type("errorString").Object().Type()
+	i.runtimeErrorString = runtimePkg.Pkg.Scope().Lookup("errorString").(*types.TypeName).Type()
 
 	initReflect(i)
 

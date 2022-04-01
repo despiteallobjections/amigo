@@ -2285,9 +2285,22 @@ func (p *SSAPackage) build() {
 	// Ensure we have runtime type info for all exported members.
 	// TODO(adonovan): ideally belongs in memberFromObject, but
 	// that would require package creation in topological order.
-	for name, mem := range p.Members {
+	pkgScope := p.Pkg.Scope()
+	for _, name := range pkgScope.Names() {
 		if token.IsExported(name) {
-			p.Prog.needMethodsOf(mem.Type())
+			obj := pkgScope.Lookup(name)
+			typ := obj.Type()
+
+			// TestRuntimeTypes expects to see *T in the list of runtime
+			// types whene there's a global variable of type T.
+			//
+			// TODO(mdempsky): Is that important? Can we just update the
+			// test expectations instead?
+			if _, ok := obj.(*Var); ok {
+				typ = NewPointer(typ)
+			}
+
+			p.Prog.needMethodsOf(typ)
 		}
 	}
 
@@ -2337,7 +2350,7 @@ func (p *SSAPackage) build() {
 			}
 			b.assign(init, lval, varinit.Rhs, true, nil)
 		} else {
-			// n:1 initialization: var x, y :=  f()
+			// n:1 initialization: var x, y = f()
 			tuple := b.exprN(init, varinit.Rhs)
 			for i, v := range varinit.Lhs {
 				if v.Name() == "_" {
