@@ -294,13 +294,7 @@ func (f *Function) finishBody() {
 	f.objects = nil
 	f.currentBlock = nil
 	f.lblocks = nil
-
-	// Don't pin the AST in memory (except in debug mode).
-	if n := f.syntax; n != nil && !f.debugInfo() {
-		_ = 0
-		// panic("TODO")
-		// f.syntax = extentNode{n.Pos(), n.End()}
-	}
+	f.syntax = nil
 
 	// Remove from f.Locals any Allocs that escape to the heap.
 	j := 0
@@ -667,19 +661,3 @@ func (f *Function) newBasicBlock(comment string) *BasicBlock {
 func (prog *Program) NewFunction(name string, sig *Signature, provenance string) *Function {
 	return &Function{Prog: prog, name: name, Signature: sig, Synthetic: provenance}
 }
-
-type extentNode [2]Pos
-
-func (n extentNode) Pos() Pos { return n[0] }
-func (n extentNode) End() Pos { return n[1] }
-
-// Syntax returns an syntax.Node whose Pos/End methods provide the
-// lexical extent of the function if it was defined by Go source code
-// (f.Synthetic==""), or nil otherwise.
-//
-// If f was built with debug information (see Package.SetDebugRef),
-// the result is the *syntax.FuncDecl or *syntax.FuncLit that declared the
-// function.  Otherwise, it is an opaque Node providing only position
-// information; this avoids pinning the AST in memory.
-//
-func (f *Function) Syntax() Node { return f.syntax }
