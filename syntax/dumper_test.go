@@ -6,9 +6,13 @@ package syntax
 
 import (
 	"testing"
+
+	"github.com/mdempsky/amigo/testenv"
 )
 
 func TestDump(t *testing.T) {
+	testenv.Noisy(t)
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}

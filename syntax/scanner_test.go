@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/mdempsky/amigo/testenv"
 )
 
 // errh is a default error handler for basic tests.
@@ -52,6 +54,8 @@ func TestTokens(t *testing.T) {
 }
 
 func TestScanner(t *testing.T) {
+	testenv.Noisy(t)
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}

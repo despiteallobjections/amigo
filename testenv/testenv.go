@@ -25,3 +25,5 @@ func NeedsTool(t testing.TB, tool string) {}
 func UsesGenerics(path string) bool       { return false }
 
 func ExitIfSmallMachine() {}
+
+func Noisy(t testing.TB) { t.Skip("skipping noisy test") }
