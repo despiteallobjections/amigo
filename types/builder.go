@@ -2168,18 +2168,13 @@ func (b *builder) buildFunction(fn *Function) {
 		return // building already started
 	}
 
-	var recvField *Field
 	var body *BlockStmt
-	var functype *FuncType
 	switch n := fn.syntax.(type) {
 	case nil:
 		return // not a Go source function.  (Synthetic, or from object file.)
 	case *FuncDecl:
-		functype = n.Type
-		recvField = n.Recv
 		body = n.Body
 	case *FuncLit:
-		functype = n.Type
 		body = n.Body
 	default:
 		panic(n)
@@ -2209,7 +2204,7 @@ func (b *builder) buildFunction(fn *Function) {
 		defer logStack("build function %s @ %s", fn, fn.pos)()
 	}
 	fn.startBody()
-	fn.createSyntacticParams(recvField, functype)
+	fn.createSyntacticParams()
 	b.stmt(fn, body)
 	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
 		// Control fell off the end of the function's body block.

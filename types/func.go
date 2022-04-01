@@ -169,7 +169,22 @@ func (f *Function) labelledBlock(label *Name) *lblock {
 // addParamObj adds a (non-escaping) parameter to f.Params for the
 // specified Var.
 //
-func (f *Function) addParamObj(obj *Var) *Parameter {
+func (f *Function) addParamObj(obj *Var) { f.addParam(obj, false) }
+
+// addSpilledParam declares a parameter that is pre-spilled to the
+// stack; the function body will load/store the spilled location.
+// Subsequent lifting will eliminate spills where possible.
+//
+func (f *Function) addSpilledParam(obj *Var) { f.addParam(obj, true) }
+
+// addParamObj adds a (non-escaping) parameter to f.Params for the
+// specified Var.
+//
+// If spill is true, then the parameter is pre-spilled to the stack;
+// the function body will load/store the spilled location. Subsequent
+// lifting will eliminate spills where possible.
+//
+func (f *Function) addParam(obj *Var, spill bool) {
 	name := obj.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Params))
@@ -180,22 +195,16 @@ func (f *Function) addParamObj(obj *Var) *Parameter {
 		parent: f,
 	}
 	f.Params = append(f.Params, param)
-	return param
-}
 
-// addSpilledParam declares a parameter that is pre-spilled to the
-// stack; the function body will load/store the spilled location.
-// Subsequent lifting will eliminate spills where possible.
-//
-func (f *Function) addSpilledParam(obj *Var) {
-	param := f.addParamObj(obj)
-	spill := &Alloc{Comment: obj.Name()}
-	spill.setType(NewPointer(obj.Type()))
-	spill.setPos(obj.Pos())
-	f.objects[obj] = spill
-	f.Locals = append(f.Locals, spill)
-	f.emit(spill)
-	f.emit(&Store{Addr: spill, Val: param})
+	if spill {
+		alloc := &Alloc{Comment: obj.Name()}
+		alloc.setType(NewPointer(obj.Type()))
+		alloc.setPos(obj.Pos())
+		f.objects[obj] = alloc
+		f.Locals = append(f.Locals, alloc)
+		f.emit(alloc)
+		f.emit(&Store{Addr: alloc, Val: param})
+	}
 }
 
 // startBody initializes the function prior to generating SSA code for its body.
@@ -215,35 +224,25 @@ func (f *Function) startBody() {
 // Postcondition:
 // len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
 //
-func (f *Function) createSyntacticParams(recv *Field, functype *FuncType) {
-	if recv != nil {
-		if recv.Name != nil {
-			f.addSpilledParam(f.Pkg.info.Defs[recv.Name].(*Var))
-		} else {
-			// Anonymous receiver?  No need to spill.
-			f.addParamObj(f.Signature.Recv())
-		}
+func (f *Function) createSyntacticParams() {
+	if recv := f.Signature.Recv(); recv != nil {
+		f.addParam(recv, recv.Name() != "")
 	}
 
 	// Parameters.
-	if functype.ParamList != nil {
-		for i, field := range functype.ParamList {
-			if field.Name != nil {
-				f.addSpilledParam(f.Pkg.info.Defs[field.Name].(*Var))
-			} else {
-				// Anonymous parameter?  No need to spill.
-				f.addParamObj(f.Signature.Params().At(i))
-			}
-		}
+	params := f.Signature.Params()
+	for i := 0; i < params.Len(); i++ {
+		param := params.At(i)
+		f.addParam(param, param.Name() != "")
 	}
 
 	// Named results.
-	if functype.ResultList != nil {
-		for _, field := range functype.ResultList {
+	results := f.Signature.Results()
+	for i := 0; i < results.Len(); i++ {
+		result := results.At(i)
+		if result.Name() != "" {
 			// Implicit "var" decl of locals for named results.
-			if field.Name != nil {
-				f.namedResults = append(f.namedResults, f.addLocalForIdent(field.Name))
-			}
+			f.namedResults = append(f.namedResults, f.addNamedLocal(result))
 		}
 	}
 }
