@@ -2306,7 +2306,7 @@ func (p *SSAPackage) build() {
 
 	var b builder
 
-	init := p.init
+	init := p.Init.member
 	init.startBody()
 
 	var done *BasicBlock
@@ -2327,7 +2327,7 @@ func (p *SSAPackage) build() {
 				panic(fmt.Sprintf("Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called", p.Pkg.Path(), pkg.Path()))
 			}
 			var v Call
-			v.Call.Value = prereq.init
+			v.Call.Value = prereq.Init.member
 			v.Call.pos = init.pos
 			v.setType(NewTuple())
 			init.emit(&v)

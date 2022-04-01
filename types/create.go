@@ -161,8 +161,8 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		Prog:      prog,
 	}
 	obj.member = fn
-	p.init = fn
-	p.Members[p.init.name] = fn
+	p.Init = obj
+	p.Members[fn.name] = fn
 
 	// CREATE phase.
 	// Allocate all package members: vars, funcs, consts and types.
@@ -199,6 +199,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 			typ:    NewPointer(obj.Type()), // address
 		}
 		obj.member = initguard
+		p.InitGuard = obj
 		p.Members[initguard.Name()] = initguard
 	}
 

@@ -40,11 +40,19 @@ type Program struct {
 // and unspecified other things too.
 //
 type SSAPackage struct {
-	Prog    *Program          // the owning program
-	Pkg     *Package          // the corresponding github.com/mdempsky/amigo/types.Package
-	Members map[string]Member // all package members keyed by name (incl. init and init#%d)
-	init    *Function         // Func("init"); the package's init function
-	debug   bool              // include full debug info in this package
+	Prog *Program // the owning program
+	Pkg  *Package // the corresponding github.com/mdempsky/amigo/types.Package
+
+	// all package members keyed by name (incl. init and init#%d)
+	//
+	// Deprecated: Use Pkg.Scope() instead, but beware it does not
+	// include Init or InitGuard.
+	Members map[string]Member
+
+	Init      *Func // the package's synthetic init function
+	InitGuard *Var  // the package's synthetic initializer guard
+
+	debug bool // include full debug info in this package
 
 	// The following fields are set transiently, then cleared
 	// after building.
