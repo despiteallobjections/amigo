@@ -398,6 +398,11 @@ func NewFunc(pos Pos, pkg *Package, name string, sig *Signature) *Func {
 	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, false}
 }
 
+// NewFuncLit returns a new function representing a function literal.
+func NewFuncLit(pos Pos, pkg *Package, sig *Signature) *Func {
+	return NewFunc(pos, pkg, "<function literal>", sig)
+}
+
 // FullName returns the package- or receiver-type-qualified name of
 // function or method obj.
 func (obj *Func) FullName() string {

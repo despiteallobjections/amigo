@@ -716,7 +716,7 @@ func (check *Checker) funcDecl(obj *Func, decl *declInfo) {
 	// (functions implemented elsewhere have no body)
 	if !check.conf.IgnoreFuncBodies && fdecl.Body != nil {
 		check.later(func() {
-			check.funcBody(decl, obj.name, sig, fdecl.Body, nil)
+			check.funcBody(decl, obj, fdecl.Body, nil)
 		}).describef(obj, "func %s", obj.name)
 	}
 }

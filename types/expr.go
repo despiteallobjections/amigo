@@ -1317,6 +1317,9 @@ func (check *Checker) exprInternal(x *operand, e Expr, hint Type) exprKind {
 
 	case *FuncLit:
 		if sig, ok := check.typ(e.Type).(*Signature); ok {
+			obj := NewFuncLit(e.Pos(), check.pkg, sig)
+			// TODO(mdempsky): Record obj in check.Info.
+
 			if !check.conf.IgnoreFuncBodies && e.Body != nil {
 				// Anonymous functions are considered part of the
 				// init expression/func declaration which contains
@@ -1328,7 +1331,7 @@ func (check *Checker) exprInternal(x *operand, e Expr, hint Type) exprKind {
 				// body refers. Instead, type-check as soon as possible,
 				// but before the enclosing scope contents changes (#22992).
 				check.later(func() {
-					check.funcBody(decl, "<function literal>", sig, e.Body, iota)
+					check.funcBody(decl, obj, e.Body, iota)
 				}).describef(e, "func literal")
 			}
 			x.mode = value
