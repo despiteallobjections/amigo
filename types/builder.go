@@ -2344,7 +2344,7 @@ func (p *SSAPackage) build() {
 			// 1:1 initialization: var x, y = a(), b()
 			var lval lvalue
 			if v := varinit.Lhs[0]; v.Name() != "_" {
-				lval = &address{addr: p.values[v].(*Global), pos: v.Pos()}
+				lval = &address{addr: v.member, pos: v.Pos()}
 			} else {
 				lval = blank{}
 			}
@@ -2356,7 +2356,7 @@ func (p *SSAPackage) build() {
 				if v.Name() == "_" {
 					continue
 				}
-				emitStore(init, p.values[v].(*Global), emitExtract(init, tuple, i), v.Pos())
+				emitStore(init, v.member, emitExtract(init, tuple, i), v.Pos())
 			}
 		}
 	}

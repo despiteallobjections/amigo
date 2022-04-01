@@ -43,7 +43,6 @@ type SSAPackage struct {
 	Prog    *Program          // the owning program
 	Pkg     *Package          // the corresponding github.com/mdempsky/amigo/types.Package
 	Members map[string]Member // all package members keyed by name (incl. init and init#%d)
-	values  map[Object]Value  // package members (incl. methods), keyed by object
 	init    *Function         // Func("init"); the package's init function
 	debug   bool              // include full debug info in this package
 

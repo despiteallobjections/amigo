@@ -60,7 +60,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			typ:    NewPointer(obj.Type()), // address
 		}
 		obj.member = g
-		pkg.values[obj] = g
 		pkg.Members[name] = g
 
 	case *Func:
@@ -83,7 +82,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 		}
 
 		obj.member = fn
-		pkg.values[obj] = fn
 		if sig.Recv() == nil {
 			pkg.Members[name] = fn // package-level function
 		}
@@ -146,7 +144,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 	p := &SSAPackage{
 		Prog:    prog,
 		Members: make(map[string]Member),
-		values:  make(map[Object]Value),
 		Pkg:     pkg,
 		info:    info,  // transient (CREATE and BUILD phases)
 		files:   files, // transient (CREATE and BUILD phases)
