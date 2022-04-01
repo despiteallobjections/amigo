@@ -341,7 +341,7 @@ func (b *builder) addr(fn *Function, e Expr, escaping bool) lvalue {
 		if isBlankIdent(e) {
 			return blank{}
 		}
-		obj := fn.Pkg.objectOf(e)
+		obj := fn.Pkg.objectOf(e).(*Var)
 		v := fn.Prog.packageLevelValue(obj) // var (address)
 		if v == nil {
 			v = fn.lookup(obj, escaping)
@@ -696,7 +696,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			return v // (func)
 		}
 		// Local var.
-		return emitLoad(fn, fn.lookup(obj, false)) // var (address)
+		return emitLoad(fn, fn.lookup(obj.(*Var), false)) // var (address)
 
 	case *SelectorExpr:
 		sel, ok := fn.Pkg.info.Selections[e]

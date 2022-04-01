@@ -203,7 +203,7 @@ func (f *Function) addSpilledParam(obj *Var) {
 //
 func (f *Function) startBody() {
 	f.currentBlock = f.newBasicBlock("entry")
-	f.objects = make(map[Object]Value) // needed for some synthetics, e.g. init
+	f.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
 }
 
 // createSyntacticParams populates f.Params and generates code (spills
@@ -227,13 +227,12 @@ func (f *Function) createSyntacticParams(recv *Field, functype *FuncType) {
 
 	// Parameters.
 	if functype.ParamList != nil {
-		n := len(f.Params) // 1 if has recv, 0 otherwise
-		for _, field := range functype.ParamList {
+		for i, field := range functype.ParamList {
 			if field.Name != nil {
 				f.addSpilledParam(f.Pkg.info.Defs[field.Name].(*Var))
 			} else {
 				// Anonymous parameter?  No need to spill.
-				f.addParamObj(f.Signature.Params().At(len(f.Params) - n))
+				f.addParamObj(f.Signature.Params().At(i))
 			}
 		}
 	}
@@ -404,7 +403,7 @@ func (f *Function) addLocal(typ Type, pos Pos) *Alloc {
 // If escaping, the reference comes from a potentially escaping pointer
 // expression and the referent must be heap-allocated.
 //
-func (f *Function) lookup(obj Object, escaping bool) Value {
+func (f *Function) lookup(obj *Var, escaping bool) Value {
 	if v, ok := f.objects[obj]; ok {
 		if alloc, ok := v.(*Alloc); ok && escaping {
 			alloc.Heap = true
