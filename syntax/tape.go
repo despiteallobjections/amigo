@@ -35,10 +35,9 @@ type tapescanner struct {
 
 	tapeelem
 
-	file   *PosBase
-	errh   ErrorHandler
-	pragh  PragmaHandler
-	pragma Pragma // pragmas
+	file  *PosBase
+	errh  ErrorHandler
+	pragh PragmaHandler
 
 	base   *PosBase // current position base
 	first  error    // first error encountered
@@ -51,12 +50,15 @@ func (s *tapescanner) init(src string, mode uint) {
 
 	var old scanner
 	old.init(src, func(pos spos, msg string) {
-		s.tape = append(s.tape, tapeelem{spos: pos, tok: _Error, lit: msg})
+		elem := old.tapeelem // necessary at least to capture old.blank, which is used in errh0 below
+		elem.spos = pos
+		elem.tok = _Error
+		elem.lit = msg
+		s.tape = append(s.tape, elem)
 	}, mode)
 
 	var stack []int // stack of open punctuation token indices
 	for {
-		old.tapeelem = tapeelem{} // minimize tape garbage
 		old.next()
 		old.link = -1
 
@@ -140,7 +142,16 @@ func (s *tapescanner) errh0(pos0 spos, msg string) {
 
 	// go: directive (but be conservative and test)
 	if s.pragh != nil && strings.HasPrefix(text, "go:") {
-		s.pragma = s.pragh(s.posAt(pos0.line, pos0.col+2), s.blank, text, s.pragma) // +2 to skip over // or /*
+		pos := s.posAt(pos0.line, pos0.col+2)
+		// TODO(mdempsky): This is the only use of blank. Since amigo
+		// keeps the full source file around anyway and pos0 provides us
+		// the byte offset, maybe it makes more sense to just scan
+		// backwards looking for non-space characters before the comment.
+		if !s.blank {
+			s.errorAt(pos, "misplaced compiler directive")
+		} else {
+			s.pragh.Add(pos, text)
+		}
 	}
 }
 

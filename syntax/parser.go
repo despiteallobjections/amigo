@@ -36,8 +36,8 @@ type asyncCall struct {
 }
 
 func (p *parser) capture(fn func()) asyncCall {
-	if p.pragma != nil {
-		panic("pending pragma before async call")
+	if p.pragh != nil && p.pragh.Take() != nil {
+		panic("current Pragma before async call")
 	}
 
 	return asyncCall{
@@ -61,8 +61,8 @@ func (call asyncCall) do(p *parser) {
 
 	call.fn()
 
-	if p.pragma != nil {
-		panic("pending pragma after async call")
+	if p.pragh != nil && p.pragh.Take() != nil {
+		panic("current Pragma after async call")
 	}
 
 	p.checkLinks(call.open)
@@ -78,7 +78,6 @@ func (p *parser) init(file *PosBase, src string, errh ErrorHandler, pragh Pragma
 	p.base = file
 	p.first = nil
 	p.errcnt = 0
-	p.pragma = nil
 
 	p.fnest = 0
 	p.xnest = 0
@@ -104,9 +103,10 @@ func (p *parser) allowGenerics() bool { return p.mode&AllowGenerics != 0 }
 // takePragma returns the current parsed pragmas
 // and clears them from the parser state.
 func (p *parser) takePragma() Pragma {
-	prag := p.pragma
-	p.pragma = nil
-	return prag
+	if p.pragh != nil {
+		return p.pragh.Take()
+	}
+	return nil
 }
 
 // clearPragma is called at the end of a statement or
@@ -114,9 +114,8 @@ func (p *parser) takePragma() Pragma {
 // It sends the pragma back to the pragma handler
 // to be reported as unused.
 func (p *parser) clearPragma() {
-	if p.pragma != nil {
-		p.pragh(p.pos(), p.blank, "", p.pragma)
-		p.pragma = nil
+	if p.pragh != nil {
+		p.pragh.Reset()
 	}
 }
 

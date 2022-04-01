@@ -43,18 +43,19 @@ type ErrorHandler func(err error)
 type Pragma interface{}
 
 // A PragmaHandler is used to process //go: directives while scanning.
-// It is passed the current pragma value, which starts out being nil,
-// and it returns an updated pragma value.
-// The text is the directive, with the "//" prefix stripped.
-// The current pragma is saved at each package, import, const, func, type, or var
-// declaration, into the File, ImportDecl, ConstDecl, FuncDecl, TypeDecl, or VarDecl node.
-//
-// If text is the empty string, the pragma is being returned
-// to the handler unused, meaning it appeared before a non-declaration.
-// The handler may wish to report an error. In this case, pos is the
-// current parser position, not the position of the pragma itself.
-// Blank specifies whether the line is blank before the pragma.
-type PragmaHandler func(pos Pos, blank bool, text string, current Pragma) Pragma
+type PragmaHandler interface {
+	// Add adds a new pragma.
+	// The text is the directive, with the "//" prefix stripped.
+	Add(pos Pos, text string)
+
+	// Take returns the current Pragma to apply to the next package,
+	// import, const, func, type, or var declaration.
+	Take() Pragma
+
+	// Reset clears the current Pragma, if any, because it appeared
+	// before a non-declaration. The handler may wish to report errors.
+	Reset()
+}
 
 // Parse parses a single Go source file from src and returns the corresponding
 // syntax tree. If there are errors, Parse will return the first error found,
