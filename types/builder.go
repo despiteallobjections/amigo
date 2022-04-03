@@ -2259,33 +2259,40 @@ func (prog *Program) Build() {
 func (p *SSAPackage) Build(prog *Program) { p.buildOnce.Do(func() { p.build(prog) }) }
 
 func (p *SSAPackage) build(prog *Program) {
-	info := p.info
+	info, files := p.info, p.files
 	if info == nil {
 		return // synthetic package, e.g. "testmain"
 	}
+	p.info, p.files = nil, nil
 
 	if prog.mode&LogSource != 0 {
 		defer logStack("build %s", p)()
 	}
 
-	// Build all package-level functions, init functions, and methods.
-	// We build them in source order, but it's not significant.
-	for _, file := range p.files {
-		for _, decl := range file.DeclList {
-			if decl, ok := decl.(*FuncDecl); ok {
-				if obj := info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					prog.buildFunction(info, p.values[obj].(*Function), decl.Body)
+	build := func(obj *Func) {
+		prog.buildFunction(info, p.values[obj].(*Function), obj.body)
+	}
+
+	pkgScope := p.Pkg.Scope()
+	for _, name := range pkgScope.Names() {
+		obj := pkgScope.Lookup(name)
+
+		// Build all package-level functions, init functions, and methods.
+		switch obj := obj.(type) {
+		case *Func:
+			build(obj)
+		case *TypeName:
+			if named, ok := obj.Type().(*Named); ok {
+				for i := 0; i < named.NumMethods(); i++ {
+					build(named.Method(0))
 				}
 			}
 		}
-	}
 
-	// Ensure we have runtime type info for all exported members.
-	// TODO(adonovan): ideally belongs in memberFromObject, but
-	// that would require package creation in topological order.
-	// TODO(mdempsky): Why would that require topological order?
-	pkgScope := p.Pkg.Scope()
-	for _, name := range pkgScope.Names() {
+		// Ensure we have runtime type info for all exported members.
+		// TODO(adonovan): ideally belongs in memberFromObject, but
+		// that would require package creation in topological order.
+		// TODO(mdempsky): Why would that require topological order?
 		if token.IsExported(name) {
 			obj := pkgScope.Lookup(name)
 			typ := obj.Type()
@@ -2303,7 +2310,7 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 	}
 
-	prog.build(p.Init, info, func(b *builder) {
+	prog.build(p.InitFunc, info, func(b *builder) {
 		var done *BasicBlock
 
 		if prog.mode&BareInits == 0 {
@@ -2322,7 +2329,7 @@ func (p *SSAPackage) build(prog *Program) {
 					panic(fmt.Sprintf("Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called", p.Pkg.Path(), pkg.Path()))
 				}
 				var v Call
-				v.Call.Value = prereq.Init
+				v.Call.Value = prereq.InitFunc
 				v.Call.pos = b.Fn.Pos() // TODO(mdempsky): Use `import` declaration position?
 				v.setType(NewTuple())
 				b.emit(&v)
@@ -2357,7 +2364,7 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 
 		// Call user declared init functions in source order.
-		for _, file := range p.files {
+		for _, file := range files {
 			for _, decl := range file.DeclList {
 				if decl, ok := decl.(*FuncDecl); ok && decl.Recv == nil && decl.Name.Value == "init" {
 					obj := b.info.Defs[decl.Name].(*Func)
@@ -2377,8 +2384,6 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 		b.emit(new(Return))
 	})
-
-	p.info = nil // We no longer need ASTs or github.com/mdempsky/amigo/types deductions.
 
 	if prog.mode&SanityCheckFunctions != 0 {
 		sanityCheckPackage(p)

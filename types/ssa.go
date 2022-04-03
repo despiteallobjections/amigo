@@ -47,7 +47,7 @@ type SSAPackage struct {
 
 	values map[Object]Value
 
-	Init      *Function // the package's synthetic init function
+	InitFunc  *Function // the package's synthetic init function
 	InitGuard *Global   // the package's synthetic initializer guard
 
 	// The following fields are set transiently, then cleared

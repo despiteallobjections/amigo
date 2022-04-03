@@ -13,9 +13,10 @@ import (
 	. "github.com/mdempsky/amigo/syntax"
 )
 
-func (check *Checker) funcBody(decl *declInfo, obj *Func, body *BlockStmt, iota constant.Value) {
+func (check *Checker) funcBody(decl *declInfo, obj *Func, iota constant.Value) {
 	name := obj.Name()
 	sig := obj.Type().(*Signature)
+	body := obj.body
 
 	if check.conf.IgnoreFuncBodies {
 		panic("function body not ignored")

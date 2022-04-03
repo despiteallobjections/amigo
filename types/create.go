@@ -152,7 +152,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		Synthetic: "package initializer",
 		Pkg:       p,
 	}
-	p.Init = fn
+	p.InitFunc = fn
 	p.Members[fn.name] = fn
 
 	// CREATE phase.

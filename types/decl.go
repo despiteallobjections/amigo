@@ -707,6 +707,7 @@ func (check *Checker) funcDecl(obj *Func, decl *declInfo) {
 	fdecl := decl.fdecl
 	check.funcType(sig, fdecl.Recv, fdecl.TParamList, fdecl.Type)
 	obj.color_ = saved
+	obj.body = fdecl.Body
 
 	if len(fdecl.TParamList) > 0 && fdecl.Body == nil {
 		check.softErrorf(fdecl, "parameterized function is missing function body")
@@ -716,7 +717,7 @@ func (check *Checker) funcDecl(obj *Func, decl *declInfo) {
 	// (functions implemented elsewhere have no body)
 	if !check.conf.IgnoreFuncBodies && fdecl.Body != nil {
 		check.later(func() {
-			check.funcBody(decl, obj, fdecl.Body, nil)
+			check.funcBody(decl, obj, nil)
 		}).describef(obj, "func %s", obj.name)
 	}
 }

@@ -689,7 +689,7 @@ func Interpret(prog *types.Program, mainpkg *types.SSAPackage, mode Mode, sizes 
 	}()
 
 	// Run!
-	call(i, nil, syntax.NoPos, mainpkg.Func("init"), nil)
+	call(i, nil, syntax.NoPos, mainpkg.InitFunc, nil)
 	if mainFn := mainpkg.Func("main"); mainFn != nil {
 		call(i, nil, syntax.NoPos, mainFn, nil)
 		exitCode = 0

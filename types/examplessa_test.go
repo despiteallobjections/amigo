@@ -75,7 +75,7 @@ func Example_buildPackage() {
 	hello.WriteTo(os.Stdout)
 
 	// Print out the package-level functions.
-	hello.Func("init").WriteTo(os.Stdout)
+	hello.InitFunc.WriteTo(os.Stdout)
 	hello.Func("main").WriteTo(os.Stdout)
 
 	// Output:

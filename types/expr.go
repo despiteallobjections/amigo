@@ -1318,6 +1318,7 @@ func (check *Checker) exprInternal(x *operand, e Expr, hint Type) exprKind {
 	case *FuncLit:
 		if sig, ok := check.typ(e.Type).(*Signature); ok {
 			obj := NewFuncLit(e.Pos(), check.pkg, sig)
+			obj.body = e.Body
 			check.recordImplicit(e, obj)
 
 			if !check.conf.IgnoreFuncBodies && e.Body != nil {
@@ -1331,7 +1332,7 @@ func (check *Checker) exprInternal(x *operand, e Expr, hint Type) exprKind {
 				// body refers. Instead, type-check as soon as possible,
 				// but before the enclosing scope contents changes (#22992).
 				check.later(func() {
-					check.funcBody(decl, obj, e.Body, iota)
+					check.funcBody(decl, obj, iota)
 				}).describef(e, "func literal")
 			}
 			x.mode = value
