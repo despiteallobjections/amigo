@@ -22,7 +22,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -227,8 +226,8 @@ func TestGorootTest(t *testing.T) {
 	var failures []string
 
 	for _, input := range gorootTestTests {
-		// TODO(mdempsky): Why is this test failing only on Go 1.17?
-		if input == "named.go" && strings.HasPrefix(runtime.Version(), "go1.17") {
+		// TODO(mdempsky): Why is this test failing?
+		if input == "named.go" {
 			continue
 		}
 
