@@ -54,7 +54,6 @@ type SSAPackage struct {
 	// after building.
 	buildOnce sync.Once // ensures package building occurs once
 	info      *Info     // package type information
-	files     []*File   // package ASTs
 }
 
 // A Member is a member of a Go package, implemented by *NamedConst,

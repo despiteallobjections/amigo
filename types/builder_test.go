@@ -299,7 +299,7 @@ func init():
 		prog := ssautil.CreateProgram(lprog, test.mode)
 		mainPkg := prog.Package(lprog.Created[0].Pkg)
 		prog.Build()
-		initFunc := mainPkg.Func("init")
+		initFunc := mainPkg.InitFunc
 		if initFunc == nil {
 			t.Errorf("test 'package %s': no init function", f.PkgName.Value)
 			continue

@@ -1144,7 +1144,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 					sf := t.Field(i)
 					if sf.Name() == fname {
 						fieldIndex = i
-						pos = kv.Pos() /*Colon*/
+						pos = tokenPos(kv, "Colon")
 						e = kv.Value
 						break
 					}
@@ -1265,19 +1265,28 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 // labelled by label.
 //
 func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
-	// We treat SwitchStmt like a sequential if-else chain.
-	// Multiway dispatch can be recovered later by ssautil.Switches()
-	// to those cases that are free of side effects.
 	if s.Init != nil {
 		b.stmt(s.Init)
 	}
-	var tag Value = vTrue
-	if s.Tag != nil {
-		tag = b.expr(s.Tag)
-	}
+
 	done := b.newBasicBlock("switch.done")
 	if label != nil {
 		label._break = done
+	}
+
+	// We treat SwitchStmt like a sequential if-else chain.
+	// Multiway dispatch can be recovered later by ssautil.Switches()
+	// to those cases that are free of side effects.
+
+	var tag Value = vTrue
+	if s.Tag != nil {
+		if guard, ok := s.Tag.(*TypeSwitchGuard); ok {
+			// Actually a type switch.
+			b.typeSwitchStmt(s, guard, done)
+			return
+		}
+
+		tag = b.expr(s.Tag)
 	}
 	// We pull the default case (if present) down to the end.
 	// But each fallthrough label must point to the next
@@ -1350,12 +1359,7 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 // typeSwitchStmt emits to fn code for the type switch statement s, optionally
 // labelled by label.
 //
-func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
-	guard := s.Tag.(*TypeSwitchGuard)
-
-	// We treat TypeSwitchStmt like a sequential if-else chain.
-	// Multiway dispatch can be recovered later by ssautil.Switches().
-
+func (b *builder) typeSwitchStmt(s *SwitchStmt, guard *TypeSwitchGuard, done *BasicBlock) {
 	// Typeswitch lowering:
 	//
 	// var x X
@@ -1398,16 +1402,8 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
 	// 	goto done
 	// .done:
 
-	if s.Init != nil {
-		b.stmt(s.Init)
-	}
-
 	x := b.expr(guard.X)
 
-	done := b.newBasicBlock("typeswitch.done")
-	if label != nil {
-		label._break = done
-	}
 	var default_ *CaseClause
 	for _, clause := range s.Body {
 		cc := clause
@@ -1655,6 +1651,11 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 // labelled by label.
 //
 func (b *builder) forStmt(s *ForStmt, label *lblock) {
+	if clause, ok := s.Init.(*RangeClause); ok {
+		b.rangeStmt(s, clause, label)
+		return
+	}
+
 	//	...init...
 	//      jump loop
 	// loop:
@@ -1909,8 +1910,7 @@ func (b *builder) rangeChan(x Value, tk Type, pos Pos) (k Value, loop, done *Bas
 // rangeStmt emits to fn code for the range statement s, optionally
 // labelled by label.
 //
-func (b *builder) rangeStmt(s *ForStmt, label *lblock) {
-	clause := s.Init.(*RangeClause)
+func (b *builder) rangeStmt(s *ForStmt, clause *RangeClause, label *lblock) {
 	lhs := unpackExpr(clause.Lhs)
 
 	var tk, tv Type
@@ -1942,13 +1942,13 @@ func (b *builder) rangeStmt(s *ForStmt, label *lblock) {
 	var loop, done *BasicBlock
 	switch rt := x.Type().Underlying().(type) {
 	case *Slice, *Array, *Pointer:
-		k, v, loop, done = b.rangeIndexed(x, tv, s.Pos() /*For*/)
+		k, v, loop, done = b.rangeIndexed(x, tv, tokenPos(s, "For"))
 
 	case *Chan:
-		k, loop, done = b.rangeChan(x, tk, s.Pos() /*For*/)
+		k, loop, done = b.rangeChan(x, tk, tokenPos(s, "For"))
 
 	case *Map, *Basic:
-		k, v, loop, done = b.rangeIter(x, tk, tv, s.Pos() /*For*/)
+		k, v, loop, done = b.rangeIter(x, tk, tv, tokenPos(s, "For"))
 
 	default:
 		panic("Cannot range over: " + rt.String())
@@ -2019,7 +2019,7 @@ start:
 			Chan: b.expr(s.Chan),
 			X: b.emitConv(b.expr(s.Value),
 				b.typeOf(s.Chan).Underlying().(*Chan).Elem()),
-			pos: s.Pos(), /*Arrow*/
+			pos: tokenPos(s, "Arrow"),
 		})
 
 	case *AssignStmt:
@@ -2040,14 +2040,14 @@ start:
 		case Go:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
-			v := SSAGo{pos: s.Pos() /*Go*/}
+			v := SSAGo{pos: tokenPos(s, "Go")}
 			b.setCall(s.Call, &v.Call)
 			b.emit(&v)
 
 		case Defer:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
-			v := SSADefer{pos: s.Pos() /*Defer*/}
+			v := SSADefer{pos: tokenPos(s, "Defer")}
 			b.setCall(s.Call, &v.Call)
 			b.emit(&v)
 
@@ -2081,7 +2081,7 @@ start:
 			// Function has named result parameters (NRPs).
 			// Perform parallel assignment of return operands to NRPs.
 			for i, r := range results {
-				b.emitStore(b.namedResults[i], r, s.Pos() /*Return*/)
+				b.emitStore(b.namedResults[i], r, tokenPos(s, "Return"))
 			}
 		}
 		// Run function calls deferred in this
@@ -2094,7 +2094,7 @@ start:
 				results = append(results, b.emitLoad(r))
 			}
 		}
-		b.emit(&Return{Results: results, pos: s.Pos() /*Return*/})
+		b.emit(&Return{Results: results, pos: tokenPos(s, "Return")})
 		b.currentBlock = b.newBasicBlock("unreachable")
 
 	case *BranchStmt:
@@ -2156,21 +2156,13 @@ start:
 		b.currentBlock = done
 
 	case *SwitchStmt:
-		if _, ok := s.Tag.(*TypeSwitchGuard); ok {
-			b.typeSwitchStmt(s, label)
-		} else {
-			b.switchStmt(s, label)
-		}
+		b.switchStmt(s, label)
 
 	case *SelectStmt:
 		b.selectStmt(s, label)
 
 	case *ForStmt:
-		if _, ok := s.Init.(*RangeClause); ok {
-			b.rangeStmt(s, label)
-		} else {
-			b.forStmt(s, label)
-		}
+		b.forStmt(s, label)
 
 	default:
 		panic(fmt.Sprintf("unexpected statement kind: %T", s))
@@ -2259,11 +2251,11 @@ func (prog *Program) Build() {
 func (p *SSAPackage) Build(prog *Program) { p.buildOnce.Do(func() { p.build(prog) }) }
 
 func (p *SSAPackage) build(prog *Program) {
-	info, files := p.info, p.files
+	info := p.info
 	if info == nil {
 		return // synthetic package, e.g. "testmain"
 	}
-	p.info, p.files = nil, nil
+	p.info = nil
 
 	if prog.mode&LogSource != 0 {
 		defer logStack("build %s", p)()
@@ -2277,14 +2269,14 @@ func (p *SSAPackage) build(prog *Program) {
 	for _, name := range pkgScope.Names() {
 		obj := pkgScope.Lookup(name)
 
-		// Build all package-level functions, init functions, and methods.
+		// Build all package-level functions and methods.
 		switch obj := obj.(type) {
 		case *Func:
 			build(obj)
 		case *TypeName:
 			if named, ok := obj.Type().(*Named); ok {
-				for i := 0; i < named.NumMethods(); i++ {
-					build(named.Method(0))
+				for i, n := 0, named.NumMethods(); i < n; i++ {
+					build(named.Method(i))
 				}
 			}
 		}
@@ -2294,7 +2286,6 @@ func (p *SSAPackage) build(prog *Program) {
 		// that would require package creation in topological order.
 		// TODO(mdempsky): Why would that require topological order?
 		if token.IsExported(name) {
-			obj := pkgScope.Lookup(name)
 			typ := obj.Type()
 
 			// TestRuntimeTypes expects to see *T in the list of runtime
@@ -2308,6 +2299,11 @@ func (p *SSAPackage) build(prog *Program) {
 
 			prog.needMethodsOf(typ)
 		}
+	}
+
+	// Build init functions too.
+	for _, init := range p.Pkg.inits {
+		build(init)
 	}
 
 	prog.build(p.InitFunc, info, func(b *builder) {
@@ -2364,17 +2360,12 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 
 		// Call user declared init functions in source order.
-		for _, file := range files {
-			for _, decl := range file.DeclList {
-				if decl, ok := decl.(*FuncDecl); ok && decl.Recv == nil && decl.Name.Value == "init" {
-					obj := b.info.Defs[decl.Name].(*Func)
-					var v Call
-					v.Call.Value = p.values[obj]
-					// TODO(mdempsky): Set v.Call.Pos to obj.Pos()?
-					v.setType(NewTuple())
-					b.emit(&v)
-				}
-			}
+		for _, init := range p.Pkg.inits {
+			var v Call
+			v.Call.Value = p.values[init]
+			// TODO(mdempsky): Set v.Call.Pos to obj.Pos()?
+			v.setType(NewTuple())
+			b.emit(&v)
 		}
 
 		// Finish up init().

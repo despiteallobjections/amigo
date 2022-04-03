@@ -12,7 +12,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/syntax"
 )
 
@@ -43,7 +42,7 @@ func NewProgram(mode BuilderMode) *Program {
 // tree (for funcs and vars only); it will be used during the build
 // phase.
 //
-func memberFromObject(pkg *SSAPackage, obj Object, haveSyntax bool) {
+func memberFromObject(pkg *SSAPackage, obj Object) {
 	name := obj.Name()
 	switch obj := obj.(type) {
 	case *Builtin:
@@ -77,7 +76,7 @@ func memberFromObject(pkg *SSAPackage, obj Object, haveSyntax bool) {
 			Signature: sig,
 			Pkg:       pkg,
 		}
-		if !haveSyntax {
+		if pkg.info == nil {
 			fn.Synthetic = "loaded from gc object file"
 		}
 
@@ -88,39 +87,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, haveSyntax bool) {
 
 	default: // (incl. *types.Package)
 		panic("unexpected Object type: " + obj.String())
-	}
-}
-
-// membersFromDecl populates package pkg with members for each
-// typechecker object (var, func, const or type) associated with the
-// specified decl.
-//
-func membersFromDecl(pkg *SSAPackage, info *Info, decl Decl) {
-	declare := func(idents ...*syntax.Name) {
-		for _, id := range idents {
-			if !isBlankIdent(id) {
-				memberFromObject(pkg, info.Defs[id], true)
-			}
-		}
-	}
-
-	switch decl := decl.(type) {
-	case *GenDecl:
-		for _, spec := range decl.SpecList {
-			switch spec := spec.(type) {
-			case *ConstSpec:
-				declare(spec.NameList...)
-
-			case *VarSpec:
-				declare(spec.NameList...)
-
-			case *TypeSpec:
-				declare(spec.Name)
-			}
-		}
-
-	case *FuncDecl:
-		declare(decl.Name)
 	}
 }
 
@@ -139,8 +105,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		Pkg:     pkg,
 		Members: make(map[string]Member),
 		values:  make(map[Object]Value),
-		info:    info,  // transient (CREATE and BUILD phases)
-		files:   files, // transient (CREATE and BUILD phases)
+		info:    info, // transient (CREATE and BUILD phases)
 	}
 
 	// Add init() function.
@@ -157,26 +122,19 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 
 	// CREATE phase.
 	// Allocate all package members: vars, funcs, consts and types.
-	if len(files) > 0 {
-		// Go source package.
-		for _, file := range files {
-			for _, decl := range file.DeclList {
-				membersFromDecl(p, info, decl)
-			}
-		}
-	} else {
-		// GC-compiled binary package (or "unsafe")
-		// No code.
-		// No position information.
-		scope := p.Pkg.Scope()
-		for _, name := range scope.Names() {
-			obj := scope.Lookup(name)
-			memberFromObject(p, obj, false)
-			if obj, ok := obj.(*TypeName); ok {
-				if named, ok := obj.Type().(*Named); ok {
-					for i, n := 0, named.NumMethods(); i < n; i++ {
-						memberFromObject(p, named.Method(i), false)
-					}
+
+	for _, init := range p.Pkg.inits {
+		memberFromObject(p, init)
+	}
+
+	scope := p.Pkg.Scope()
+	for _, name := range scope.Names() {
+		obj := scope.Lookup(name)
+		memberFromObject(p, obj)
+		if obj, ok := obj.(*TypeName); ok {
+			if named, ok := obj.Type().(*Named); ok {
+				for i, n := 0, named.NumMethods(); i < n; i++ {
+					memberFromObject(p, named.Method(i))
 				}
 			}
 		}
