@@ -74,7 +74,7 @@ func emitArith(f *Function, op Operator, x, y Value, t Type, pos Pos) Value {
 		x = emitConv(f, x, t)
 		// y may be signed or an 'untyped' constant.
 		// TODO(adonovan): whence signed values?
-		if b, ok := y.Type().Underlying().(*Basic); ok && b.Info()&IsUnsigned == 0 {
+		if yt, ok := y.Type().Underlying().(*Basic); ok && yt.Info()&IsUnsigned == 0 {
 			y = emitConv(f, y, Typ[Uint64])
 		}
 
@@ -268,9 +268,9 @@ func emitStore(f *Function, addr, val Value, pos Pos) *Store {
 // Postcondition: f.currentBlock is nil.
 //
 func emitJump(f *Function, target *BasicBlock) {
-	b := f.currentBlock
-	b.emit(new(Jump))
-	addEdge(b, target)
+	block := f.currentBlock
+	block.emit(new(Jump))
+	addEdge(block, target)
 	f.currentBlock = nil
 }
 
@@ -279,10 +279,10 @@ func emitJump(f *Function, target *BasicBlock) {
 // Postcondition: f.currentBlock is nil.
 //
 func emitIf(f *Function, cond Value, tblock, fblock *BasicBlock) {
-	b := f.currentBlock
-	b.emit(&If{Cond: cond})
-	addEdge(b, tblock)
-	addEdge(b, fblock)
+	block := f.currentBlock
+	block.emit(&If{Cond: cond})
+	addEdge(block, tblock)
+	addEdge(block, fblock)
 	f.currentBlock = nil
 }
 
