@@ -69,7 +69,7 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 		Signature: sig,
 		Synthetic: description,
 	}
-	prog.build(fn, func(b *builder) {
+	prog.build(fn, nil, func(b *builder) {
 		b.addSpilledParam(recv)
 		b.createParams(start)
 
@@ -185,7 +185,7 @@ func (prog *Program) makeBound(obj *Func) *Function {
 			Signature: changeRecv(obj.Type().(*Signature), nil), // drop receiver
 			Synthetic: description,
 		}
-		prog.build(fn, func(b *builder) {
+		prog.build(fn, nil, func(b *builder) {
 			recv := obj.Type().(*Signature).Recv()
 			fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}
 			fn.FreeVars = []*FreeVar{fv}

@@ -357,19 +357,9 @@ func (f *Function) removeNilBlocks() {
 	f.Blocks = f.Blocks[:j]
 }
 
-// SetDebugMode sets the debug mode for package pkg.  If true, all its
-// functions will include full debug info.  This greatly increases the
-// size of the instruction stream, and causes Functions to depend upon
-// the ASTs, potentially keeping them live in memory for longer.
-//
-func (pkg *SSAPackage) SetDebugMode(debug bool) {
-	// TODO(adonovan): do we want syntax.File granularity?
-	pkg.debug = debug
-}
-
 // debugInfo reports whether debug info is wanted for this function.
-func (f *Function) debugInfo() bool {
-	return f.Pkg != nil && f.Pkg.debug
+func (b *builder) debugInfo() bool {
+	return b.Prog.mode&GlobalDebug != 0
 }
 
 // addNamedLocal creates a local variable, adds it to function f and
@@ -405,7 +395,7 @@ func (b *builder) addLocal(typ Type, pos Pos) *Alloc {
 // If escaping, the reference comes from a potentially escaping pointer
 // expression and the referent must be heap-allocated.
 //
-func (b *builder) lookup(f *Function, obj *Var, escaping bool) Value {
+func (b *builder) lookup(obj *Var, escaping bool) Value {
 	if v, ok := b.objects[obj]; ok {
 		if alloc, ok := v.(*Alloc); ok && escaping {
 			alloc.Heap = true
@@ -418,10 +408,10 @@ func (b *builder) lookup(f *Function, obj *Var, escaping bool) Value {
 	v := &FreeVar{
 		object: obj,
 		typ:    NewPointer(obj.Type()),
-		parent: f,
+		parent: b.Fn,
 	}
 	b.objects[obj] = v
-	f.FreeVars = append(f.FreeVars, v)
+	b.Fn.FreeVars = append(b.Fn.FreeVars, v)
 	return v
 }
 

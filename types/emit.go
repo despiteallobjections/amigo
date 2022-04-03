@@ -37,7 +37,7 @@ func (b *builder) emitLoad(addr Value) *UnOp {
 // expression e with value v.
 //
 func (b *builder) emitDebugRef(e Expr, v Value, isAddr bool) {
-	if !b.Fn.debugInfo() {
+	if !b.debugInfo() {
 		return // debugging not enabled
 	}
 	if v == nil || e == nil {

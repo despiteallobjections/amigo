@@ -50,8 +50,6 @@ type SSAPackage struct {
 	Init      *Function // the package's synthetic init function
 	InitGuard *Global   // the package's synthetic initializer guard
 
-	debug bool // include full debug info in this package
-
 	// The following fields are set transiently, then cleared
 	// after building.
 	buildOnce sync.Once // ensures package building occurs once

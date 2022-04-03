@@ -185,7 +185,7 @@ func (b *builder) logicalBinop(e *Operation) Value {
 	b.currentBlock = done
 
 	phi := &Phi{Edges: edges, Comment: e.Op.String()}
-	phi.pos = e.Pos() // OpPos
+	phi.pos = tokenPos(e, "OpPos")
 	phi.typ = t
 	return done.emit(phi)
 }
@@ -222,11 +222,11 @@ func (b *builder) exprN(e Expr) Value {
 			CommaOk: true,
 		}
 		lookup.setType(typ)
-		lookup.setPos(e.Pos() /*Lbrack*/)
+		lookup.setPos(tokenPos(e, "Lbrack"))
 		return b.emit(lookup)
 
 	case *AssertExpr:
-		return b.emitTypeTest(b.expr(e.X), typ.At(0).Type(), e.Pos() /*Lparen*/)
+		return b.emitTypeTest(b.expr(e.X), typ.At(0).Type(), tokenPos(e, "Lparen"))
 
 	case *Operation:
 		unop := &UnOp{
@@ -235,7 +235,7 @@ func (b *builder) exprN(e Expr) Value {
 			CommaOk: true,
 		}
 		unop.setType(typ)
-		unop.setPos(e.Pos() /*OpPos*/)
+		unop.setPos(tokenPos(e, "OpPos"))
 		return b.emit(unop)
 	}
 	panic(fmt.Sprintf("exprN(%T) in %s", e, b.Fn))
@@ -363,7 +363,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		obj := b.objectOf(e).(*Var)
 		v := b.Prog.packageLevelValue(obj) // var (address)
 		if v == nil {
-			v = b.lookup(b.Fn, obj, escaping)
+			v = b.lookup(obj, escaping)
 		}
 		return &address{addr: v, pos: e.Pos(), expr: e}
 
@@ -371,15 +371,15 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		t := ssaDeref(b.typeOf(e))
 		var v *Alloc
 		if escaping {
-			v = b.emitNew(t, e.Pos() /*Lbrace*/)
+			v = b.emitNew(t, tokenPos(e, "Lbrace"))
 		} else {
-			v = b.addLocal(t, e.Pos() /*Lbrace*/)
+			v = b.addLocal(t, tokenPos(e, "Lbrace"))
 		}
 		v.Comment = "complit"
 		var sb storebuf
 		b.compLit(v, e, true, &sb)
 		sb.emit(b)
-		return &address{addr: v, pos: e.Pos() /*Lbrace*/, expr: e}
+		return &address{addr: v, pos: tokenPos(e, "Lbrace"), expr: e}
 
 	case *ParenExpr:
 		return b.addr(e.X, escaping)
@@ -420,7 +420,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 				m:   b.expr(e.X),
 				k:   b.emitConv(b.expr(e.Index), t.Key()),
 				t:   t.Elem(),
-				pos: e.Pos(), /*Lbrack*/
+				pos: tokenPos(e, "Lbrack"),
 			}
 		default:
 			panic("unexpected container type in IndexExpr: " + t.String())
@@ -429,14 +429,14 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 			X:     x,
 			Index: b.emitConv(b.expr(e.Index), tInt),
 		}
-		v.setPos(e.Pos() /*Lbrack*/)
+		v.setPos(tokenPos(e, "Lbrack"))
 		v.setType(et)
-		return &address{addr: b.emit(v), pos: e.Pos() /*Lbrack*/, expr: e}
+		return &address{addr: b.emit(v), pos: tokenPos(e, "Lbrack"), expr: e}
 
 	case *Operation:
 		assert(e.Op == Mul)
 		assert(e.Y == nil)
-		return &address{addr: b.expr(e.X), pos: e.Pos() /*Star*/, expr: e}
+		return &address{addr: b.expr(e.X), pos: tokenPos(e, "OpPos"), expr: e}
 	}
 
 	panic(fmt.Sprintf("unexpected address expression: %T", e))
@@ -551,9 +551,7 @@ func (b *builder) expr(e Expr) Value {
 	} else {
 		v = b.expr0(e, tv)
 	}
-	if b.Fn.debugInfo() {
-		b.emitDebugRef(e, v, false)
-	}
+	b.emitDebugRef(e, v, false)
 	return v
 }
 
@@ -579,13 +577,13 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		v := &MakeClosure{Fn: fn2}
 		v.setType(tv.Type)
 		for _, fv := range fn2.FreeVars {
-			outer := b.lookup(b.Fn, fv.object, true) // escaping
+			outer := b.lookup(fv.object, true) // escaping
 			v.Bindings = append(v.Bindings, outer)
 		}
 		return b.emit(v)
 
 	case *AssertExpr:
-		return b.emitTypeAssert(b.expr(e.X), tv.Type, e.Pos() /*Lparen*/)
+		return b.emitTypeAssert(b.expr(e.X), tv.Type, tokenPos(e, "Lparen"))
 
 	case *CallExpr:
 		if b.info.Types[e.Fun].IsType() {
@@ -593,15 +591,17 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			x := b.expr(e.ArgList[0])
 			y := b.emitConv(x, tv.Type)
 			if y != x {
+				pos := tokenPos(e, "Lparen")
 				switch y := y.(type) {
+				// TODO(mdempsky): Add default panic?
 				case *Convert:
-					y.pos = e.Pos() /*Lparen*/
+					y.pos = pos
 				case *ChangeType:
-					y.pos = e.Pos() /*Lparen*/
+					y.pos = pos
 				case *MakeInterface:
-					y.pos = e.Pos() /*Lparen*/
+					y.pos = pos
 				case *SliceToArrayPointer:
-					y.pos = e.Pos() /*Lparen*/
+					y.pos = pos
 				}
 			}
 			return y
@@ -609,7 +609,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := Unparen(e.Fun).(*Name); ok {
 			if obj, ok := b.info.Uses[id].(*Builtin); ok {
-				if v := b.builtin(obj, e.ArgList, tv.Type, e.Pos() /*Lparen*/); v != nil {
+				if v := b.builtin(obj, e.ArgList, tv.Type, tokenPos(e, "Lparen")); v != nil {
 					return v
 				}
 			}
@@ -640,7 +640,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 					Op: e.Op,
 					X:  b.expr(e.X),
 				}
-				v.setPos(e.Pos() /*OpPos*/)
+				v.setPos(tokenPos(e, "OpPos"))
 				v.setType(tv.Type)
 				return b.emit(v)
 			case Mul:
@@ -656,10 +656,10 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			case Shl, Shr:
 				fallthrough
 			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
-				return b.emitArith(e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, e.Pos() /*OpPos*/)
+				return b.emitArith(e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, tokenPos(e, "OpPos"))
 
 			case Eql, Neq, Gtr, Lss, Leq, Geq:
-				cmp := b.emitCompare(e.Op, b.expr(e.X), b.expr(e.Y), e.Pos() /*OpPos*/)
+				cmp := b.emitCompare(e.Op, b.expr(e.X), b.expr(e.Y), tokenPos(e, "OpPos"))
 				// The type of x==y may be UntypedBool.
 				return b.emitConv(cmp, Default(tv.Type))
 			default:
@@ -695,28 +695,25 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			High: high,
 			Max:  max,
 		}
-		v.setPos(e.Pos() /*Lbrack*/)
+		v.setPos(tokenPos(e, "Lbrack"))
 		v.setType(tv.Type)
 		return b.emit(v)
 
 	case *Name:
-		obj := b.info.Uses[e]
-		// Universal built-in or nil?
-		switch obj := obj.(type) {
+		switch obj := b.info.Uses[e].(type) {
 		case *Builtin:
 			return &SSABuiltin{name: obj.Name(), sig: tv.Type.(*Signature)}
+		case *Func:
+			return b.Prog.packageLevelValue(obj)
 		case *Nil:
 			return nilConst(tv.Type)
-		}
-		// Package-level func or var?
-		if v := b.Prog.packageLevelValue(obj); v != nil {
-			if _, ok := obj.(*Var); ok {
-				return b.emitLoad(v) // var (address)
+		case *Var:
+			addr := b.Prog.packageLevelValue(obj)
+			if addr == nil {
+				b.lookup(obj, false)
 			}
-			return v // (func)
+			return b.emitLoad(addr)
 		}
-		// Local var.
-		return b.emitLoad(b.lookup(b.Fn, obj.(*Var), false)) // var (address)
 
 	case *SelectorExpr:
 		sel, ok := b.info.Selections[e]
@@ -775,7 +772,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				X:     b.expr(e.X),
 				Index: b.emitConv(b.expr(e.Index), tInt),
 			}
-			v.setPos(e.Pos() /*Lbrack*/)
+			v.setPos(tokenPos(e, "Lbrack"))
 			v.setType(t.Elem())
 			return b.emit(v)
 
@@ -786,7 +783,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				X:     b.expr(e.X),
 				Index: b.emitConv(b.expr(e.Index), mapt.Key()),
 			}
-			v.setPos(e.Pos() /*Lbrack*/)
+			v.setPos(tokenPos(e, "Lbrack"))
 			v.setType(mapt.Elem())
 			return b.emit(v)
 
@@ -796,7 +793,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				X:     b.expr(e.X),
 				Index: b.expr(e.Index),
 			}
-			v.setPos(e.Pos() /*Lbrack*/)
+			v.setPos(tokenPos(e, "Lbrack"))
 			v.setType(tByte)
 			return b.emit(v)
 
@@ -855,7 +852,7 @@ func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) Valu
 // occurring in e.
 //
 func (b *builder) setCallFunc(e *CallExpr, c *CallCommon) {
-	c.pos = e.Pos() /*Lparen*/
+	c.pos = tokenPos(e, "Lparen")
 
 	// Is this a method call?
 	if selector, ok := Unparen(e.Fun).(*SelectorExpr); ok {
@@ -966,7 +963,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 			// Replace a suffix of args with a slice containing it.
 			at := NewArray(vt, int64(len(varargs)))
 			a := b.emitNew(at, NoPos)
-			a.setPos(e.Pos() /*Rparen*/)
+			a.setPos(tokenPos(e, "Rparen"))
 			a.Comment = "varargs"
 			for i, arg := range varargs {
 				iaddr := &IndexAddr{
@@ -1031,9 +1028,7 @@ func (b *builder) localValueSpec(spec *VarSpec) {
 		for _, id := range spec.NameList {
 			if !isBlankIdent(id) {
 				lhs := b.defLocal(id)
-				if b.Fn.debugInfo() {
-					b.emitDebugRef(id, lhs, true)
-				}
+				b.emitDebugRef(id, lhs, true) // TODO(mdempsky): Why only in this case? Explain.
 			}
 		}
 
@@ -1136,7 +1131,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 	case *Struct:
 		if !isZero && len(e.ElemList) != t.NumFields() {
 			// memclear
-			sb.store(&address{addr, e.Pos() /*Lbrace*/, nil},
+			sb.store(&address{addr, tokenPos(e, "Lbrace"), nil},
 				zeroValue(b, ssaDeref(addr.Type())))
 			isZero = true
 		}
@@ -1171,7 +1166,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 		switch t := t.(type) {
 		case *Slice:
 			at = NewArray(t.Elem(), b.arrayLen(e.ElemList))
-			alloc := b.emitNew(at, e.Pos() /*Lbrace*/)
+			alloc := b.emitNew(at, tokenPos(e, "Lbrace"))
 			alloc.Comment = "slicelit"
 			array = alloc
 		case *Array:
@@ -1180,7 +1175,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 
 			if !isZero && int64(len(e.ElemList)) != at.Len() {
 				// memclear
-				sb.store(&address{array, e.Pos() /*Lbrace*/, nil},
+				sb.store(&address{array, tokenPos(e, "Lbrace"), nil},
 					zeroValue(b, ssaDeref(array.Type())))
 			}
 		}
@@ -1190,7 +1185,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 			pos := e.Pos()
 			if kv, ok := e.(*KeyValueExpr); ok {
 				idx = b.expr(kv.Key).(*SSAConst)
-				pos = kv.Pos() /*Colon*/
+				pos = tokenPos(kv, "Colon")
 				e = kv.Value
 			} else {
 				var idxval int64
@@ -1215,14 +1210,14 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 
 		if t != at { // slice
 			s := &SSASlice{X: array}
-			s.setPos(e.Pos() /*Lbrace*/)
+			s.setPos(tokenPos(e, "Lbrace"))
 			s.setType(typ)
-			sb.store(&address{addr: addr, pos: e.Pos() /*Lbrace*/, expr: e}, b.emit(s))
+			sb.store(&address{addr: addr, pos: tokenPos(e, "Lbrace"), expr: e}, b.emit(s))
 		}
 
 	case *Map:
 		m := &MakeMap{Reserve: intConst(int64(len(e.ElemList)))}
-		m.setPos(e.Pos() /*Lbrace*/)
+		m.setPos(tokenPos(e, "Lbrace"))
 		m.setType(typ)
 		b.emit(m)
 		for _, e := range e.ElemList {
@@ -1248,7 +1243,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 				m:   m,
 				k:   b.emitConv(key, t.Key()),
 				t:   t.Elem(),
-				pos: e.Pos(), /*Colon*/
+				pos: tokenPos(e, "Colon"),
 			}
 
 			// We call assign() only because it takes care
@@ -1259,7 +1254,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 			// and no storebuf is needed.
 			b.assign(&loc, e.Value, true, nil)
 		}
-		sb.store(&address{addr: addr, pos: e.Pos() /*Lbrace*/, expr: e}, m)
+		sb.store(&address{addr: addr, pos: tokenPos(e, "Lbrace"), expr: e}, m)
 
 	default:
 		panic("unexpected CompositeLit type: " + t.String())
@@ -1432,7 +1427,7 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
 				condv = b.emitCompare(Eql, x, nilConst(x.Type()), NoPos)
 				ti = x
 			} else {
-				yok := b.emitTypeTest(x, casetype, cc.Pos() /*Case*/)
+				yok := b.emitTypeTest(x, casetype, tokenPos(cc, "Case"))
 				ti = b.emitExtract(yok, 0)
 				condv = b.emitExtract(yok, 1)
 			}
@@ -1503,7 +1498,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 	// the directions of each state.
 	var states []*SelectState
 	blocking := true
-	debugInfo := b.Fn.debugInfo()
+	debugInfo := b.debugInfo()
 	for _, clause := range s.Body {
 		var st *SelectState
 		switch comm := clause.Comm.(type) {
@@ -1518,7 +1513,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 				Chan: ch,
 				Send: b.emitConv(b.expr(comm.Value),
 					ch.Type().Underlying().(*Chan).Elem()),
-				Pos: comm.Pos(), /*Arrow*/
+				Pos: tokenPos(comm, "Arrow"),
 			}
 			if debugInfo {
 				st.DebugNode = comm
@@ -1529,7 +1524,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			st = &SelectState{
 				Dir:  RecvOnly,
 				Chan: b.expr(recv.X),
-				Pos:  recv.Pos(), /*OpPos*/
+				Pos:  tokenPos(recv, "OpPos"),
 			}
 			if debugInfo {
 				st.DebugNode = recv
@@ -1540,7 +1535,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			st = &SelectState{
 				Dir:  RecvOnly,
 				Chan: b.expr(recv.X),
-				Pos:  recv.Pos(), /*OpPos*/
+				Pos:  tokenPos(recv, "OpPos"),
 			}
 			if debugInfo {
 				st.DebugNode = recv
@@ -1565,7 +1560,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 		States:   states,
 		Blocking: blocking,
 	}
-	sel.setPos(s.Pos() /*Select*/)
+	sel.setPos(tokenPos(s, "Select"))
 	var vars []*Var
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
@@ -2212,7 +2207,7 @@ func (prog *Program) buildFunction(info *Info, fn *Function, body *BlockStmt) {
 		defer logStack("build function %s @ %s", fn, fn.Pos())()
 	}
 
-	prog.build(fn, p.info, func(b *builder) {
+	prog.build(fn, info, func(b *builder) {
 		b.createSyntacticParams()
 		b.stmt(body)
 		if cb := b.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
@@ -2279,7 +2274,7 @@ func (p *SSAPackage) build(prog *Program) {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
 				if obj := info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					prog.buildFunction(p.info, p.values[obj].(*Function), decl.Body)
+					prog.buildFunction(info, p.values[obj].(*Function), decl.Body)
 				}
 			}
 		}
@@ -2308,7 +2303,7 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 	}
 
-	prog.build(p.Init, func(b *builder) {
+	prog.build(p.Init, info, func(b *builder) {
 		var done *BasicBlock
 
 		if prog.mode&BareInits == 0 {

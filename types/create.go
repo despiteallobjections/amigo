@@ -161,7 +161,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		// Go source package.
 		for _, file := range files {
 			for _, decl := range file.DeclList {
-				membersFromDecl(p, p.info, decl)
+				membersFromDecl(p, info, decl)
 			}
 		}
 	} else {
@@ -191,10 +191,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		}
 		p.InitGuard = initguard
 		p.Members[initguard.Name()] = initguard
-	}
-
-	if prog.mode&GlobalDebug != 0 {
-		p.SetDebugMode(true)
 	}
 
 	if prog.mode&PrintPackages != 0 {

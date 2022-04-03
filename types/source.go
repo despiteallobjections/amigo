@@ -4,6 +4,8 @@
 
 package types
 
+import . "github.com/mdempsky/amigo/syntax"
+
 // This file defines utilities for working with source positions
 // or source-level named entities ("objects").
 
@@ -31,3 +33,9 @@ func (prog *Program) packageLevelValue(obj Object) Value {
 	}
 	return nil
 }
+
+// tokenPos returns n.Pos().
+//
+// It exists just for internal documentation purposes, to help remind
+// which token position package ssa was originally accessing.
+func tokenPos(n Node, which string) Pos { return n.Pos() }
