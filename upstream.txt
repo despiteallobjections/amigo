@@ -1,0 +1,5 @@
+syntax, types2, cgo, etc came from std@32fdad19a246143ae4f194d1b39886d778de1380
+(I think?)
+
+ssa, etc came from x/tools@bf6c7f26e9f0fea5b256f9ef6968435dddc5be25,
+but then I manually patched in the new emitArith code in 153e30b3c7fa2996154a94565eaedf3fcdf9e514
