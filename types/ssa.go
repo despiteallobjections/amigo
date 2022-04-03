@@ -292,14 +292,6 @@ type Function struct {
 	Recover   *BasicBlock   // optional; control transfers here after recovered panic
 	AnonFuncs []*Function   // anonymous functions directly beneath this one
 	referrers []Instruction // referring instructions (iff Parent() != nil)
-
-	// The following fields are set transiently during building,
-	// then cleared.
-	currentBlock *BasicBlock        // where to emit code
-	objects      map[*Var]Value     // addresses of local variables
-	namedResults []*Alloc           // tuple of named results
-	targets      *targets           // linked stack of branch targets
-	lblocks      map[string]*lblock // labelled blocks
 }
 
 // BasicBlock represents an SSA basic block.

@@ -185,14 +185,14 @@ func lift(b *builder) {
 	// Determine which allocs we can lift and number them densely.
 	// The renaming phase uses this numbering for compact maps.
 	numAllocs := 0
-	for _, b := range fn.Blocks {
-		b.gaps = 0
-		b.rundefers = 0
-		for _, instr := range b.Instrs {
+	for _, block := range fn.Blocks {
+		block.gaps = 0
+		block.rundefers = 0
+		for _, instr := range block.Instrs {
 			switch instr := instr.(type) {
 			case *Alloc:
 				index := -1
-				if liftAlloc(df, instr, newPhis, &fresh) {
+				if b.liftAlloc(df, instr, newPhis, &fresh) {
 					index = numAllocs
 					numAllocs++
 				}
@@ -200,7 +200,7 @@ func lift(b *builder) {
 			case *SSADefer:
 				usesDefer = true
 			case *RunDefers:
-				b.rundefers++
+				block.rundefers++
 			}
 		}
 	}
@@ -385,7 +385,7 @@ type newPhiMap map[*BasicBlock][]newPhi
 //
 // fresh is a source of fresh ids for phi nodes.
 //
-func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool {
+func (b *builder) liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool {
 	// Don't lift aggregates into registers, because we don't have
 	// a way to express their zero-constants.
 	switch ssaDeref(alloc.Type()).Underlying().(type) {
@@ -396,7 +396,7 @@ func liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fresh *int) bool
 	// Don't lift named return values in functions that defer
 	// calls that may recover from panic.
 	if fn := alloc.Parent(); fn.Recover != nil {
-		for _, nr := range fn.namedResults {
+		for _, nr := range b.namedResults { // TODO(mdempsky): Seems a suspicious use of a builder field...
 			if nr == alloc {
 				return false
 			}

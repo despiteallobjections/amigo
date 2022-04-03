@@ -70,12 +70,20 @@ var (
 // Its methods contain all the logic for AST-to-SSA conversion.
 type builder struct {
 	Fn *Function
+
+	currentBlock *BasicBlock        // where to emit code
+	objects      map[*Var]Value     // addresses of local variables
+	namedResults []*Alloc           // tuple of named results
+	targets      *targets           // linked stack of branch targets
+	lblocks      map[string]*lblock // labelled blocks
 }
+
+func (b *builder) String() string { return b.Fn.String() }
 
 // cond emits to fn code to evaluate boolean condition e and jump
 // to t or f depending on its value, performing various simplifications.
 //
-// Postcondition: b.Fn.currentBlock is nil.
+// Postcondition: b.currentBlock is nil.
 //
 func (b *builder) cond(fn *Function, e Expr, t, f *BasicBlock) {
 	switch e := e.(type) {
@@ -89,14 +97,14 @@ func (b *builder) cond(fn *Function, e Expr, t, f *BasicBlock) {
 			case AndAnd:
 				ltrue := b.newBasicBlock("cond.true")
 				b.cond(fn, e.X, ltrue, f)
-				b.Fn.currentBlock = ltrue
+				b.currentBlock = ltrue
 				b.cond(fn, e.Y, t, f)
 				return
 
 			case OrOr:
 				lfalse := b.newBasicBlock("cond.false")
 				b.cond(fn, e.X, t, lfalse)
-				b.Fn.currentBlock = lfalse
+				b.currentBlock = lfalse
 				b.cond(fn, e.Y, t, f)
 				return
 			}
@@ -144,14 +152,14 @@ func (b *builder) logicalBinop(fn *Function, e *Operation) Value {
 	// Is rhs unreachable?
 	if rhs.Preds == nil {
 		// Simplify false&&y to false, true||y to true.
-		b.Fn.currentBlock = done
+		b.currentBlock = done
 		return short
 	}
 
 	// Is done unreachable?
 	if done.Preds == nil {
 		// Simplify true&&y (or false||y) to y.
-		b.Fn.currentBlock = rhs
+		b.currentBlock = rhs
 		return b.expr(fn, e.Y)
 	}
 
@@ -162,10 +170,10 @@ func (b *builder) logicalBinop(fn *Function, e *Operation) Value {
 	}
 
 	// The edge from e.Y to done carries the value of e.Y.
-	b.Fn.currentBlock = rhs
+	b.currentBlock = rhs
 	edges = append(edges, b.expr(fn, e.Y))
 	emitJump(b, done)
-	b.Fn.currentBlock = done
+	b.currentBlock = done
 
 	phi := &Phi{Edges: edges, Comment: e.Op.String()}
 	phi.pos = e.Pos() // OpPos
@@ -308,7 +316,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 			X:   emitConv(b, b.expr(fn, args[0]), tEface),
 			pos: pos,
 		})
-		b.Fn.currentBlock = b.newBasicBlock("unreachable")
+		b.currentBlock = b.newBasicBlock("unreachable")
 		return vTrue // any non-nil Value will do
 	}
 	return nil // treat all others as a regular function call
@@ -346,7 +354,7 @@ func (b *builder) addr(fn *Function, e Expr, escaping bool) lvalue {
 		obj := fn.Pkg.objectOf(e).(*Var)
 		v := fn.Prog.packageLevelValue(obj) // var (address)
 		if v == nil {
-			v = fn.lookup(obj, escaping)
+			v = b.lookup(fn, obj, escaping)
 		}
 		return &address{addr: v, pos: e.Pos(), expr: e}
 
@@ -699,7 +707,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			return v // (func)
 		}
 		// Local var.
-		return emitLoad(b, fn.lookup(obj.(*Var), false)) // var (address)
+		return emitLoad(b, b.lookup(fn, obj.(*Var), false)) // var (address)
 
 	case *SelectorExpr:
 		sel, ok := fn.Pkg.info.Selections[e]
@@ -1307,32 +1315,32 @@ func (b *builder) switchStmt(fn *Function, s *SwitchStmt, label *lblock) {
 			// though.
 			cond := emitCompare(b, Eql, tag, b.expr(fn, cond), NoPos)
 			emitIf(b, cond, body, nextCond)
-			b.Fn.currentBlock = nextCond
+			b.currentBlock = nextCond
 		}
-		b.Fn.currentBlock = body
-		fn.targets = &targets{
-			tail:         fn.targets,
+		b.currentBlock = body
+		b.targets = &targets{
+			tail:         b.targets,
 			_break:       done,
 			_fallthrough: fallthru,
 		}
 		b.stmtList(fn, cc.Body)
-		fn.targets = fn.targets.tail
+		b.targets = b.targets.tail
 		emitJump(b, done)
-		b.Fn.currentBlock = nextCond
+		b.currentBlock = nextCond
 	}
 	if dfltBlock != nil {
 		emitJump(b, dfltBlock)
-		b.Fn.currentBlock = dfltBlock
-		fn.targets = &targets{
-			tail:         fn.targets,
+		b.currentBlock = dfltBlock
+		b.targets = &targets{
+			tail:         b.targets,
 			_break:       done,
 			_fallthrough: dfltFallthrough,
 		}
 		b.stmtList(fn, *dfltBody)
-		fn.targets = fn.targets.tail
+		b.targets = b.targets.tail
 	}
 	emitJump(b, done)
-	b.Fn.currentBlock = done
+	b.currentBlock = done
 }
 
 // typeSwitchStmt emits to fn code for the type switch statement s, optionally
@@ -1420,21 +1428,21 @@ func (b *builder) typeSwitchStmt(fn *Function, s *SwitchStmt, label *lblock) {
 				condv = emitExtract(b, yok, 1)
 			}
 			emitIf(b, condv, body, next)
-			b.Fn.currentBlock = next
+			b.currentBlock = next
 		}
 		if len(unpackExpr(cc.Cases)) != 1 {
 			ti = x
 		}
-		b.Fn.currentBlock = body
+		b.currentBlock = body
 		b.typeCaseBody(fn, cc, ti, done)
-		b.Fn.currentBlock = next
+		b.currentBlock = next
 	}
 	if default_ != nil {
 		b.typeCaseBody(fn, default_, x, done)
 	} else {
 		emitJump(b, done)
 	}
-	b.Fn.currentBlock = done
+	b.currentBlock = done
 }
 
 func (b *builder) typeCaseBody(fn *Function, cc *CaseClause, x Value, done *BasicBlock) {
@@ -1446,12 +1454,12 @@ func (b *builder) typeCaseBody(fn *Function, cc *CaseClause, x Value, done *Basi
 		// y has the same type as the interface operand.
 		emitStore(b, b.addNamedLocal(obj.(*Var)), x, obj.Pos())
 	}
-	fn.targets = &targets{
-		tail:   fn.targets,
+	b.targets = &targets{
+		tail:   b.targets,
 		_break: done,
 	}
 	b.stmtList(fn, cc.Body)
-	fn.targets = fn.targets.tail
+	b.targets = b.targets.tail
 	emitJump(b, done)
 }
 
@@ -1470,14 +1478,14 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 			if label != nil {
 				label._break = done
 			}
-			fn.targets = &targets{
-				tail:   fn.targets,
+			b.targets = &targets{
+				tail:   b.targets,
 				_break: done,
 			}
 			b.stmtList(fn, clause.Body)
-			fn.targets = fn.targets.tail
+			b.targets = b.targets.tail
 			emitJump(b, done)
-			b.Fn.currentBlock = done
+			b.currentBlock = done
 			return
 		}
 	}
@@ -1579,9 +1587,9 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 		body := b.newBasicBlock("select.body")
 		next := b.newBasicBlock("select.next")
 		emitIf(b, emitCompare(b, Eql, idx, intConst(int64(state)), NoPos), body, next)
-		b.Fn.currentBlock = body
-		fn.targets = &targets{
-			tail:   fn.targets,
+		b.currentBlock = body
+		b.targets = &targets{
+			tail:   b.targets,
 			_break: done,
 		}
 		switch comm := clause.Comm.(type) {
@@ -1615,28 +1623,28 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 			r++
 		}
 		b.stmtList(fn, clause.Body)
-		fn.targets = fn.targets.tail
+		b.targets = b.targets.tail
 		emitJump(b, done)
-		b.Fn.currentBlock = next
+		b.currentBlock = next
 		state++
 	}
 	if defaultBody != nil {
-		fn.targets = &targets{
-			tail:   fn.targets,
+		b.targets = &targets{
+			tail:   b.targets,
 			_break: done,
 		}
 		b.stmtList(fn, *defaultBody)
-		fn.targets = fn.targets.tail
+		b.targets = b.targets.tail
 	} else {
 		// A blocking select must match some case.
 		// (This should really be a runtime.errorString, not a string.)
 		b.emit(&Panic{
 			X: emitConv(b, stringConst("blocking select matched no case"), tEface),
 		})
-		b.Fn.currentBlock = b.newBasicBlock("unreachable")
+		b.currentBlock = b.newBasicBlock("unreachable")
 	}
 	emitJump(b, done)
-	b.Fn.currentBlock = done
+	b.currentBlock = done
 }
 
 // forStmt emits to fn code for the for statement s, optionally
@@ -1672,26 +1680,26 @@ func (b *builder) forStmt(fn *Function, s *ForStmt, label *lblock) {
 		label._continue = cont
 	}
 	emitJump(b, loop)
-	b.Fn.currentBlock = loop
+	b.currentBlock = loop
 	if loop != body {
 		b.cond(fn, s.Cond, body, done)
-		b.Fn.currentBlock = body
+		b.currentBlock = body
 	}
-	fn.targets = &targets{
-		tail:      fn.targets,
+	b.targets = &targets{
+		tail:      b.targets,
 		_break:    done,
 		_continue: cont,
 	}
 	b.stmt(fn, s.Body)
-	fn.targets = fn.targets.tail
+	b.targets = b.targets.tail
 	emitJump(b, cont)
 
 	if s.Post != nil {
-		b.Fn.currentBlock = cont
+		b.currentBlock = cont
 		b.stmt(fn, s.Post)
 		emitJump(b, loop) // back-edge
 	}
-	b.Fn.currentBlock = done
+	b.currentBlock = done
 }
 
 // rangeIndexed emits to fn the header for an integer-indexed loop
@@ -1737,7 +1745,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 
 	loop = b.newBasicBlock("rangeindex.loop")
 	emitJump(b, loop)
-	b.Fn.currentBlock = loop
+	b.currentBlock = loop
 
 	incr := &BinOp{
 		Op: Add,
@@ -1750,7 +1758,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 	body := b.newBasicBlock("rangeindex.body")
 	done = b.newBasicBlock("rangeindex.done")
 	emitIf(b, emitCompare(b, Lss, incr, length, NoPos), body, done)
-	b.Fn.currentBlock = body
+	b.currentBlock = body
 
 	k = emitLoad(b, index)
 	if tv != nil {
@@ -1823,7 +1831,7 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv Type, pos Pos) (k, v V
 
 	loop = b.newBasicBlock("rangeiter.loop")
 	emitJump(b, loop)
-	b.Fn.currentBlock = loop
+	b.currentBlock = loop
 
 	_, isString := x.Type().Underlying().(*Basic)
 
@@ -1841,7 +1849,7 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv Type, pos Pos) (k, v V
 	body := b.newBasicBlock("rangeiter.body")
 	done = b.newBasicBlock("rangeiter.done")
 	emitIf(b, emitExtract(b, okv, 0), body, done)
-	b.Fn.currentBlock = body
+	b.currentBlock = body
 
 	if tk != tInvalid {
 		k = emitExtract(b, okv, 1)
@@ -1872,7 +1880,7 @@ func (b *builder) rangeChan(fn *Function, x Value, tk Type, pos Pos) (k Value, l
 
 	loop = b.newBasicBlock("rangechan.loop")
 	emitJump(b, loop)
-	b.Fn.currentBlock = loop
+	b.currentBlock = loop
 	recv := &UnOp{
 		Op:      Recv,
 		X:       x,
@@ -1887,7 +1895,7 @@ func (b *builder) rangeChan(fn *Function, x Value, tk Type, pos Pos) (k Value, l
 	body := b.newBasicBlock("rangechan.body")
 	done = b.newBasicBlock("rangechan.done")
 	emitIf(b, emitExtract(b, ko, 1), body, done)
-	b.Fn.currentBlock = body
+	b.currentBlock = body
 	if tk != nil {
 		k = emitExtract(b, ko, 0)
 	}
@@ -1962,15 +1970,15 @@ func (b *builder) rangeStmt(fn *Function, s *ForStmt, label *lblock) {
 		label._continue = loop
 	}
 
-	fn.targets = &targets{
-		tail:      fn.targets,
+	b.targets = &targets{
+		tail:      b.targets,
 		_break:    done,
 		_continue: loop,
 	}
 	b.stmt(fn, s.Body)
-	fn.targets = fn.targets.tail
+	b.targets = b.targets.tail
 	emitJump(b, loop) // back-edge
-	b.Fn.currentBlock = done
+	b.currentBlock = done
 }
 
 // stmt lowers statement s to SSA form, emitting code to fn.
@@ -1995,7 +2003,7 @@ start:
 	case *LabeledStmt:
 		label = b.labelledBlock(s.Label)
 		emitJump(b, label._goto)
-		b.Fn.currentBlock = label._goto
+		b.currentBlock = label._goto
 		_s = s.Stmt
 		goto start // effectively: tailcall stmt(fn, s.Stmt, label)
 
@@ -2065,25 +2073,25 @@ start:
 				results = append(results, v)
 			}
 		}
-		if fn.namedResults != nil {
+		if b.namedResults != nil {
 			// Function has named result parameters (NRPs).
 			// Perform parallel assignment of return operands to NRPs.
 			for i, r := range results {
-				emitStore(b, fn.namedResults[i], r, s.Pos() /*Return*/)
+				emitStore(b, b.namedResults[i], r, s.Pos() /*Return*/)
 			}
 		}
 		// Run function calls deferred in this
 		// function when explicitly returning from it.
 		b.emit(new(RunDefers))
-		if fn.namedResults != nil {
+		if b.namedResults != nil {
 			// Reload NRPs to form the result tuple.
 			results = results[:0]
-			for _, r := range fn.namedResults {
+			for _, r := range b.namedResults {
 				results = append(results, emitLoad(b, r))
 			}
 		}
 		b.emit(&Return{Results: results, pos: s.Pos() /*Return*/})
-		b.Fn.currentBlock = b.newBasicBlock("unreachable")
+		b.currentBlock = b.newBasicBlock("unreachable")
 
 	case *BranchStmt:
 		var block *BasicBlock
@@ -2092,7 +2100,7 @@ start:
 			if s.Label != nil {
 				block = b.labelledBlock(s.Label)._break
 			} else {
-				for t := fn.targets; t != nil && block == nil; t = t.tail {
+				for t := b.targets; t != nil && block == nil; t = t.tail {
 					block = t._break
 				}
 			}
@@ -2101,13 +2109,13 @@ start:
 			if s.Label != nil {
 				block = b.labelledBlock(s.Label)._continue
 			} else {
-				for t := fn.targets; t != nil && block == nil; t = t.tail {
+				for t := b.targets; t != nil && block == nil; t = t.tail {
 					block = t._continue
 				}
 			}
 
 		case Fallthrough:
-			for t := fn.targets; t != nil && block == nil; t = t.tail {
+			for t := b.targets; t != nil && block == nil; t = t.tail {
 				block = t._fallthrough
 			}
 
@@ -2115,7 +2123,7 @@ start:
 			block = b.labelledBlock(s.Label)._goto
 		}
 		emitJump(b, block)
-		b.Fn.currentBlock = b.newBasicBlock("unreachable")
+		b.currentBlock = b.newBasicBlock("unreachable")
 
 	case *BlockStmt:
 		b.stmtList(fn, s.List)
@@ -2131,17 +2139,17 @@ start:
 			els = b.newBasicBlock("if.else")
 		}
 		b.cond(fn, s.Cond, then, els)
-		b.Fn.currentBlock = then
+		b.currentBlock = then
 		b.stmt(fn, s.Then)
 		emitJump(b, done)
 
 		if s.Else != nil {
-			b.Fn.currentBlock = els
+			b.currentBlock = els
 			b.stmt(fn, s.Else)
 			emitJump(b, done)
 		}
 
-		b.Fn.currentBlock = done
+		b.currentBlock = done
 
 	case *SwitchStmt:
 		if _, ok := s.Tag.(*TypeSwitchGuard); ok {
@@ -2210,7 +2218,7 @@ func (b *builder) buildFunction() {
 	b.startBody()
 	b.createSyntacticParams()
 	b.stmt(fn, body)
-	if cb := b.Fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
+	if cb := b.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
 		// Control fell off the end of the function's body block.
 		//
 		// Block optimizations eliminate the current block, if
@@ -2316,7 +2324,7 @@ func (p *SSAPackage) build() {
 		doinit := b.newBasicBlock("init.start")
 		done = b.newBasicBlock("init.done")
 		emitIf(b, emitLoad(b, initguard), done, doinit)
-		b.Fn.currentBlock = doinit
+		b.currentBlock = doinit
 		emitStore(b, initguard, vTrue, NoPos)
 
 		// Call the init() function of each package we import.
@@ -2376,7 +2384,7 @@ func (p *SSAPackage) build() {
 	// Finish up init().
 	if p.Prog.mode&BareInits == 0 {
 		emitJump(b, done)
-		b.Fn.currentBlock = done
+		b.currentBlock = done
 	}
 	b.emit(new(Return))
 	b.finishBody()

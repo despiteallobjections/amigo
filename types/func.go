@@ -150,19 +150,18 @@ type lblock struct {
 // specified label, creating it if needed.
 //
 func (b *builder) labelledBlock(label *Name) *lblock {
-	f := b.Fn
 	// TODO(mdempsky): This used to be keyed by label.Object, but now
 	// I'm using label.Value. I think that's safe, but double check that
 	// it doesn't cause problems with closures and identically named
 	// labels.
 
-	lb := f.lblocks[label.Value]
+	lb := b.lblocks[label.Value]
 	if lb == nil {
 		lb = &lblock{_goto: b.newBasicBlock(label.Value)}
-		if f.lblocks == nil {
-			f.lblocks = make(map[string]*lblock)
+		if b.lblocks == nil {
+			b.lblocks = make(map[string]*lblock)
 		}
-		f.lblocks[label.Value] = lb
+		b.lblocks[label.Value] = lb
 	}
 	return lb
 }
@@ -202,7 +201,7 @@ func (b *builder) addParam(obj *Var, spill bool) {
 		alloc := &Alloc{Comment: obj.Name()}
 		alloc.setType(NewPointer(obj.Type()))
 		alloc.setPos(obj.Pos())
-		f.objects[obj] = alloc
+		b.objects[obj] = alloc
 		f.Locals = append(f.Locals, alloc)
 		b.emit(alloc)
 		b.emit(&Store{Addr: alloc, Val: param})
@@ -213,9 +212,8 @@ func (b *builder) addParam(obj *Var, spill bool) {
 // Precondition: f.Type() already set.
 //
 func (b *builder) startBody() {
-	fn := b.Fn
-	b.Fn.currentBlock = b.newBasicBlock("entry")
-	fn.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
+	b.currentBlock = b.newBasicBlock("entry")
+	b.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
 }
 
 // createSyntacticParams populates f.Params and generates code (spills
@@ -246,7 +244,7 @@ func (b *builder) createSyntacticParams() {
 		result := results.At(i)
 		if result.Name() != "" {
 			// Implicit "var" decl of locals for named results.
-			f.namedResults = append(f.namedResults, b.addNamedLocal(result))
+			b.namedResults = append(b.namedResults, b.addNamedLocal(result))
 		}
 	}
 }
@@ -296,9 +294,9 @@ func buildReferrers(b *builder) {
 // finishBody() finalizes the function after SSA code generation of its body.
 func (b *builder) finishBody() {
 	f := b.Fn
-	f.objects = nil
-	b.Fn.currentBlock = nil
-	f.lblocks = nil
+	b.objects = nil
+	b.currentBlock = nil
+	b.lblocks = nil
 	f.syntax = nil
 
 	// Remove from f.Locals any Allocs that escape to the heap.
@@ -328,7 +326,7 @@ func (b *builder) finishBody() {
 		lift(b)
 	}
 
-	f.namedResults = nil // (used by lifting)
+	b.namedResults = nil // (used by lifting)
 
 	numberRegisters(b)
 
@@ -384,7 +382,7 @@ func (f *Function) debugInfo() bool {
 func (b *builder) addNamedLocal(obj *Var) *Alloc {
 	l := b.addLocal(obj.Type(), obj.Pos())
 	l.Comment = obj.Name()
-	b.Fn.objects[obj] = l
+	b.objects[obj] = l
 	return l
 }
 
@@ -410,8 +408,8 @@ func (b *builder) addLocal(typ Type, pos Pos) *Alloc {
 // If escaping, the reference comes from a potentially escaping pointer
 // expression and the referent must be heap-allocated.
 //
-func (f *Function) lookup(obj *Var, escaping bool) Value {
-	if v, ok := f.objects[obj]; ok {
+func (b *builder) lookup(f *Function, obj *Var, escaping bool) Value {
+	if v, ok := b.objects[obj]; ok {
 		if alloc, ok := v.(*Alloc); ok && escaping {
 			alloc.Heap = true
 		}
@@ -423,7 +421,7 @@ func (f *Function) lookup(obj *Var, escaping bool) Value {
 	if f.parent == nil {
 		panic("no ssa.Value for " + obj.String())
 	}
-	outer := f.parent.lookup(obj, true) // escaping
+	outer := b.lookup(f.parent, obj, true) // escaping
 	v := &FreeVar{
 		name:   obj.Name(),
 		typ:    outer.Type(),
@@ -431,14 +429,14 @@ func (f *Function) lookup(obj *Var, escaping bool) Value {
 		outer:  outer,
 		parent: f,
 	}
-	f.objects[obj] = v
+	b.objects[obj] = v
 	f.FreeVars = append(f.FreeVars, v)
 	return v
 }
 
 // emit emits the specified instruction to function f.
 func (b *builder) emit(instr Instruction) Value {
-	return b.Fn.currentBlock.emit(instr)
+	return b.currentBlock.emit(instr)
 }
 
 // RelString returns the full name of this function, qualified by

@@ -268,10 +268,10 @@ func emitStore(b *builder, addr, val Value, pos Pos) *Store {
 // Postcondition: f.currentBlock is nil.
 //
 func emitJump(b *builder, target *BasicBlock) {
-	block := b.Fn.currentBlock
+	block := b.currentBlock
 	block.emit(new(Jump))
 	addEdge(block, target)
-	b.Fn.currentBlock = nil
+	b.currentBlock = nil
 }
 
 // emitIf emits to f a conditional jump to tblock or fblock based on
@@ -279,11 +279,11 @@ func emitJump(b *builder, target *BasicBlock) {
 // Postcondition: f.currentBlock is nil.
 //
 func emitIf(b *builder, cond Value, tblock, fblock *BasicBlock) {
-	block := b.Fn.currentBlock
+	block := b.currentBlock
 	block.emit(&If{Cond: cond})
 	addEdge(block, tblock)
 	addEdge(block, fblock)
-	b.Fn.currentBlock = nil
+	b.currentBlock = nil
 }
 
 // emitExtract emits to f an instruction to extract the index'th
@@ -354,7 +354,7 @@ func emitTailCall(b *builder, call *Call) {
 		}
 	}
 	b.emit(&ret)
-	b.Fn.currentBlock = nil
+	b.currentBlock = nil
 }
 
 // emitImplicitSelections emits to f code to apply the sequence of
@@ -452,15 +452,15 @@ func createRecoverBlock(b *builder) {
 	if fn.Recover != nil {
 		return // already created
 	}
-	saved := b.Fn.currentBlock
+	saved := b.currentBlock
 
 	fn.Recover = b.newBasicBlock("recover")
-	b.Fn.currentBlock = b.Fn.Recover
+	b.currentBlock = b.Fn.Recover
 
 	var results []Value
-	if fn.namedResults != nil {
+	if b.namedResults != nil {
 		// Reload NRPs to form value tuple.
-		for _, r := range fn.namedResults {
+		for _, r := range b.namedResults {
 			results = append(results, emitLoad(b, r))
 		}
 	} else {
@@ -474,5 +474,5 @@ func createRecoverBlock(b *builder) {
 	}
 	b.emit(&Return{Results: results})
 
-	b.Fn.currentBlock = saved
+	b.currentBlock = saved
 }
