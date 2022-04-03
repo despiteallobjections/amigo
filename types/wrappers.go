@@ -80,7 +80,7 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 
 	var v Value = fn.Locals[0] // spilled receiver
 	if isPointer(sel.Recv()) {
-		v = emitLoad(fn, v)
+		v = emitLoad(b, v)
 
 		// For simple indirection wrappers, perform an informative nil-check:
 		// "value method (T).f called using nil *T pointer"
@@ -110,7 +110,7 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 	// Load) in preference to value extraction (Field possibly
 	// preceded by Load).
 
-	v = emitImplicitSelections(fn, v, indices[:len(indices)-1])
+	v = emitImplicitSelections(b, v, indices[:len(indices)-1])
 
 	// Invariant: v is a pointer, either
 	//   value of implicit *C field, or
@@ -119,19 +119,19 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 	var c Call
 	if r := recvType(obj); !isInterface(r) { // concrete method
 		if !isPointer(r) {
-			v = emitLoad(fn, v)
+			v = emitLoad(b, v)
 		}
 		c.Call.Value = prog.declaredFunc(obj)
 		c.Call.Args = append(c.Call.Args, v)
 	} else {
 		c.Call.Method = obj
-		c.Call.Value = emitLoad(fn, v)
+		c.Call.Value = emitLoad(b, v)
 	}
 	for _, arg := range fn.Params[1:] {
 		c.Call.Args = append(c.Call.Args, arg)
 	}
-	emitTailCall(fn, &c)
-	fn.finishBody()
+	emitTailCall(b, &c)
+	b.finishBody()
 	return fn
 }
 
@@ -208,8 +208,8 @@ func makeBound(prog *Program, obj *Func) *Function {
 		for _, arg := range fn.Params {
 			c.Call.Args = append(c.Call.Args, arg)
 		}
-		emitTailCall(fn, &c)
-		fn.finishBody()
+		emitTailCall(b, &c)
+		b.finishBody()
 
 		prog.bounds[obj] = fn
 	}

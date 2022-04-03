@@ -15,7 +15,7 @@ import (
 // emitNew emits to f a new (heap Alloc) instruction allocating an
 // object of type typ.  pos is the optional source location.
 //
-func emitNew(b *Function, typ Type, pos Pos) *Alloc {
+func emitNew(b *builder, typ Type, pos Pos) *Alloc {
 	v := &Alloc{Heap: true}
 	v.setType(NewPointer(typ))
 	v.setPos(pos)
@@ -26,7 +26,7 @@ func emitNew(b *Function, typ Type, pos Pos) *Alloc {
 // emitLoad emits to f an instruction to load the address addr into a
 // new temporary, and returns the value so defined.
 //
-func emitLoad(b *Function, addr Value) *UnOp {
+func emitLoad(b *builder, addr Value) *UnOp {
 	v := &UnOp{Op: Mul, X: addr}
 	v.setType(ssaDeref(addr.Type()))
 	b.emit(v)
@@ -36,8 +36,8 @@ func emitLoad(b *Function, addr Value) *UnOp {
 // emitDebugRef emits to f a DebugRef pseudo-instruction associating
 // expression e with value v.
 //
-func emitDebugRef(b *Function, e Expr, v Value, isAddr bool) {
-	if !b.debugInfo() {
+func emitDebugRef(b *builder, e Expr, v Value, isAddr bool) {
+	if !b.Fn.debugInfo() {
 		return // debugging not enabled
 	}
 	if v == nil || e == nil {
@@ -49,7 +49,7 @@ func emitDebugRef(b *Function, e Expr, v Value, isAddr bool) {
 		if isBlankIdent(id) {
 			return
 		}
-		obj = b.Pkg.objectOf(id)
+		obj = b.Fn.Pkg.objectOf(id)
 		switch obj.(type) {
 		case *Nil, *Const, *Builtin:
 			return
@@ -68,7 +68,7 @@ func emitDebugRef(b *Function, e Expr, v Value, isAddr bool) {
 // (Use emitCompare() for comparisons and Builder.logicalBinop() for
 // non-eager operations.)
 //
-func emitArith(b *Function, op Operator, x, y Value, t Type, pos Pos) Value {
+func emitArith(b *builder, op Operator, x, y Value, t Type, pos Pos) Value {
 	switch op {
 	case Shl, Shr:
 		x = emitConv(b, x, t)
@@ -99,7 +99,7 @@ func emitArith(b *Function, op Operator, x, y Value, t Type, pos Pos) Value {
 // emitCompare emits to f code compute the boolean result of
 // comparison comparison 'x op y'.
 //
-func emitCompare(b *Function, op Operator, x, y Value, pos Pos) Value {
+func emitCompare(b *builder, op Operator, x, y Value, pos Pos) Value {
 	xt := x.Type().Underlying()
 	yt := y.Type().Underlying()
 
@@ -169,7 +169,7 @@ func isValuePreserving(ut_src, ut_dst Type) bool {
 // by language assignability rules in assignments, parameter passing,
 // etc.
 //
-func emitConv(b *Function, val Value, typ Type) Value {
+func emitConv(b *builder, val Value, typ Type) Value {
 	t_src := val.Type()
 
 	// Identical types?  Conversion is a no-op.
@@ -206,7 +206,7 @@ func emitConv(b *Function, val Value, typ Type) Value {
 			val = emitConv(b, val, Default(ut_src))
 		}
 
-		b.Pkg.Prog.needMethodsOf(val.Type())
+		b.Fn.Pkg.Prog.needMethodsOf(val.Type())
 		mi := &MakeInterface{X: val}
 		mi.setType(typ)
 		return b.emit(mi)
@@ -254,7 +254,7 @@ func emitConv(b *Function, val Value, typ Type) Value {
 // emitStore emits to f an instruction to store value val at location
 // addr, applying implicit conversions as required by assignability rules.
 //
-func emitStore(b *Function, addr, val Value, pos Pos) *Store {
+func emitStore(b *builder, addr, val Value, pos Pos) *Store {
 	s := &Store{
 		Addr: addr,
 		Val:  emitConv(b, val, ssaDeref(addr.Type())),
@@ -267,29 +267,29 @@ func emitStore(b *Function, addr, val Value, pos Pos) *Store {
 // emitJump emits to f a jump to target, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
-func emitJump(b *Function, target *BasicBlock) {
-	block := b.currentBlock
+func emitJump(b *builder, target *BasicBlock) {
+	block := b.Fn.currentBlock
 	block.emit(new(Jump))
 	addEdge(block, target)
-	b.currentBlock = nil
+	b.Fn.currentBlock = nil
 }
 
 // emitIf emits to f a conditional jump to tblock or fblock based on
 // cond, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
-func emitIf(b *Function, cond Value, tblock, fblock *BasicBlock) {
-	block := b.currentBlock
+func emitIf(b *builder, cond Value, tblock, fblock *BasicBlock) {
+	block := b.Fn.currentBlock
 	block.emit(&If{Cond: cond})
 	addEdge(block, tblock)
 	addEdge(block, fblock)
-	b.currentBlock = nil
+	b.Fn.currentBlock = nil
 }
 
 // emitExtract emits to f an instruction to extract the index'th
 // component of tuple.  It returns the extracted value.
 //
-func emitExtract(b *Function, tuple Value, index int) Value {
+func emitExtract(b *builder, tuple Value, index int) Value {
 	e := &Extract{Tuple: tuple, Index: index}
 	e.setType(tuple.Type().(*Tuple).At(index).Type())
 	return b.emit(e)
@@ -298,7 +298,7 @@ func emitExtract(b *Function, tuple Value, index int) Value {
 // emitTypeAssert emits to f a type assertion value := x.(t) and
 // returns the value.  x.Type() must be an interface.
 //
-func emitTypeAssert(b *Function, x Value, t Type, pos Pos) Value {
+func emitTypeAssert(b *builder, x Value, t Type, pos Pos) Value {
 	a := &TypeAssert{X: x, AssertedType: t}
 	a.setPos(pos)
 	a.setType(t)
@@ -308,7 +308,7 @@ func emitTypeAssert(b *Function, x Value, t Type, pos Pos) Value {
 // emitTypeTest emits to f a type test value,ok := x.(t) and returns
 // a (value, ok) tuple.  x.Type() must be an interface.
 //
-func emitTypeTest(b *Function, x Value, t Type, pos Pos) Value {
+func emitTypeTest(b *builder, x Value, t Type, pos Pos) Value {
 	a := &TypeAssert{
 		X:            x,
 		AssertedType: t,
@@ -328,8 +328,8 @@ func emitTypeTest(b *Function, x Value, t Type, pos Pos) Value {
 // Precondition: f does/will not use deferred procedure calls.
 // Postcondition: f.currentBlock is nil.
 //
-func emitTailCall(b *Function, call *Call) {
-	tresults := b.Signature.Results()
+func emitTailCall(b *builder, call *Call) {
+	tresults := b.Fn.Signature.Results()
 	nr := tresults.Len()
 	if nr == 1 {
 		call.typ = tresults.At(0).Type()
@@ -354,7 +354,7 @@ func emitTailCall(b *Function, call *Call) {
 		}
 	}
 	b.emit(&ret)
-	b.currentBlock = nil
+	b.Fn.currentBlock = nil
 }
 
 // emitImplicitSelections emits to f code to apply the sequence of
@@ -365,7 +365,7 @@ func emitTailCall(b *Function, call *Call) {
 // a field; if it is the value of a struct, the result will be the
 // value of a field.
 //
-func emitImplicitSelections(b *Function, v Value, indices []int) Value {
+func emitImplicitSelections(b *builder, v Value, indices []int) Value {
 	for _, index := range indices {
 		fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 
@@ -399,7 +399,7 @@ func emitImplicitSelections(b *Function, v Value, indices []int) Value {
 // field's value.
 // Ident id is used for position and debug info.
 //
-func emitFieldSelection(b *Function, v Value, index int, wantAddr bool, id *Name) Value {
+func emitFieldSelection(b *builder, v Value, index int, wantAddr bool, id *Name) Value {
 	fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 	if isPointer(v.Type()) {
 		instr := &FieldAddr{
@@ -429,10 +429,10 @@ func emitFieldSelection(b *Function, v Value, index int, wantAddr bool, id *Name
 // zeroValue emits to f code to produce a zero value of type t,
 // and returns it.
 //
-func zeroValue(b *Function, t Type) Value {
+func zeroValue(b *builder, t Type) Value {
 	switch t.Underlying().(type) {
 	case *Struct, *Array:
-		return emitLoad(b, b.addLocal(t, NoPos))
+		return emitLoad(b, b.Fn.addLocal(t, NoPos))
 	default:
 		return zeroConst(t)
 	}
@@ -447,23 +447,24 @@ func zeroValue(b *Function, t Type) Value {
 //
 // Idempotent.
 //
-func createRecoverBlock(b *Function) {
-	if b.Recover != nil {
+func createRecoverBlock(b *builder) {
+	fn := b.Fn
+	if fn.Recover != nil {
 		return // already created
 	}
-	saved := b.currentBlock
+	saved := fn.currentBlock
 
-	b.Recover = b.newBasicBlock("recover")
-	b.currentBlock = b.Recover
+	fn.Recover = fn.newBasicBlock("recover")
+	b.Fn.currentBlock = b.Fn.Recover
 
 	var results []Value
-	if b.namedResults != nil {
+	if fn.namedResults != nil {
 		// Reload NRPs to form value tuple.
-		for _, r := range b.namedResults {
+		for _, r := range fn.namedResults {
 			results = append(results, emitLoad(b, r))
 		}
 	} else {
-		R := b.Signature.Results()
+		R := fn.Signature.Results()
 		for i, n := 0, R.Len(); i < n; i++ {
 			T := R.At(i).Type()
 
@@ -473,5 +474,5 @@ func createRecoverBlock(b *Function) {
 	}
 	b.emit(&Return{Results: results})
 
-	b.currentBlock = saved
+	b.Fn.currentBlock = saved
 }

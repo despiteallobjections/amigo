@@ -16,10 +16,10 @@ import (
 // pointer to permit updates to elements of maps.
 //
 type lvalue interface {
-	store(fn *Function, v Value) // stores v into the location
-	load(fn *Function) Value     // loads the contents of the location
-	address(fn *Function) Value  // address of the location
-	typ() Type                   // returns the type of the location
+	store(b *builder, v Value) // stores v into the location
+	load(b *builder) Value     // loads the contents of the location
+	address(b *builder) Value  // address of the location
+	typ() Type                 // returns the type of the location
 }
 
 // An address is an lvalue represented by a true pointer.
@@ -29,23 +29,23 @@ type address struct {
 	expr Expr // source syntax of the value (not address) [debug mode]
 }
 
-func (a *address) load(fn *Function) Value {
-	load := emitLoad(fn, a.addr)
+func (a *address) load(b *builder) Value {
+	load := emitLoad(b, a.addr)
 	load.pos = a.pos
 	return load
 }
 
-func (a *address) store(fn *Function, v Value) {
-	store := emitStore(fn, a.addr, v, a.pos)
+func (a *address) store(b *builder, v Value) {
+	store := emitStore(b, a.addr, v, a.pos)
 	if a.expr != nil {
 		// store.Val is v, converted for assignability.
-		emitDebugRef(fn, a.expr, store.Val, false)
+		emitDebugRef(b, a.expr, store.Val, false)
 	}
 }
 
-func (a *address) address(fn *Function) Value {
+func (a *address) address(b *builder) Value {
 	if a.expr != nil {
-		emitDebugRef(fn, a.expr, a.addr, true)
+		emitDebugRef(b, a.expr, a.addr, true)
 	}
 	return a.addr
 }
@@ -65,27 +65,27 @@ type element struct {
 	pos  Pos   // source position of colon ({k:v}) or lbrack (m[k]=v)
 }
 
-func (e *element) load(fn *Function) Value {
+func (e *element) load(b *builder) Value {
 	l := &Lookup{
 		X:     e.m,
 		Index: e.k,
 	}
 	l.setPos(e.pos)
 	l.setType(e.t)
-	return fn.emit(l)
+	return b.emit(l)
 }
 
-func (e *element) store(fn *Function, v Value) {
+func (e *element) store(b *builder, v Value) {
 	up := &MapUpdate{
 		Map:   e.m,
 		Key:   e.k,
-		Value: emitConv(fn, v, e.t),
+		Value: emitConv(b, v, e.t),
 	}
 	up.pos = e.pos
-	fn.emit(up)
+	b.emit(up)
 }
 
-func (e *element) address(fn *Function) Value {
+func (e *element) address(b *builder) Value {
 	panic("map/string elements are not addressable")
 }
 
@@ -98,15 +98,15 @@ func (e *element) typ() Type {
 //
 type blank struct{}
 
-func (bl blank) load(fn *Function) Value {
+func (bl blank) load(b *builder) Value {
 	panic("blank.load is illegal")
 }
 
-func (bl blank) store(fn *Function, v Value) {
+func (bl blank) store(b *builder, v Value) {
 	// no-op
 }
 
-func (bl blank) address(fn *Function) Value {
+func (bl blank) address(b *builder) Value {
 	panic("blank var is not addressable")
 }
 
