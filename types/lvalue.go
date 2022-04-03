@@ -30,22 +30,22 @@ type address struct {
 }
 
 func (a *address) load(b *builder) Value {
-	load := emitLoad(b, a.addr)
+	load := b.emitLoad(a.addr)
 	load.pos = a.pos
 	return load
 }
 
 func (a *address) store(b *builder, v Value) {
-	store := emitStore(b, a.addr, v, a.pos)
+	store := b.emitStore(a.addr, v, a.pos)
 	if a.expr != nil {
 		// store.Val is v, converted for assignability.
-		emitDebugRef(b, a.expr, store.Val, false)
+		b.emitDebugRef(a.expr, store.Val, false)
 	}
 }
 
 func (a *address) address(b *builder) Value {
 	if a.expr != nil {
-		emitDebugRef(b, a.expr, a.addr, true)
+		b.emitDebugRef(a.expr, a.addr, true)
 	}
 	return a.addr
 }
@@ -79,7 +79,7 @@ func (e *element) store(b *builder, v Value) {
 	up := &MapUpdate{
 		Map:   e.m,
 		Key:   e.k,
-		Value: emitConv(b, v, e.t),
+		Value: b.emitConv(v, e.t),
 	}
 	up.pos = e.pos
 	b.emit(up)

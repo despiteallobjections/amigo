@@ -15,7 +15,7 @@ import (
 // emitNew emits to f a new (heap Alloc) instruction allocating an
 // object of type typ.  pos is the optional source location.
 //
-func emitNew(b *builder, typ Type, pos Pos) *Alloc {
+func (b *builder) emitNew(typ Type, pos Pos) *Alloc {
 	v := &Alloc{Heap: true}
 	v.setType(NewPointer(typ))
 	v.setPos(pos)
@@ -26,7 +26,7 @@ func emitNew(b *builder, typ Type, pos Pos) *Alloc {
 // emitLoad emits to f an instruction to load the address addr into a
 // new temporary, and returns the value so defined.
 //
-func emitLoad(b *builder, addr Value) *UnOp {
+func (b *builder) emitLoad(addr Value) *UnOp {
 	v := &UnOp{Op: Mul, X: addr}
 	v.setType(ssaDeref(addr.Type()))
 	b.emit(v)
@@ -36,7 +36,7 @@ func emitLoad(b *builder, addr Value) *UnOp {
 // emitDebugRef emits to f a DebugRef pseudo-instruction associating
 // expression e with value v.
 //
-func emitDebugRef(b *builder, e Expr, v Value, isAddr bool) {
+func (b *builder) emitDebugRef(e Expr, v Value, isAddr bool) {
 	if !b.Fn.debugInfo() {
 		return // debugging not enabled
 	}
@@ -68,19 +68,19 @@ func emitDebugRef(b *builder, e Expr, v Value, isAddr bool) {
 // (Use emitCompare() for comparisons and Builder.logicalBinop() for
 // non-eager operations.)
 //
-func emitArith(b *builder, op Operator, x, y Value, t Type, pos Pos) Value {
+func (b *builder) emitArith(op Operator, x, y Value, t Type, pos Pos) Value {
 	switch op {
 	case Shl, Shr:
-		x = emitConv(b, x, t)
+		x = b.emitConv(x, t)
 		// y may be signed or an 'untyped' constant.
 		// TODO(adonovan): whence signed values?
 		if yt, ok := y.Type().Underlying().(*Basic); ok && yt.Info()&IsUnsigned == 0 {
-			y = emitConv(b, y, Typ[Uint64])
+			y = b.emitConv(y, Typ[Uint64])
 		}
 
 	case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
-		x = emitConv(b, x, t)
-		y = emitConv(b, y, t)
+		x = b.emitConv(x, t)
+		y = b.emitConv(y, t)
 
 	default:
 		panic("illegal op in emitArith: " + op.String())
@@ -99,7 +99,7 @@ func emitArith(b *builder, op Operator, x, y Value, t Type, pos Pos) Value {
 // emitCompare emits to f code compute the boolean result of
 // comparison comparison 'x op y'.
 //
-func emitCompare(b *builder, op Operator, x, y Value, pos Pos) Value {
+func (b *builder) emitCompare(op Operator, x, y Value, pos Pos) Value {
 	xt := x.Type().Underlying()
 	yt := y.Type().Underlying()
 
@@ -119,13 +119,13 @@ func emitCompare(b *builder, op Operator, x, y Value, pos Pos) Value {
 	if Identical(xt, yt) {
 		// no conversion necessary
 	} else if _, ok := xt.(*Interface); ok {
-		y = emitConv(b, y, x.Type())
+		y = b.emitConv(y, x.Type())
 	} else if _, ok := yt.(*Interface); ok {
-		x = emitConv(b, x, y.Type())
+		x = b.emitConv(x, y.Type())
 	} else if _, ok := x.(*SSAConst); ok {
-		x = emitConv(b, x, y.Type())
+		x = b.emitConv(x, y.Type())
 	} else if _, ok := y.(*SSAConst); ok {
-		y = emitConv(b, y, x.Type())
+		y = b.emitConv(y, x.Type())
 	} else {
 		// other cases, e.g. channels.  No-op.
 	}
@@ -169,7 +169,7 @@ func isValuePreserving(ut_src, ut_dst Type) bool {
 // by language assignability rules in assignments, parameter passing,
 // etc.
 //
-func emitConv(b *builder, val Value, typ Type) Value {
+func (b *builder) emitConv(val Value, typ Type) Value {
 	t_src := val.Type()
 
 	// Identical types?  Conversion is a no-op.
@@ -203,7 +203,7 @@ func emitConv(b *builder, val Value, typ Type) Value {
 
 		// Convert (non-nil) "untyped" literals to their default type.
 		if t, ok := ut_src.(*Basic); ok && t.Info()&IsUntyped != 0 {
-			val = emitConv(b, val, Default(ut_src))
+			val = b.emitConv(val, Default(ut_src))
 		}
 
 		b.Prog.needMethodsOf(val.Type())
@@ -254,10 +254,10 @@ func emitConv(b *builder, val Value, typ Type) Value {
 // emitStore emits to f an instruction to store value val at location
 // addr, applying implicit conversions as required by assignability rules.
 //
-func emitStore(b *builder, addr, val Value, pos Pos) *Store {
+func (b *builder) emitStore(addr, val Value, pos Pos) *Store {
 	s := &Store{
 		Addr: addr,
-		Val:  emitConv(b, val, ssaDeref(addr.Type())),
+		Val:  b.emitConv(val, ssaDeref(addr.Type())),
 		pos:  pos,
 	}
 	b.emit(s)
@@ -267,7 +267,7 @@ func emitStore(b *builder, addr, val Value, pos Pos) *Store {
 // emitJump emits to f a jump to target, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
-func emitJump(b *builder, target *BasicBlock) {
+func (b *builder) emitJump(target *BasicBlock) {
 	block := b.currentBlock
 	block.emit(new(Jump))
 	addEdge(block, target)
@@ -278,7 +278,7 @@ func emitJump(b *builder, target *BasicBlock) {
 // cond, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
-func emitIf(b *builder, cond Value, tblock, fblock *BasicBlock) {
+func (b *builder) emitIf(cond Value, tblock, fblock *BasicBlock) {
 	block := b.currentBlock
 	block.emit(&If{Cond: cond})
 	addEdge(block, tblock)
@@ -289,7 +289,7 @@ func emitIf(b *builder, cond Value, tblock, fblock *BasicBlock) {
 // emitExtract emits to f an instruction to extract the index'th
 // component of tuple.  It returns the extracted value.
 //
-func emitExtract(b *builder, tuple Value, index int) Value {
+func (b *builder) emitExtract(tuple Value, index int) Value {
 	e := &Extract{Tuple: tuple, Index: index}
 	e.setType(tuple.Type().(*Tuple).At(index).Type())
 	return b.emit(e)
@@ -298,7 +298,7 @@ func emitExtract(b *builder, tuple Value, index int) Value {
 // emitTypeAssert emits to f a type assertion value := x.(t) and
 // returns the value.  x.Type() must be an interface.
 //
-func emitTypeAssert(b *builder, x Value, t Type, pos Pos) Value {
+func (b *builder) emitTypeAssert(x Value, t Type, pos Pos) Value {
 	a := &TypeAssert{X: x, AssertedType: t}
 	a.setPos(pos)
 	a.setType(t)
@@ -308,7 +308,7 @@ func emitTypeAssert(b *builder, x Value, t Type, pos Pos) Value {
 // emitTypeTest emits to f a type test value,ok := x.(t) and returns
 // a (value, ok) tuple.  x.Type() must be an interface.
 //
-func emitTypeTest(b *builder, x Value, t Type, pos Pos) Value {
+func (b *builder) emitTypeTest(x Value, t Type, pos Pos) Value {
 	a := &TypeAssert{
 		X:            x,
 		AssertedType: t,
@@ -328,7 +328,7 @@ func emitTypeTest(b *builder, x Value, t Type, pos Pos) Value {
 // Precondition: f does/will not use deferred procedure calls.
 // Postcondition: f.currentBlock is nil.
 //
-func emitTailCall(b *builder, call *Call) {
+func (b *builder) emitTailCall(call *Call) {
 	tresults := b.Fn.Signature.Results()
 	nr := tresults.Len()
 	if nr == 1 {
@@ -345,7 +345,7 @@ func emitTailCall(b *builder, call *Call) {
 		ret.Results = []Value{tuple}
 	default:
 		for i := 0; i < nr; i++ {
-			v := emitExtract(b, tuple, i)
+			v := b.emitExtract(tuple, i)
 			// TODO(adonovan): in principle, this is required:
 			//   v = emitConv(f, o.Type, f.Signature.Results[i].Type)
 			// but in practice emitTailCall is only used when
@@ -365,7 +365,7 @@ func emitTailCall(b *builder, call *Call) {
 // a field; if it is the value of a struct, the result will be the
 // value of a field.
 //
-func emitImplicitSelections(b *builder, v Value, indices []int) Value {
+func (b *builder) emitImplicitSelections(v Value, indices []int) Value {
 	for _, index := range indices {
 		fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 
@@ -378,7 +378,7 @@ func emitImplicitSelections(b *builder, v Value, indices []int) Value {
 			v = b.emit(instr)
 			// Load the field's value iff indirectly embedded.
 			if isPointer(fld.Type()) {
-				v = emitLoad(b, v)
+				v = b.emitLoad(v)
 			}
 		} else {
 			instr := &SSAField{
@@ -399,7 +399,7 @@ func emitImplicitSelections(b *builder, v Value, indices []int) Value {
 // field's value.
 // Ident id is used for position and debug info.
 //
-func emitFieldSelection(b *builder, v Value, index int, wantAddr bool, id *Name) Value {
+func (b *builder) emitFieldSelection(v Value, index int, wantAddr bool, id *Name) Value {
 	fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 	if isPointer(v.Type()) {
 		instr := &FieldAddr{
@@ -411,7 +411,7 @@ func emitFieldSelection(b *builder, v Value, index int, wantAddr bool, id *Name)
 		v = b.emit(instr)
 		// Load the field's value iff we don't want its address.
 		if !wantAddr {
-			v = emitLoad(b, v)
+			v = b.emitLoad(v)
 		}
 	} else {
 		instr := &SSAField{
@@ -422,7 +422,7 @@ func emitFieldSelection(b *builder, v Value, index int, wantAddr bool, id *Name)
 		instr.setType(fld.Type())
 		v = b.emit(instr)
 	}
-	emitDebugRef(b, id, v, wantAddr)
+	b.emitDebugRef(id, v, wantAddr)
 	return v
 }
 
@@ -432,7 +432,7 @@ func emitFieldSelection(b *builder, v Value, index int, wantAddr bool, id *Name)
 func zeroValue(b *builder, t Type) Value {
 	switch t.Underlying().(type) {
 	case *Struct, *Array:
-		return emitLoad(b, b.addLocal(t, NoPos))
+		return b.emitLoad(b.addLocal(t, NoPos))
 	default:
 		return zeroConst(t)
 	}
@@ -461,7 +461,7 @@ func createRecoverBlock(b *builder) {
 	if b.namedResults != nil {
 		// Reload NRPs to form value tuple.
 		for _, r := range b.namedResults {
-			results = append(results, emitLoad(b, r))
+			results = append(results, b.emitLoad(r))
 		}
 	} else {
 		R := fn.Signature.Results()

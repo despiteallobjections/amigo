@@ -136,7 +136,7 @@ func (b *builder) cond(e Expr, t, f *BasicBlock) {
 	// The value of a constant condition may be platform-specific,
 	// and may cause blocks that are reachable in some configuration
 	// to be hidden from subsequent analyses such as bug-finding tools.
-	emitIf(b, b.expr(e), t, f)
+	b.emitIf(b.expr(e), t, f)
 }
 
 // logicalBinop emits code to fn to evaluate e, a &&- or
@@ -186,7 +186,7 @@ func (b *builder) logicalBinop(e *Operation) Value {
 	// The edge from e.Y to done carries the value of e.Y.
 	b.currentBlock = rhs
 	edges = append(edges, b.expr(e.Y))
-	emitJump(b, done)
+	b.emitJump(done)
 	b.currentBlock = done
 
 	phi := &Phi{Edges: edges, Comment: e.Op.String()}
@@ -223,7 +223,7 @@ func (b *builder) exprN(e Expr) Value {
 		mapt := b.Fn.Pkg.typeOf(e.X).Underlying().(*Map)
 		lookup := &Lookup{
 			X:       b.expr(e.X),
-			Index:   emitConv(b, b.expr(e.Index), mapt.Key()),
+			Index:   b.emitConv(b.expr(e.Index), mapt.Key()),
 			CommaOk: true,
 		}
 		lookup.setType(typ)
@@ -231,7 +231,7 @@ func (b *builder) exprN(e Expr) Value {
 		return b.emit(lookup)
 
 	case *AssertExpr:
-		return emitTypeTest(b, b.expr(e.X), typ.At(0).Type(), e.Pos() /*Lparen*/)
+		return b.emitTypeTest(b.expr(e.X), typ.At(0).Type(), e.Pos() /*Lparen*/)
 
 	case *Operation:
 		unop := &UnOp{
@@ -268,7 +268,7 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 				// treat make([]T, n, m) as new([m]T)[:n]
 				cap := m.Int64()
 				at := NewArray(typ.Underlying().(*Slice).Elem(), cap)
-				alloc := emitNew(b, at, pos)
+				alloc := b.emitNew(at, pos)
 				alloc.Comment = "makeslice"
 				v := &SSASlice{
 					X:    alloc,
@@ -308,7 +308,7 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 		}
 
 	case "new":
-		alloc := emitNew(b, ssaDeref(typ), pos)
+		alloc := b.emitNew(ssaDeref(typ), pos)
 		alloc.Comment = "new"
 		return alloc
 
@@ -327,7 +327,7 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 
 	case "panic":
 		b.emit(&Panic{
-			X:   emitConv(b, b.expr(args[0]), tEface),
+			X:   b.emitConv(b.expr(args[0]), tEface),
 			pos: pos,
 		})
 		b.currentBlock = b.newBasicBlock("unreachable")
@@ -376,7 +376,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		t := ssaDeref(b.Fn.Pkg.typeOf(e))
 		var v *Alloc
 		if escaping {
-			v = emitNew(b, t, e.Pos() /*Lbrace*/)
+			v = b.emitNew(t, e.Pos() /*Lbrace*/)
 		} else {
 			v = b.addLocal(t, e.Pos() /*Lbrace*/)
 		}
@@ -402,7 +402,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		v := b.receiver(e.X, wantAddr, escaping, sel)
 		last := len(sel.Index()) - 1
 		return &address{
-			addr: emitFieldSelection(b, v, sel.Index()[last], true, e.Sel),
+			addr: b.emitFieldSelection(v, sel.Index()[last], true, e.Sel),
 			pos:  e.Sel.Pos(),
 			expr: e.Sel,
 		}
@@ -423,7 +423,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		case *Map:
 			return &element{
 				m:   b.expr(e.X),
-				k:   emitConv(b, b.expr(e.Index), t.Key()),
+				k:   b.emitConv(b.expr(e.Index), t.Key()),
 				t:   t.Elem(),
 				pos: e.Pos(), /*Lbrack*/
 			}
@@ -432,7 +432,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		}
 		v := &IndexAddr{
 			X:     x,
-			Index: emitConv(b, b.expr(e.Index), tInt),
+			Index: b.emitConv(b.expr(e.Index), tInt),
 		}
 		v.setPos(e.Pos() /*Lbrack*/)
 		v.setType(et)
@@ -515,7 +515,7 @@ func (b *builder) assign(loc lvalue, e Expr, isZero bool, sb *storebuf) {
 				// slice and map are handled by store ops in compLit.
 				switch loc.typ().Underlying().(type) {
 				case *Struct, *Array:
-					emitDebugRef(b, e, addr, true)
+					b.emitDebugRef(e, addr, true)
 				}
 
 				return
@@ -555,7 +555,7 @@ func (b *builder) expr(e Expr) Value {
 		v = b.expr0(e, tv)
 	}
 	if b.Fn.debugInfo() {
-		emitDebugRef(b, e, v, false)
+		b.emitDebugRef(e, v, false)
 	}
 	return v
 }
@@ -587,13 +587,13 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		return b.emit(v)
 
 	case *AssertExpr:
-		return emitTypeAssert(b, b.expr(e.X), tv.Type, e.Pos() /*Lparen*/)
+		return b.emitTypeAssert(b.expr(e.X), tv.Type, e.Pos() /*Lparen*/)
 
 	case *CallExpr:
 		if b.Fn.Pkg.info.Types[e.Fun].IsType() {
 			// Explicit type conversion, e.g. string(x) or big.Int(x)
 			x := b.expr(e.ArgList[0])
-			y := emitConv(b, x, tv.Type)
+			y := b.emitConv(x, tv.Type)
 			if y != x {
 				switch y := y.(type) {
 				case *Convert:
@@ -658,12 +658,12 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			case Shl, Shr:
 				fallthrough
 			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
-				return emitArith(b, e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, e.Pos() /*OpPos*/)
+				return b.emitArith(e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, e.Pos() /*OpPos*/)
 
 			case Eql, Neq, Gtr, Lss, Leq, Geq:
-				cmp := emitCompare(b, e.Op, b.expr(e.X), b.expr(e.Y), e.Pos() /*OpPos*/)
+				cmp := b.emitCompare(e.Op, b.expr(e.X), b.expr(e.Y), e.Pos() /*OpPos*/)
 				// The type of x==y may be UntypedBool.
-				return emitConv(b, cmp, Default(tv.Type))
+				return b.emitConv(cmp, Default(tv.Type))
 			default:
 				panic("illegal op in BinaryExpr: " + e.Op.String())
 			}
@@ -713,12 +713,12 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		// Package-level func or var?
 		if v := b.Prog.packageLevelValue(obj); v != nil {
 			if _, ok := obj.(*Var); ok {
-				return emitLoad(b, v) // var (address)
+				return b.emitLoad(v) // var (address)
 			}
 			return v // (func)
 		}
 		// Local var.
-		return emitLoad(b, b.lookup(b.Fn, obj.(*Var), false)) // var (address)
+		return b.emitLoad(b.lookup(b.Fn, obj.(*Var), false)) // var (address)
 
 	case *SelectorExpr:
 		sel, ok := b.Fn.Pkg.info.Selections[e]
@@ -734,7 +734,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		case MethodExpr:
 			// (*T).f or T.f, the method f from the method-set of type T.
 			// The result is a "thunk".
-			return emitConv(b, b.Prog.makeThunk(sel), tv.Type)
+			return b.emitConv(b.Prog.makeThunk(sel), tv.Type)
 
 		case MethodVal:
 			// e.f where e is an expression and f is a method.
@@ -748,7 +748,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				// If v has interface type I,
 				// we must emit a check that v is non-nil.
 				// We use: typeassert v.(I).
-				emitTypeAssert(b, v, rt, NoPos)
+				b.emitTypeAssert(v, rt, NoPos)
 			}
 			c := &MakeClosure{
 				Fn:       b.Prog.makeBound(obj),
@@ -762,8 +762,8 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			indices := sel.Index()
 			last := len(indices) - 1
 			v := b.expr(e.X)
-			v = emitImplicitSelections(b, v, indices[:last])
-			v = emitFieldSelection(b, v, indices[last], false, e.Sel)
+			v = b.emitImplicitSelections(v, indices[:last])
+			v = b.emitFieldSelection(v, indices[last], false, e.Sel)
 			return v
 		}
 
@@ -775,7 +775,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			// Non-addressable array (in a register).
 			v := &Index{
 				X:     b.expr(e.X),
-				Index: emitConv(b, b.expr(e.Index), tInt),
+				Index: b.emitConv(b.expr(e.Index), tInt),
 			}
 			v.setPos(e.Pos() /*Lbrack*/)
 			v.setType(t.Elem())
@@ -786,7 +786,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			mapt := b.Fn.Pkg.typeOf(e.X).Underlying().(*Map)
 			v := &Lookup{
 				X:     b.expr(e.X),
-				Index: emitConv(b, b.expr(e.Index), mapt.Key()),
+				Index: b.emitConv(b.expr(e.Index), mapt.Key()),
 			}
 			v.setPos(e.Pos() /*Lbrack*/)
 			v.setType(mapt.Elem())
@@ -845,9 +845,9 @@ func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) Valu
 	}
 
 	last := len(sel.Index()) - 1
-	v = emitImplicitSelections(b, v, sel.Index()[:last])
+	v = b.emitImplicitSelections(v, sel.Index()[:last])
 	if !wantAddr && isPointer(v.Type()) {
-		v = emitLoad(b, v)
+		v = b.emitLoad(v)
 	}
 	return v
 }
@@ -923,7 +923,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 	// f(x, y, z...): pass slice z straight through.
 	if e.HasDots {
 		for i, arg := range e.ArgList {
-			v := emitConv(b, b.expr(arg), sig.Params().At(i).Type())
+			v := b.emitConv(b.expr(arg), sig.Params().At(i).Type())
 			args = append(args, v)
 		}
 		return args
@@ -940,7 +940,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 		v := b.expr(arg)
 		if ttuple, ok := v.Type().(*Tuple); ok { // MRV chain
 			for i, n := 0, ttuple.Len(); i < n; i++ {
-				args = append(args, emitExtract(b, v, i))
+				args = append(args, b.emitExtract(v, i))
 			}
 		} else {
 			args = append(args, v)
@@ -953,7 +953,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 		np--
 	}
 	for i := 0; i < np; i++ {
-		args[offset+i] = emitConv(b, args[offset+i], sig.Params().At(i).Type())
+		args[offset+i] = b.emitConv(args[offset+i], sig.Params().At(i).Type())
 	}
 
 	// Actual->formal assignability conversions for variadic parameter,
@@ -967,7 +967,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 		} else {
 			// Replace a suffix of args with a slice containing it.
 			at := NewArray(vt, int64(len(varargs)))
-			a := emitNew(b, at, NoPos)
+			a := b.emitNew(at, NoPos)
 			a.setPos(e.Pos() /*Rparen*/)
 			a.Comment = "varargs"
 			for i, arg := range varargs {
@@ -977,7 +977,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 				}
 				iaddr.setType(NewPointer(vt))
 				b.emit(iaddr)
-				emitStore(b, iaddr, arg, arg.Pos())
+				b.emitStore(iaddr, arg, arg.Pos())
 			}
 			s := &SSASlice{X: a}
 			s.setType(st)
@@ -1006,7 +1006,7 @@ func (b *builder) setCall(e *CallExpr, c *CallCommon) {
 // assignOp emits to fn code to perform loc <op>= val.
 func (b *builder) assignOp(loc lvalue, val Value, op Operator, pos Pos) {
 	oldv := loc.load(b)
-	loc.store(b, emitArith(b, op, oldv, emitConv(b, val, oldv.Type()), loc.typ(), pos))
+	loc.store(b, b.emitArith(op, oldv, b.emitConv(val, oldv.Type()), loc.typ(), pos))
 }
 
 // localValueSpec emits to fn code to define all of the vars in the
@@ -1034,7 +1034,7 @@ func (b *builder) localValueSpec(spec *VarSpec) {
 			if !isBlankIdent(id) {
 				lhs := b.addLocalForIdent(id)
 				if b.Fn.debugInfo() {
-					emitDebugRef(b, id, lhs, true)
+					b.emitDebugRef(id, lhs, true)
 				}
 			}
 		}
@@ -1046,7 +1046,7 @@ func (b *builder) localValueSpec(spec *VarSpec) {
 			if !isBlankIdent(id) {
 				b.addLocalForIdent(id)
 				lhs := b.addr(id, false) // non-escaping
-				lhs.store(b, emitExtract(b, tuple, i))
+				lhs.store(b, b.emitExtract(tuple, i))
 			}
 		}
 	}
@@ -1089,9 +1089,9 @@ func (b *builder) assignStmt(lhss, rhss []Expr, isDef bool) {
 	} else {
 		// e.g. x, y = pos()
 		tuple := b.exprN(rhss[0])
-		emitDebugRef(b, rhss[0], tuple, false)
+		b.emitDebugRef(rhss[0], tuple, false)
 		for i, lval := range lvals {
-			lval.store(b, emitExtract(b, tuple, i))
+			lval.store(b, b.emitExtract(tuple, i))
 		}
 	}
 }
@@ -1173,7 +1173,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 		switch t := t.(type) {
 		case *Slice:
 			at = NewArray(t.Elem(), b.arrayLen(e.ElemList))
-			alloc := emitNew(b, at, e.Pos() /*Lbrace*/)
+			alloc := b.emitNew(at, e.Pos() /*Lbrace*/)
 			alloc.Comment = "slicelit"
 			array = alloc
 		case *Array:
@@ -1248,7 +1248,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 
 			loc := element{
 				m:   m,
-				k:   emitConv(b, key, t.Key()),
+				k:   b.emitConv(key, t.Key()),
 				t:   t.Elem(),
 				pos: e.Pos(), /*Colon*/
 			}
@@ -1324,8 +1324,8 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 			// instead of BinOp(EQL, tag, b.expr(cond))
 			// followed by If.  Don't forget conversions
 			// though.
-			cond := emitCompare(b, Eql, tag, b.expr(cond), NoPos)
-			emitIf(b, cond, body, nextCond)
+			cond := b.emitCompare(Eql, tag, b.expr(cond), NoPos)
+			b.emitIf(cond, body, nextCond)
 			b.currentBlock = nextCond
 		}
 		b.currentBlock = body
@@ -1336,11 +1336,11 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 		}
 		b.stmtList(cc.Body)
 		b.targets = b.targets.tail
-		emitJump(b, done)
+		b.emitJump(done)
 		b.currentBlock = nextCond
 	}
 	if dfltBlock != nil {
-		emitJump(b, dfltBlock)
+		b.emitJump(dfltBlock)
 		b.currentBlock = dfltBlock
 		b.targets = &targets{
 			tail:         b.targets,
@@ -1350,7 +1350,7 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 		b.stmtList(*dfltBody)
 		b.targets = b.targets.tail
 	}
-	emitJump(b, done)
+	b.emitJump(done)
 	b.currentBlock = done
 }
 
@@ -1431,14 +1431,14 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
 			casetype = b.Fn.Pkg.typeOf(cond)
 			var condv Value
 			if casetype == tUntypedNil {
-				condv = emitCompare(b, Eql, x, nilConst(x.Type()), NoPos)
+				condv = b.emitCompare(Eql, x, nilConst(x.Type()), NoPos)
 				ti = x
 			} else {
-				yok := emitTypeTest(b, x, casetype, cc.Pos() /*Case*/)
-				ti = emitExtract(b, yok, 0)
-				condv = emitExtract(b, yok, 1)
+				yok := b.emitTypeTest(x, casetype, cc.Pos() /*Case*/)
+				ti = b.emitExtract(yok, 0)
+				condv = b.emitExtract(yok, 1)
 			}
-			emitIf(b, condv, body, next)
+			b.emitIf(condv, body, next)
 			b.currentBlock = next
 		}
 		if len(unpackExpr(cc.Cases)) != 1 {
@@ -1451,7 +1451,7 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
 	if default_ != nil {
 		b.typeCaseBody(default_, x, done)
 	} else {
-		emitJump(b, done)
+		b.emitJump(done)
 	}
 	b.currentBlock = done
 }
@@ -1463,7 +1463,7 @@ func (b *builder) typeCaseBody(cc *CaseClause, x Value, done *BasicBlock) {
 		// In a single-type case, y has that type.
 		// In multi-type cases, 'case nil' and default,
 		// y has the same type as the interface operand.
-		emitStore(b, b.addNamedLocal(obj.(*Var)), x, obj.Pos())
+		b.emitStore(b.addNamedLocal(obj.(*Var)), x, obj.Pos())
 	}
 	b.targets = &targets{
 		tail:   b.targets,
@@ -1471,7 +1471,7 @@ func (b *builder) typeCaseBody(cc *CaseClause, x Value, done *BasicBlock) {
 	}
 	b.stmtList(cc.Body)
 	b.targets = b.targets.tail
-	emitJump(b, done)
+	b.emitJump(done)
 }
 
 // selectStmt emits to fn code for the select statement s, optionally
@@ -1495,7 +1495,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			}
 			b.stmtList(clause.Body)
 			b.targets = b.targets.tail
-			emitJump(b, done)
+			b.emitJump(done)
 			b.currentBlock = done
 			return
 		}
@@ -1518,7 +1518,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			st = &SelectState{
 				Dir:  SendOnly,
 				Chan: ch,
-				Send: emitConv(b, b.expr(comm.Value),
+				Send: b.emitConv(b.expr(comm.Value),
 					ch.Type().Underlying().(*Chan).Elem()),
 				Pos: comm.Pos(), /*Arrow*/
 			}
@@ -1579,7 +1579,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 	sel.setType(NewTuple(vars...))
 
 	b.emit(sel)
-	idx := emitExtract(b, sel, 0)
+	idx := b.emitExtract(sel, 0)
 
 	done := b.newBasicBlock("select.done")
 	if label != nil {
@@ -1597,7 +1597,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 		}
 		body := b.newBasicBlock("select.body")
 		next := b.newBasicBlock("select.next")
-		emitIf(b, emitCompare(b, Eql, idx, intConst(int64(state)), NoPos), body, next)
+		b.emitIf(b.emitCompare(Eql, idx, intConst(int64(state)), NoPos), body, next)
 		b.currentBlock = body
 		b.targets = &targets{
 			tail:   b.targets,
@@ -1606,8 +1606,8 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 		switch comm := clause.Comm.(type) {
 		case *ExprStmt:
 			if debugInfo {
-				v := emitExtract(b, sel, r)
-				emitDebugRef(b, states[state].DebugNode.(Expr), v, false)
+				v := b.emitExtract(sel, r)
+				b.emitDebugRef(states[state].DebugNode.(Expr), v, false)
 			}
 			r++
 
@@ -1618,9 +1618,9 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 				b.addLocalForIdent(lhs[0].(*Name))
 			}
 			x := b.addr(lhs[0], false) // non-escaping
-			v := emitExtract(b, sel, r)
+			v := b.emitExtract(sel, r)
 			if debugInfo {
-				emitDebugRef(b, states[state].DebugNode.(Expr), v, false)
+				b.emitDebugRef(states[state].DebugNode.(Expr), v, false)
 			}
 			x.store(b, v)
 
@@ -1629,13 +1629,13 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 					b.addLocalForIdent(lhs[1].(*Name))
 				}
 				ok := b.addr(lhs[1], false) // non-escaping
-				ok.store(b, emitExtract(b, sel, 1))
+				ok.store(b, b.emitExtract(sel, 1))
 			}
 			r++
 		}
 		b.stmtList(clause.Body)
 		b.targets = b.targets.tail
-		emitJump(b, done)
+		b.emitJump(done)
 		b.currentBlock = next
 		state++
 	}
@@ -1650,11 +1650,11 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 		// A blocking select must match some case.
 		// (This should really be a runtime.errorString, not a string.)
 		b.emit(&Panic{
-			X: emitConv(b, stringConst("blocking select matched no case"), tEface),
+			X: b.emitConv(stringConst("blocking select matched no case"), tEface),
 		})
 		b.currentBlock = b.newBasicBlock("unreachable")
 	}
-	emitJump(b, done)
+	b.emitJump(done)
 	b.currentBlock = done
 }
 
@@ -1690,7 +1690,7 @@ func (b *builder) forStmt(s *ForStmt, label *lblock) {
 		label._break = done
 		label._continue = cont
 	}
-	emitJump(b, loop)
+	b.emitJump(loop)
 	b.currentBlock = loop
 	if loop != body {
 		b.cond(s.Cond, body, done)
@@ -1703,12 +1703,12 @@ func (b *builder) forStmt(s *ForStmt, label *lblock) {
 	}
 	b.stmt(s.Body)
 	b.targets = b.targets.tail
-	emitJump(b, cont)
+	b.emitJump(cont)
 
 	if s.Post != nil {
 		b.currentBlock = cont
 		b.stmt(s.Post)
-		emitJump(b, loop) // back-edge
+		b.emitJump(loop) // back-edge
 	}
 	b.currentBlock = done
 }
@@ -1752,26 +1752,26 @@ func (b *builder) rangeIndexed(x Value, tv Type, pos Pos) (k, v Value, loop, don
 	}
 
 	index := b.addLocal(tInt, NoPos)
-	emitStore(b, index, intConst(-1), pos)
+	b.emitStore(index, intConst(-1), pos)
 
 	loop = b.newBasicBlock("rangeindex.loop")
-	emitJump(b, loop)
+	b.emitJump(loop)
 	b.currentBlock = loop
 
 	incr := &BinOp{
 		Op: Add,
-		X:  emitLoad(b, index),
+		X:  b.emitLoad(index),
 		Y:  vOne,
 	}
 	incr.setType(tInt)
-	emitStore(b, index, b.emit(incr), pos)
+	b.emitStore(index, b.emit(incr), pos)
 
 	body := b.newBasicBlock("rangeindex.body")
 	done = b.newBasicBlock("rangeindex.done")
-	emitIf(b, emitCompare(b, Lss, incr, length, NoPos), body, done)
+	b.emitIf(b.emitCompare(Lss, incr, length, NoPos), body, done)
 	b.currentBlock = body
 
-	k = emitLoad(b, index)
+	k = b.emitLoad(index)
 	if tv != nil {
 		switch t := x.Type().Underlying().(type) {
 		case *Array:
@@ -1790,7 +1790,7 @@ func (b *builder) rangeIndexed(x Value, tv Type, pos Pos) (k, v Value, loop, don
 			}
 			instr.setType(NewPointer(t.Elem().Underlying().(*Array).Elem()))
 			instr.setPos(x.Pos())
-			v = emitLoad(b, b.emit(instr))
+			v = b.emitLoad(b.emit(instr))
 
 		case *Slice:
 			instr := &IndexAddr{
@@ -1799,7 +1799,7 @@ func (b *builder) rangeIndexed(x Value, tv Type, pos Pos) (k, v Value, loop, don
 			}
 			instr.setType(NewPointer(t.Elem()))
 			instr.setPos(x.Pos())
-			v = emitLoad(b, b.emit(instr))
+			v = b.emitLoad(b.emit(instr))
 
 		default:
 			panic("rangeIndexed x:" + t.String())
@@ -1841,7 +1841,7 @@ func (b *builder) rangeIter(x Value, tk, tv Type, pos Pos) (k, v Value, loop, do
 	it := b.emit(rng)
 
 	loop = b.newBasicBlock("rangeiter.loop")
-	emitJump(b, loop)
+	b.emitJump(loop)
 	b.currentBlock = loop
 
 	_, isString := x.Type().Underlying().(*Basic)
@@ -1859,14 +1859,14 @@ func (b *builder) rangeIter(x Value, tk, tv Type, pos Pos) (k, v Value, loop, do
 
 	body := b.newBasicBlock("rangeiter.body")
 	done = b.newBasicBlock("rangeiter.done")
-	emitIf(b, emitExtract(b, okv, 0), body, done)
+	b.emitIf(b.emitExtract(okv, 0), body, done)
 	b.currentBlock = body
 
 	if tk != tInvalid {
-		k = emitExtract(b, okv, 1)
+		k = b.emitExtract(okv, 1)
 	}
 	if tv != tInvalid {
-		v = emitExtract(b, okv, 2)
+		v = b.emitExtract(okv, 2)
 	}
 	return
 }
@@ -1890,7 +1890,7 @@ func (b *builder) rangeChan(x Value, tk Type, pos Pos) (k Value, loop, done *Bas
 	// done:                                   (target of break)
 
 	loop = b.newBasicBlock("rangechan.loop")
-	emitJump(b, loop)
+	b.emitJump(loop)
 	b.currentBlock = loop
 	recv := &UnOp{
 		Op:      Recv,
@@ -1905,10 +1905,10 @@ func (b *builder) rangeChan(x Value, tk Type, pos Pos) (k Value, loop, done *Bas
 	ko := b.emit(recv)
 	body := b.newBasicBlock("rangechan.body")
 	done = b.newBasicBlock("rangechan.done")
-	emitIf(b, emitExtract(b, ko, 1), body, done)
+	b.emitIf(b.emitExtract(ko, 1), body, done)
 	b.currentBlock = body
 	if tk != nil {
-		k = emitExtract(b, ko, 0)
+		k = b.emitExtract(ko, 0)
 	}
 	return
 }
@@ -1988,7 +1988,7 @@ func (b *builder) rangeStmt(s *ForStmt, label *lblock) {
 	}
 	b.stmt(s.Body)
 	b.targets = b.targets.tail
-	emitJump(b, loop) // back-edge
+	b.emitJump(loop) // back-edge
 	b.currentBlock = done
 }
 
@@ -2013,7 +2013,7 @@ start:
 
 	case *LabeledStmt:
 		label = b.labelledBlock(s.Label)
-		emitJump(b, label._goto)
+		b.emitJump(label._goto)
 		b.currentBlock = label._goto
 		_s = s.Stmt
 		goto start // effectively: tailcall stmt(s.Stmt, label)
@@ -2024,7 +2024,7 @@ start:
 	case *SendStmt:
 		b.emit(&Send{
 			Chan: b.expr(s.Chan),
-			X: emitConv(b, b.expr(s.Value),
+			X: b.emitConv(b.expr(s.Value),
 				b.Fn.Pkg.typeOf(s.Chan).Underlying().(*Chan).Elem()),
 			pos: s.Pos(), /*Arrow*/
 		})
@@ -2074,13 +2074,13 @@ start:
 			ttuple := tuple.Type().(*Tuple)
 			for i, n := 0, ttuple.Len(); i < n; i++ {
 				results = append(results,
-					emitConv(b, emitExtract(b, tuple, i),
+					b.emitConv(b.emitExtract(tuple, i),
 						b.Fn.Signature.Results().At(i).Type()))
 			}
 		} else {
 			// 1:1 return, or no-arg return in non-void function.
 			for i, r := range unpackExpr(s.Results) {
-				v := emitConv(b, b.expr(r), b.Fn.Signature.Results().At(i).Type())
+				v := b.emitConv(b.expr(r), b.Fn.Signature.Results().At(i).Type())
 				results = append(results, v)
 			}
 		}
@@ -2088,7 +2088,7 @@ start:
 			// Function has named result parameters (NRPs).
 			// Perform parallel assignment of return operands to NRPs.
 			for i, r := range results {
-				emitStore(b, b.namedResults[i], r, s.Pos() /*Return*/)
+				b.emitStore(b.namedResults[i], r, s.Pos() /*Return*/)
 			}
 		}
 		// Run function calls deferred in this
@@ -2098,7 +2098,7 @@ start:
 			// Reload NRPs to form the result tuple.
 			results = results[:0]
 			for _, r := range b.namedResults {
-				results = append(results, emitLoad(b, r))
+				results = append(results, b.emitLoad(r))
 			}
 		}
 		b.emit(&Return{Results: results, pos: s.Pos() /*Return*/})
@@ -2133,7 +2133,7 @@ start:
 		case Goto:
 			block = b.labelledBlock(s.Label)._goto
 		}
-		emitJump(b, block)
+		b.emitJump(block)
 		b.currentBlock = b.newBasicBlock("unreachable")
 
 	case *BlockStmt:
@@ -2152,12 +2152,12 @@ start:
 		b.cond(s.Cond, then, els)
 		b.currentBlock = then
 		b.stmt(s.Then)
-		emitJump(b, done)
+		b.emitJump(done)
 
 		if s.Else != nil {
 			b.currentBlock = els
 			b.stmt(s.Else)
-			emitJump(b, done)
+			b.emitJump(done)
 		}
 
 		b.currentBlock = done
@@ -2320,9 +2320,9 @@ func (p *SSAPackage) build(prog *Program) {
 			initguard := p.Var("init$guard")
 			doinit := b.newBasicBlock("init.start")
 			done = b.newBasicBlock("init.done")
-			emitIf(b, emitLoad(b, initguard), done, doinit)
+			b.emitIf(b.emitLoad(initguard), done, doinit)
 			b.currentBlock = doinit
-			emitStore(b, initguard, vTrue, NoPos)
+			b.emitStore(initguard, vTrue, NoPos)
 
 			// Call the init() function of each package we import.
 			for _, pkg := range p.Pkg.Imports() {
@@ -2360,7 +2360,7 @@ func (p *SSAPackage) build(prog *Program) {
 					if v.Name() == "_" {
 						continue
 					}
-					emitStore(b, v.member, emitExtract(b, tuple, i), v.Pos())
+					b.emitStore(v.member, b.emitExtract(tuple, i), v.Pos())
 				}
 			}
 		}
@@ -2380,7 +2380,7 @@ func (p *SSAPackage) build(prog *Program) {
 
 		// Finish up init().
 		if prog.mode&BareInits == 0 {
-			emitJump(b, done)
+			b.emitJump(done)
 			b.currentBlock = done
 		}
 		b.emit(new(Return))
