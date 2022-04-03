@@ -10,7 +10,6 @@ package types
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
 	. "github.com/mdempsky/amigo/syntax"
@@ -158,7 +157,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		Pkg:       p,
 	}
 	obj.member = fn
-	p.Init = obj
+	p.Init = fn
 	p.Members[fn.name] = fn
 
 	// CREATE phase.
@@ -196,7 +195,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 			typ:    NewPointer(obj.Type()), // address
 		}
 		obj.member = initguard
-		p.InitGuard = obj
+		p.InitGuard = initguard
 		p.Members[initguard.Name()] = initguard
 	}
 
@@ -214,34 +213,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		prog.imported[p.Pkg.Path()] = p
 	}
 	prog.packages[p.Pkg] = p
-
-	const validate = true
-	if validate {
-		// Check that p.Pkg.Scope() and p.Members are consistent.
-		//
-		// TODO(mdempsky): How do we want to update existing uses of
-		// p.Members, particularly regarding the synthetic "init" objects?
-		// Do we just declare them in p.Pkg.Scope() directly?
-
-		for name, mem := range p.Members {
-			if name == "init" || name == "init$guard" || strings.HasPrefix(name, "init#") {
-				// ok
-			} else if obj := mem.Object(); obj == nil {
-				panic(fmt.Errorf("member %q (%v) has nil Object", name, mem))
-			} else if obj.Member() != mem {
-				panic(fmt.Errorf("member %q (%v) has Object %v, which has member %v", name, mem, obj, obj.Member()))
-			} else if obj2 := p.Pkg.Scope().Lookup(name); obj2 != obj {
-				panic(fmt.Errorf("member %q (%v) has Object %v, but Pkg.Scope has Object %v", name, mem, obj, obj2))
-			}
-		}
-
-		for _, name := range p.Pkg.Scope().Names() {
-			obj := p.Pkg.Scope().Lookup(name)
-			if obj.Member() != p.Members[name] {
-				panic(fmt.Errorf("object %q (%v) has Member %v, but p.Members has %v", name, obj, obj.Member(), p.Members[name]))
-			}
-		}
-	}
 
 	return p
 }

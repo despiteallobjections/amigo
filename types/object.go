@@ -30,9 +30,6 @@ type Object interface {
 	// String returns a human-readable string of the object.
 	String() string
 
-	// Member returns the object's Member representation, if any.
-	Member() Member
-
 	// order reflects a package-level object's source order: if object
 	// a is before object b in the source, then a.order() < b.order().
 	// order returns a value > 0 for package-level objects; it returns
@@ -156,8 +153,6 @@ func (obj *object) Exported() bool { return isExported(obj.name) }
 
 // Id is a wrapper for Id(obj.Pkg(), obj.Name()).
 func (obj *object) Id() string { return Id(obj.pkg, obj.name) }
-
-func (obj *object) Member() Member { return nil } // overriden by *Func and *Var
 
 func (obj *object) String() string { panic("abstract") }
 func (obj *object) order() uint32  { return obj.order_ }
@@ -328,10 +323,10 @@ func (obj *TypeName) IsAlias() bool {
 // A Variable represents a declared variable (including function parameters and results, and struct fields).
 type Var struct {
 	object
-	member   *Global
-	embedded bool // if set, the variable is an embedded struct field, and name is the type name
-	isField  bool // var is struct field
-	used     bool // set if the variable was used
+	member   *Global // TODO(mdempsky): Remove.
+	embedded bool    // if set, the variable is an embedded struct field, and name is the type name
+	isField  bool    // var is struct field
+	used     bool    // set if the variable was used
 }
 
 // NewVar returns a new variable.
@@ -362,13 +357,6 @@ func (obj *Var) Embedded() bool { return obj.embedded }
 // IsField reports whether the variable is a struct field.
 func (obj *Var) IsField() bool { return obj.isField }
 
-func (obj *Var) Member() Member {
-	if obj.member != nil {
-		return obj.member
-	}
-	return nil
-}
-
 func (*Var) isDependency() {} // a variable may be a dependency of an initialization expression
 
 // A Func represents a declared function, concrete method, or abstract
@@ -376,16 +364,9 @@ func (*Var) isDependency() {} // a variable may be a dependency of an initializa
 // An abstract method may belong to many interfaces due to embedding.
 type Func struct {
 	object
+	member      *Function // TODO(mdempsky): Remove.
 	labels      []*Label
-	member      *Function
 	hasPtrRecv_ bool // only valid for methods that don't have a type yet; use hasPtrRecv() to read
-}
-
-func (obj *Func) Member() Member {
-	if obj.member != nil {
-		return obj.member
-	}
-	return nil
 }
 
 // NewFunc returns a new function with the given signature, representing
