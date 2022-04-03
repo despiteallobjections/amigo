@@ -1439,14 +1439,6 @@ func (p *SSAPackage) Func(name string) (f *Function) {
 	return
 }
 
-// Var returns the package-level variable of the specified name,
-// or nil if not found.
-//
-func (p *SSAPackage) Var(name string) (g *Global) {
-	g, _ = p.Members[name].(*Global)
-	return
-}
-
 func (v *Call) Pos() Pos      { return v.Call.pos }
 func (s *SSADefer) Pos() Pos  { return s.pos }
 func (s *SSAGo) Pos() Pos     { return s.pos }

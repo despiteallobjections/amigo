@@ -2304,13 +2304,12 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 	}
 
-	init := p.Init
-	prog.build(init, func(b *builder) {
+	prog.build(p.Init, func(b *builder) {
 		var done *BasicBlock
 
 		if prog.mode&BareInits == 0 {
 			// Make init() skip if package is already initialized.
-			initguard := p.Var("init$guard")
+			initguard := p.InitGuard
 			doinit := b.newBasicBlock("init.start")
 			done = b.newBasicBlock("init.done")
 			b.emitIf(b.emitLoad(initguard), done, doinit)
@@ -2325,7 +2324,7 @@ func (p *SSAPackage) build(prog *Program) {
 				}
 				var v Call
 				v.Call.Value = prereq.Init
-				v.Call.pos = init.Pos()
+				v.Call.pos = b.Fn.Pos() // TODO(mdempsky): Use `import` declaration position?
 				v.setType(NewTuple())
 				b.emit(&v)
 			}
@@ -2365,6 +2364,7 @@ func (p *SSAPackage) build(prog *Program) {
 					obj := p.info.Defs[decl.Name].(*Func)
 					var v Call
 					v.Call.Value = obj.member
+					// TODO(mdempsky): Set v.Call.Pos to obj.Pos()?
 					v.setType(NewTuple())
 					b.emit(&v)
 				}
