@@ -76,8 +76,8 @@ type builder struct {
 	currentBlock *BasicBlock    // where to emit code
 	objects      map[*Var]Value // addresses of local variables
 	namedResults []*Alloc       // tuple of named results
-	targets      *targets       // linked stack of branch targets
-	lblocks      []*lblock      // labelled blocks
+	implicit     lblock         // implicit targets for unlabeled branches
+	lblocks      []lblock       // labelled blocks
 }
 
 func (prog *Program) build(fn *Function, info *Info, emitBody func(b *builder)) {
@@ -1332,29 +1332,38 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 			b.currentBlock = nextCond
 		}
 		b.currentBlock = body
-		b.targets = &targets{
-			tail:         b.targets,
-			_break:       done,
-			_fallthrough: fallthru,
-		}
-		b.stmtList(cc.Body)
-		b.targets = b.targets.tail
+		b.labeledStmts(lblock{_break: done, _fallthrough: fallthru}, cc.Body...)
 		b.emitJump(done)
 		b.currentBlock = nextCond
 	}
 	if dfltBlock != nil {
 		b.emitJump(dfltBlock)
 		b.currentBlock = dfltBlock
-		b.targets = &targets{
-			tail:         b.targets,
-			_break:       done,
-			_fallthrough: dfltFallthrough,
-		}
-		b.stmtList(*dfltBody)
-		b.targets = b.targets.tail
+		b.labeledStmts(lblock{_break: done, _fallthrough: dfltFallthrough}, *dfltBody...)
 	}
 	b.emitJump(done)
 	b.currentBlock = done
+}
+
+// TODO(mdempsky): This API feels a bit clumsy. Double check how
+// cmd/compile/internal/ssagen handles this.
+func (b *builder) labeledStmts(lb lblock, stmts ...Stmt) {
+	assert(lb._goto == nil)
+
+	old := b.implicit
+	if lb._break != nil {
+		b.implicit._break = lb._break
+	}
+	if lb._continue != nil {
+		b.implicit._continue = lb._continue
+	}
+	if lb._fallthrough != nil {
+		b.implicit._fallthrough = lb._fallthrough
+	}
+
+	b.stmtList(stmts)
+
+	b.implicit = old
 }
 
 // typeSwitchStmt emits to fn code for the type switch statement s, optionally
@@ -1460,12 +1469,7 @@ func (b *builder) typeCaseBody(cc *CaseClause, x Value, done *BasicBlock) {
 		// y has the same type as the interface operand.
 		b.emitStore(b.addNamedLocal(obj.(*Var)), x, obj.Pos())
 	}
-	b.targets = &targets{
-		tail:   b.targets,
-		_break: done,
-	}
-	b.stmtList(cc.Body)
-	b.targets = b.targets.tail
+	b.labeledStmts(lblock{_break: done}, cc.Body...)
 	b.emitJump(done)
 }
 
@@ -1484,12 +1488,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			if label != nil {
 				label._break = done
 			}
-			b.targets = &targets{
-				tail:   b.targets,
-				_break: done,
-			}
-			b.stmtList(clause.Body)
-			b.targets = b.targets.tail
+			b.labeledStmts(lblock{_break: done}, clause.Body...)
 			b.emitJump(done)
 			b.currentBlock = done
 			return
@@ -1594,10 +1593,6 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 		next := b.newBasicBlock("select.next")
 		b.emitIf(b.emitCompare(Eql, idx, intConst(int64(state)), NoPos), body, next)
 		b.currentBlock = body
-		b.targets = &targets{
-			tail:   b.targets,
-			_break: done,
-		}
 		switch comm := clause.Comm.(type) {
 		case *ExprStmt:
 			if debugInfo {
@@ -1628,19 +1623,13 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			}
 			r++
 		}
-		b.stmtList(clause.Body)
-		b.targets = b.targets.tail
+		b.labeledStmts(lblock{_break: done}, clause.Body...)
 		b.emitJump(done)
 		b.currentBlock = next
 		state++
 	}
 	if defaultBody != nil {
-		b.targets = &targets{
-			tail:   b.targets,
-			_break: done,
-		}
-		b.stmtList(*defaultBody)
-		b.targets = b.targets.tail
+		b.labeledStmts(lblock{_break: done}, *defaultBody...)
 	} else {
 		// A blocking select must match some case.
 		// (This should really be a runtime.errorString, not a string.)
@@ -1696,13 +1685,7 @@ func (b *builder) forStmt(s *ForStmt, label *lblock) {
 		b.cond(s.Cond, body, done)
 		b.currentBlock = body
 	}
-	b.targets = &targets{
-		tail:      b.targets,
-		_break:    done,
-		_continue: cont,
-	}
-	b.stmt(s.Body)
-	b.targets = b.targets.tail
+	b.labeledStmts(lblock{_break: done, _continue: cont}, s.Body)
 	b.emitJump(cont)
 
 	if s.Post != nil {
@@ -1980,13 +1963,7 @@ func (b *builder) rangeStmt(s *ForStmt, clause *RangeClause, label *lblock) {
 		label._continue = loop
 	}
 
-	b.targets = &targets{
-		tail:      b.targets,
-		_break:    done,
-		_continue: loop,
-	}
-	b.stmt(s.Body)
-	b.targets = b.targets.tail
+	b.labeledStmts(lblock{_break: done, _continue: loop}, s.Body)
 	b.emitJump(loop) // back-edge
 	b.currentBlock = done
 }
@@ -2104,34 +2081,7 @@ start:
 		b.currentBlock = b.newBasicBlock("unreachable")
 
 	case *BranchStmt:
-		var block *BasicBlock
-		switch s.Tok {
-		case Break:
-			if s.Label != nil {
-				block = b.labelledBlock(b.info.Uses[s.Label].(*Label))._break
-			} else {
-				for t := b.targets; t != nil && block == nil; t = t.tail {
-					block = t._break
-				}
-			}
-
-		case Continue:
-			if s.Label != nil {
-				block = b.labelledBlock(b.info.Uses[s.Label].(*Label))._continue
-			} else {
-				for t := b.targets; t != nil && block == nil; t = t.tail {
-					block = t._continue
-				}
-			}
-
-		case Fallthrough:
-			for t := b.targets; t != nil && block == nil; t = t.tail {
-				block = t._fallthrough
-			}
-
-		case Goto:
-			block = b.labelledBlock(b.info.Uses[s.Label].(*Label))._goto
-		}
+		block := b.useLabel(s.Label).tok(s.Tok)
 		b.emitJump(block)
 		b.currentBlock = b.newBasicBlock("unreachable")
 

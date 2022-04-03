@@ -125,37 +125,54 @@ func (b *BasicBlock) removePred(p *BasicBlock) {
 	}
 }
 
-// Destinations associated with unlabelled for/switch/select stmts.
-// We push/pop one of these as we enter/leave each construct and for
-// each BranchStmt we scan for the innermost target of the right type.
-//
-type targets struct {
-	tail         *targets // rest of stack
-	_break       *BasicBlock
-	_continue    *BasicBlock
-	_fallthrough *BasicBlock
-}
-
 // Destinations associated with a labelled block.
 // We populate these as labels are encountered in forward gotos or
 // labelled statements.
 //
 type lblock struct {
-	_goto     *BasicBlock
-	_break    *BasicBlock
-	_continue *BasicBlock
+	// TODO(mdempsky): _goto is only set on lblocks associated with a
+	// LabeledStmt, whereas _fallthrough is only set on b.implicit. We
+	// could shave a little bit of memory by having them share a single
+	// field, but labels are rare enough that such an optimization
+	// doesn't seem worthwhile.
+
+	_goto        *BasicBlock
+	_break       *BasicBlock
+	_continue    *BasicBlock
+	_fallthrough *BasicBlock
+}
+
+func (lb *lblock) tok(tok Token) *BasicBlock {
+	switch tok {
+	case Break:
+		return lb._break
+	case Continue:
+		return lb._continue
+	case Fallthrough:
+		return lb._fallthrough
+	case Goto:
+		return lb._goto
+	}
+	panic("unreachable")
 }
 
 // labelledBlock returns the branch target associated with the
 // specified label, creating it if needed.
 //
 func (b *builder) labelledBlock(label *Label) *lblock {
-	lb := b.lblocks[label.index]
-	if lb == nil {
-		lb = &lblock{_goto: b.newBasicBlock(label.Name())}
-		b.lblocks[label.index] = lb
+	lb := &b.lblocks[label.index]
+	if lb._goto == nil {
+		lb._goto = b.newBasicBlock(label.Name())
 	}
 	return lb
+}
+
+func (b *builder) useLabel(name *Name) *lblock {
+	if name == nil {
+		return &b.implicit
+	}
+	label := b.info.Uses[name].(*Label)
+	return b.labelledBlock(label)
 }
 
 // addSpilledParam declares a parameter that is pre-spilled to the
@@ -210,7 +227,7 @@ func (b *builder) startBody() {
 	b.currentBlock = b.newBasicBlock("entry")
 	b.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
 	if obj := b.Fn.object; obj != nil {
-		b.lblocks = make([]*lblock, len(obj.labels))
+		b.lblocks = make([]lblock, len(obj.labels))
 	}
 }
 
