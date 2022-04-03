@@ -9,11 +9,11 @@ import (
 )
 
 // labels checks correct label use in body.
-func (check *Checker) labels(body *BlockStmt) {
+func (check *Checker) labels(obj *Func, body *BlockStmt) {
 	// set of all labels in this body
 	all := NewScope(nil, body.Pos(), EndPos(body), "label")
 
-	fwdJumps := check.blockBranches(all, nil, nil, body.List)
+	fwdJumps := check.blockBranches(obj, all, nil, nil, body.List)
 
 	// If there are any forward jumps left, no label was found for
 	// the corresponding goto statements. Either those labels were
@@ -87,7 +87,7 @@ func (b *block) enclosingTarget(name string) *LabeledStmt {
 // blockBranches processes a block's statement list and returns the set of outgoing forward jumps.
 // all is the scope of all declared labels, parent the set of labels declared in the immediately
 // enclosing block, and lstmt is the labeled statement this block is associated with (or nil).
-func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *LabeledStmt, list []Stmt) []*BranchStmt {
+func (check *Checker) blockBranches(obj *Func, all *Scope, parent *block, lstmt *LabeledStmt, list []Stmt) []*BranchStmt {
 	b := &block{parent, lstmt, nil}
 
 	var (
@@ -128,6 +128,8 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *LabeledStm
 			// declare non-blank label
 			if name := s.Label.Value; name != "_" {
 				lbl := NewLabel(s.Label.Pos(), check.pkg, name)
+				lbl.index = len(obj.labels)
+				obj.labels = append(obj.labels, lbl)
 				if alt := all.Insert(lbl); alt != nil {
 					var err error_
 					err.soft = true
@@ -230,7 +232,7 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *LabeledStm
 		case *BlockStmt:
 			// Unresolved forward jumps inside the nested block
 			// become forward jumps in the current block.
-			fwdJumps = append(fwdJumps, check.blockBranches(all, b, lstmt, s.List)...)
+			fwdJumps = append(fwdJumps, check.blockBranches(obj, all, b, lstmt, s.List)...)
 
 		case *IfStmt:
 			stmtBranches(s.Then)
@@ -241,13 +243,13 @@ func (check *Checker) blockBranches(all *Scope, parent *block, lstmt *LabeledStm
 		case *SwitchStmt:
 			b := &block{b, lstmt, nil}
 			for _, s := range s.Body {
-				fwdJumps = append(fwdJumps, check.blockBranches(all, b, nil, s.Body)...)
+				fwdJumps = append(fwdJumps, check.blockBranches(obj, all, b, nil, s.Body)...)
 			}
 
 		case *SelectStmt:
 			b := &block{b, lstmt, nil}
 			for _, s := range s.Body {
-				fwdJumps = append(fwdJumps, check.blockBranches(all, b, nil, s.Body)...)
+				fwdJumps = append(fwdJumps, check.blockBranches(obj, all, b, nil, s.Body)...)
 			}
 
 		case *ForStmt:

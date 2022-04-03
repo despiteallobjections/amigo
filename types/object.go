@@ -376,6 +376,7 @@ func (*Var) isDependency() {} // a variable may be a dependency of an initializa
 // An abstract method may belong to many interfaces due to embedding.
 type Func struct {
 	object
+	labels      []*Label
 	member      *Function
 	hasPtrRecv_ bool // only valid for methods that don't have a type yet; use hasPtrRecv() to read
 }
@@ -395,7 +396,7 @@ func NewFunc(pos Pos, pkg *Package, name string, sig *Signature) *Func {
 	if sig != nil {
 		typ = sig
 	}
-	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, false}
+	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, nil, false}
 }
 
 // NewFuncLit returns a new function representing a function literal.
@@ -441,12 +442,13 @@ func (*Func) isDependency() {} // a function may be a dependency of an initializ
 // Labels don't have a type.
 type Label struct {
 	object
-	used bool // set if the label was used
+	index int  // index within respective function
+	used  bool // set if the label was used
 }
 
 // NewLabel returns a new label.
 func NewLabel(pos Pos, pkg *Package, name string) *Label {
-	return &Label{object{pos: pos, pkg: pkg, name: name, typ: Typ[Invalid], color_: black}, false}
+	return &Label{object{pos: pos, pkg: pkg, name: name, typ: Typ[Invalid], color_: black}, -1, false}
 }
 
 // A Builtin represents a built-in function.

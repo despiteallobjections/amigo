@@ -46,7 +46,7 @@ func (check *Checker) funcBody(decl *declInfo, obj *Func, body *BlockStmt, iota 
 	check.stmtList(0, body.List)
 
 	if check.hasLabel && !check.conf.IgnoreLabels {
-		check.labels(body)
+		check.labels(obj, body)
 	}
 
 	if sig.results.Len() > 0 && !check.isTerminating(body, "") {

@@ -149,19 +149,11 @@ type lblock struct {
 // labelledBlock returns the branch target associated with the
 // specified label, creating it if needed.
 //
-func (b *builder) labelledBlock(label *Name) *lblock {
-	// TODO(mdempsky): This used to be keyed by label.Object, but now
-	// I'm using label.Value. I think that's safe, but double check that
-	// it doesn't cause problems with closures and identically named
-	// labels.
-
-	lb := b.lblocks[label.Value]
+func (b *builder) labelledBlock(label *Label) *lblock {
+	lb := b.lblocks[label.index]
 	if lb == nil {
-		lb = &lblock{_goto: b.newBasicBlock(label.Value)}
-		if b.lblocks == nil {
-			b.lblocks = make(map[string]*lblock)
-		}
-		b.lblocks[label.Value] = lb
+		lb = &lblock{_goto: b.newBasicBlock(label.Name())}
+		b.lblocks[label.index] = lb
 	}
 	return lb
 }
@@ -217,6 +209,9 @@ func (b *builder) spillParam(param *Parameter) {
 func (b *builder) startBody() {
 	b.currentBlock = b.newBasicBlock("entry")
 	b.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
+	if obj, ok := b.Fn.object.(*Func); ok {
+		b.lblocks = make([]*lblock, len(obj.labels))
+	}
 }
 
 // createSyntacticParams populates f.Params and generates code (spills

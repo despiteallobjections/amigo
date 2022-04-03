@@ -72,11 +72,11 @@ type builder struct {
 	Prog *Program
 	Fn   *Function
 
-	currentBlock *BasicBlock        // where to emit code
-	objects      map[*Var]Value     // addresses of local variables
-	namedResults []*Alloc           // tuple of named results
-	targets      *targets           // linked stack of branch targets
-	lblocks      map[string]*lblock // labelled blocks
+	currentBlock *BasicBlock    // where to emit code
+	objects      map[*Var]Value // addresses of local variables
+	namedResults []*Alloc       // tuple of named results
+	targets      *targets       // linked stack of branch targets
+	lblocks      []*lblock      // labelled blocks
 }
 
 func (prog *Program) build(fn *Function, emitBody func(b *builder)) {
@@ -2006,7 +2006,7 @@ start:
 		}
 
 	case *LabeledStmt:
-		label = b.labelledBlock(s.Label)
+		label = b.labelledBlock(b.Fn.Pkg.info.Defs[s.Label].(*Label))
 		b.emitJump(label._goto)
 		b.currentBlock = label._goto
 		_s = s.Stmt
@@ -2103,7 +2103,7 @@ start:
 		switch s.Tok {
 		case Break:
 			if s.Label != nil {
-				block = b.labelledBlock(s.Label)._break
+				block = b.labelledBlock(b.Fn.Pkg.info.Uses[s.Label].(*Label))._break
 			} else {
 				for t := b.targets; t != nil && block == nil; t = t.tail {
 					block = t._break
@@ -2112,7 +2112,7 @@ start:
 
 		case Continue:
 			if s.Label != nil {
-				block = b.labelledBlock(s.Label)._continue
+				block = b.labelledBlock(b.Fn.Pkg.info.Uses[s.Label].(*Label))._continue
 			} else {
 				for t := b.targets; t != nil && block == nil; t = t.tail {
 					block = t._continue
@@ -2125,7 +2125,7 @@ start:
 			}
 
 		case Goto:
-			block = b.labelledBlock(s.Label)._goto
+			block = b.labelledBlock(b.Fn.Pkg.info.Uses[s.Label].(*Label))._goto
 		}
 		b.emitJump(block)
 		b.currentBlock = b.newBasicBlock("unreachable")
