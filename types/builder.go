@@ -144,7 +144,7 @@ func (b *builder) logicalBinop(e *Operation) Value {
 	// T(e) = T(e.X) = T(e.Y) after untyped constants have been
 	// eliminated.
 	// TODO(adonovan): not true; MyBool==MyBool yields UntypedBool.
-	t := b.Fn.Pkg.typeOf(e)
+	t := b.typeOf(e)
 
 	var short Value // value of the short-circuit path
 	switch e.Op {
@@ -199,7 +199,7 @@ func (b *builder) logicalBinop(e *Operation) Value {
 // is token.ARROW).
 //
 func (b *builder) exprN(e Expr) Value {
-	typ := b.Fn.Pkg.typeOf(e).(*Tuple)
+	typ := b.typeOf(e).(*Tuple)
 	switch e := e.(type) {
 	case *ParenExpr:
 		return b.exprN(e.X)
@@ -214,7 +214,7 @@ func (b *builder) exprN(e Expr) Value {
 		return b.emit(&c)
 
 	case *IndexExpr:
-		mapt := b.Fn.Pkg.typeOf(e.X).Underlying().(*Map)
+		mapt := b.typeOf(e.X).Underlying().(*Map)
 		lookup := &Lookup{
 			X:       b.expr(e.X),
 			Index:   b.emitConv(b.expr(e.Index), mapt.Key()),
@@ -312,7 +312,7 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 		// We must still evaluate the value, though.  (If it
 		// was side-effect free, the whole call would have
 		// been constant-folded.)
-		t := ssaDeref(b.Fn.Pkg.typeOf(args[0])).Underlying()
+		t := ssaDeref(b.typeOf(args[0])).Underlying()
 		if at, ok := t.(*Array); ok {
 			b.expr(args[0]) // for effects only
 			return intConst(at.Len())
@@ -359,7 +359,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		if isBlankIdent(e) {
 			return blank{}
 		}
-		obj := b.Fn.Pkg.objectOf(e).(*Var)
+		obj := b.objectOf(e).(*Var)
 		v := b.Prog.packageLevelValue(obj) // var (address)
 		if v == nil {
 			v = b.lookup(b.Fn, obj, escaping)
@@ -367,7 +367,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		return &address{addr: v, pos: e.Pos(), expr: e}
 
 	case *CompositeLit:
-		t := ssaDeref(b.Fn.Pkg.typeOf(e))
+		t := ssaDeref(b.typeOf(e))
 		var v *Alloc
 		if escaping {
 			v = b.emitNew(t, e.Pos() /*Lbrace*/)
@@ -404,7 +404,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 	case *IndexExpr:
 		var x Value
 		var et Type
-		switch t := b.Fn.Pkg.typeOf(e.X).Underlying().(type) {
+		switch t := b.typeOf(e.X).Underlying().(type) {
 		case *Array:
 			x = b.addr(e.X, escaping).address(b)
 			et = NewPointer(t.Elem())
@@ -560,10 +560,12 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		panic("non-constant BasicLit") // unreachable
 
 	case *FuncLit:
+		obj := b.Fn.Pkg.info.Implicits[e].(*Func)
 		fn2 := &Function{
 			name:      fmt.Sprintf("%s$%d", b.Fn.Name(), 1+len(b.Fn.AnonFuncs)),
-			Signature: b.Fn.Pkg.typeOf(e.Type).Underlying().(*Signature),
-			pos:       e.Type.Pos(), /*Func*/
+			object:    obj,
+			Signature: obj.Type().(*Signature),
+			pos:       obj.Pos(),
 			parent:    b.Fn,
 			Pkg:       b.Fn.Pkg,
 		}
@@ -666,7 +668,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 	case *SliceExpr:
 		var low, high, max Value
 		var x Value
-		switch b.Fn.Pkg.typeOf(e.X).Underlying().(type) {
+		switch b.typeOf(e.X).Underlying().(type) {
 		case *Array:
 			// Potentially escaping.
 			x = b.addr(e.X, true).address(b)
@@ -764,7 +766,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		panic("unexpected expression-relative selector")
 
 	case *IndexExpr:
-		switch t := b.Fn.Pkg.typeOf(e.X).Underlying().(type) {
+		switch t := b.typeOf(e.X).Underlying().(type) {
 		case *Array:
 			// Non-addressable array (in a register).
 			v := &Index{
@@ -777,7 +779,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 
 		case *Map:
 			// Maps are not addressable.
-			mapt := b.Fn.Pkg.typeOf(e.X).Underlying().(*Map)
+			mapt := b.typeOf(e.X).Underlying().(*Map)
 			v := &Lookup{
 				X:     b.expr(e.X),
 				Index: b.emitConv(b.expr(e.Index), mapt.Key()),
@@ -832,7 +834,7 @@ func (b *builder) stmtList(list []Stmt) {
 //
 func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) Value {
 	var v Value
-	if wantAddr && !sel.Indirect() && !isPointer(b.Fn.Pkg.typeOf(e)) {
+	if wantAddr && !sel.Indirect() && !isPointer(b.typeOf(e)) {
 		v = b.addr(e, escaping).address(b)
 	} else {
 		v = b.expr(e)
@@ -990,7 +992,7 @@ func (b *builder) setCall(e *CallExpr, c *CallCommon) {
 	b.setCallFunc(e, c)
 
 	// Then append the other actual parameters.
-	sig, _ := b.Fn.Pkg.typeOf(e.Fun).Underlying().(*Signature)
+	sig, _ := b.typeOf(e.Fun).Underlying().(*Signature)
 	if sig == nil {
 		panic(fmt.Sprintf("no signature for call of %s", e.Fun))
 	}
@@ -1127,7 +1129,7 @@ func (b *builder) arrayLen(elts []Expr) int64 {
 // In that case, addr must hold a T, not a *T.
 //
 func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf) {
-	typ := ssaDeref(b.Fn.Pkg.typeOf(e))
+	typ := ssaDeref(b.typeOf(e))
 	switch t := typ.Underlying().(type) {
 	case *Struct:
 		if !isZero && len(e.ElemList) != t.NumFields() {
@@ -1422,7 +1424,7 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
 		var ti Value // ti, ok := typeassert,ok x <Ti>
 		for _, cond := range unpackExpr(cc.Cases) {
 			next = b.newBasicBlock("typeswitch.next")
-			casetype = b.Fn.Pkg.typeOf(cond)
+			casetype = b.typeOf(cond)
 			var condv Value
 			if casetype == tUntypedNil {
 				condv = b.emitCompare(Eql, x, nilConst(x.Type()), NoPos)
@@ -1916,10 +1918,10 @@ func (b *builder) rangeStmt(s *ForStmt, label *lblock) {
 
 	var tk, tv Type
 	if len(lhs) >= 1 && !isBlankIdent(lhs[0]) {
-		tk = b.Fn.Pkg.typeOf(lhs[0])
+		tk = b.typeOf(lhs[0])
 	}
 	if len(lhs) >= 2 && !isBlankIdent(lhs[1]) {
-		tv = b.Fn.Pkg.typeOf(lhs[1])
+		tv = b.typeOf(lhs[1])
 	}
 
 	// If iteration variables are defined (:=), this
@@ -2019,7 +2021,7 @@ start:
 		b.emit(&Send{
 			Chan: b.expr(s.Chan),
 			X: b.emitConv(b.expr(s.Value),
-				b.Fn.Pkg.typeOf(s.Chan).Underlying().(*Chan).Elem()),
+				b.typeOf(s.Chan).Underlying().(*Chan).Elem()),
 			pos: s.Pos(), /*Arrow*/
 		})
 
@@ -2387,8 +2389,8 @@ func (p *SSAPackage) build(prog *Program) {
 
 // Like ObjectOf, but panics instead of returning nil.
 // Only valid during p's create and build phases.
-func (p *SSAPackage) objectOf(id *Name) Object {
-	if o := p.info.ObjectOf(id); o != nil {
+func (b *builder) objectOf(id *Name) Object {
+	if o := b.Fn.Pkg.info.ObjectOf(id); o != nil {
 		return o
 	}
 	panic(fmt.Sprintf("no types.Object for syntax.Name %s @ %s",
@@ -2397,8 +2399,8 @@ func (p *SSAPackage) objectOf(id *Name) Object {
 
 // Like TypeOf, but panics instead of returning nil.
 // Only valid during p's create and build phases.
-func (p *SSAPackage) typeOf(e Expr) Type {
-	if T := p.info.TypeOf(e); T != nil {
+func (b *builder) typeOf(e Expr) Type {
+	if T := b.Fn.Pkg.info.TypeOf(e); T != nil {
 		return T
 	}
 	panic(fmt.Sprintf("no type for %T @ %s",

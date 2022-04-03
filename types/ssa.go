@@ -276,7 +276,7 @@ type Function struct {
 	object    Object     // a declared *types.Func or one of its wrappers
 	method    *Selection // info about provenance of synthetic methods
 	Signature *Signature
-	pos       Pos
+	pos       Pos // TODO(mdempsky): Replace with object.Pos()
 
 	Synthetic string        // provenance of synthetic function; "" for true source functions
 	parent    *Function     // enclosing function if anon; nil if global

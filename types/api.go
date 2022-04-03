@@ -220,6 +220,7 @@ type Info struct {
 	//     *syntax.ImportDecl    *PkgName for imports without renames
 	//     *syntax.CaseClause    type-specific *Var for each type switch case clause (incl. default)
 	//     *syntax.Field         anonymous parameter *Var (incl. unnamed results)
+	//     *syntax.FuncLit       anonymous *Func
 	//
 	Implicits map[Node]Object
 
