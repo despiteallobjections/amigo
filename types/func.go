@@ -203,8 +203,8 @@ func (b *builder) addParam(obj *Var, spill bool) {
 		alloc.setPos(obj.Pos())
 		f.objects[obj] = alloc
 		f.Locals = append(f.Locals, alloc)
-		f.emit(alloc)
-		f.emit(&Store{Addr: alloc, Val: param})
+		b.emit(alloc)
+		b.emit(&Store{Addr: alloc, Val: param})
 	}
 }
 
@@ -245,7 +245,7 @@ func (b *builder) createSyntacticParams() {
 		result := results.At(i)
 		if result.Name() != "" {
 			// Implicit "var" decl of locals for named results.
-			f.namedResults = append(f.namedResults, f.addNamedLocal(result))
+			f.namedResults = append(f.namedResults, b.addNamedLocal(result))
 		}
 	}
 }
@@ -380,26 +380,27 @@ func (f *Function) debugInfo() bool {
 // returns it.  Its name and type are taken from obj.  Subsequent
 // calls to f.lookup(obj) will return the same local.
 //
-func (f *Function) addNamedLocal(obj *Var) *Alloc {
-	l := f.addLocal(obj.Type(), obj.Pos())
+func (b *builder) addNamedLocal(obj *Var) *Alloc {
+	l := b.addLocal(obj.Type(), obj.Pos())
 	l.Comment = obj.Name()
-	f.objects[obj] = l
+	b.Fn.objects[obj] = l
 	return l
 }
 
-func (f *Function) addLocalForIdent(id *Name) *Alloc {
-	return f.addNamedLocal(f.Pkg.info.Defs[id].(*Var))
+func (b *builder) addLocalForIdent(id *Name) *Alloc {
+	return b.addNamedLocal(b.Fn.Pkg.info.Defs[id].(*Var))
 }
 
 // addLocal creates an anonymous local variable of type typ, adds it
 // to function f and returns it.  pos is the optional source location.
 //
-func (f *Function) addLocal(typ Type, pos Pos) *Alloc {
+func (b *builder) addLocal(typ Type, pos Pos) *Alloc {
+	fn := b.Fn
 	v := &Alloc{}
 	v.setType(NewPointer(typ))
 	v.setPos(pos)
-	f.Locals = append(f.Locals, v)
-	f.emit(v)
+	fn.Locals = append(fn.Locals, v)
+	b.emit(v)
 	return v
 }
 

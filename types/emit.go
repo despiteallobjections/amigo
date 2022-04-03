@@ -432,7 +432,7 @@ func emitFieldSelection(b *builder, v Value, index int, wantAddr bool, id *Name)
 func zeroValue(b *builder, t Type) Value {
 	switch t.Underlying().(type) {
 	case *Struct, *Array:
-		return emitLoad(b, b.Fn.addLocal(t, NoPos))
+		return emitLoad(b, b.addLocal(t, NoPos))
 	default:
 		return zeroConst(t)
 	}

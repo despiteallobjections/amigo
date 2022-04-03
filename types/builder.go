@@ -197,7 +197,7 @@ func (b *builder) exprN(fn *Function, e Expr) Value {
 		var c Call
 		b.setCall(fn, e, &c.Call)
 		c.typ = typ
-		return fn.emit(&c)
+		return b.emit(&c)
 
 	case *IndexExpr:
 		mapt := fn.Pkg.typeOf(e.X).Underlying().(*Map)
@@ -208,7 +208,7 @@ func (b *builder) exprN(fn *Function, e Expr) Value {
 		}
 		lookup.setType(typ)
 		lookup.setPos(e.Pos() /*Lbrack*/)
-		return fn.emit(lookup)
+		return b.emit(lookup)
 
 	case *AssertExpr:
 		return emitTypeTest(b, b.expr(fn, e.X), typ.At(0).Type(), e.Pos() /*Lparen*/)
@@ -221,7 +221,7 @@ func (b *builder) exprN(fn *Function, e Expr) Value {
 		}
 		unop.setType(typ)
 		unop.setPos(e.Pos() /*OpPos*/)
-		return fn.emit(unop)
+		return b.emit(unop)
 	}
 	panic(fmt.Sprintf("exprN(%T) in %s", e, fn))
 }
@@ -256,7 +256,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 				}
 				v.setPos(pos)
 				v.setType(typ)
-				return fn.emit(v)
+				return b.emit(v)
 			}
 			v := &MakeSlice{
 				Len: n,
@@ -264,7 +264,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 			}
 			v.setPos(pos)
 			v.setType(typ)
-			return fn.emit(v)
+			return b.emit(v)
 
 		case *Map:
 			var res Value
@@ -274,7 +274,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 			v := &MakeMap{Reserve: res}
 			v.setPos(pos)
 			v.setType(typ)
-			return fn.emit(v)
+			return b.emit(v)
 
 		case *Chan:
 			var sz Value = vZero
@@ -284,7 +284,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 			v := &MakeChan{Size: sz}
 			v.setPos(pos)
 			v.setType(typ)
-			return fn.emit(v)
+			return b.emit(v)
 		}
 
 	case "new":
@@ -306,7 +306,7 @@ func (b *builder) builtin(fn *Function, obj *Builtin, args []Expr, typ Type, pos
 		// Otherwise treat as normal.
 
 	case "panic":
-		fn.emit(&Panic{
+		b.emit(&Panic{
 			X:   emitConv(b, b.expr(fn, args[0]), tEface),
 			pos: pos,
 		})
@@ -358,7 +358,7 @@ func (b *builder) addr(fn *Function, e Expr, escaping bool) lvalue {
 		if escaping {
 			v = emitNew(b, t, e.Pos() /*Lbrace*/)
 		} else {
-			v = fn.addLocal(t, e.Pos() /*Lbrace*/)
+			v = b.addLocal(t, e.Pos() /*Lbrace*/)
 		}
 		v.Comment = "complit"
 		var sb storebuf
@@ -416,7 +416,7 @@ func (b *builder) addr(fn *Function, e Expr, escaping bool) lvalue {
 		}
 		v.setPos(e.Pos() /*Lbrack*/)
 		v.setType(et)
-		return &address{addr: fn.emit(v), pos: e.Pos() /*Lbrack*/, expr: e}
+		return &address{addr: b.emit(v), pos: e.Pos() /*Lbrack*/, expr: e}
 
 	case *Operation:
 		return &address{addr: b.expr(fn, e.X), pos: e.Pos() /*Star*/, expr: e}
@@ -567,7 +567,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			v.Bindings = append(v.Bindings, fv.outer)
 			fv.outer = nil
 		}
-		return fn.emit(v)
+		return b.emit(v)
 
 	case *AssertExpr:
 		return emitTypeAssert(b, b.expr(fn, e.X), tv.Type, e.Pos() /*Lparen*/)
@@ -603,7 +603,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 		var v Call
 		b.setCall(fn, e, &v.Call)
 		v.setType(tv.Type)
-		return fn.emit(&v)
+		return b.emit(&v)
 
 	case *Operation:
 		if e.Y == nil { // UnaryExpr
@@ -627,7 +627,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 				}
 				v.setPos(e.Pos() /*OpPos*/)
 				v.setType(tv.Type)
-				return fn.emit(v)
+				return b.emit(v)
 			case Mul:
 				// Addressable types (lvalues)
 				return b.addr(fn, e, false).load(b)
@@ -682,7 +682,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 		}
 		v.setPos(e.Pos() /*Lbrack*/)
 		v.setType(tv.Type)
-		return fn.emit(v)
+		return b.emit(v)
 
 	case *Name:
 		obj := fn.Pkg.info.Uses[e]
@@ -739,7 +739,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			}
 			c.setPos(e.Sel.Pos())
 			c.setType(tv.Type)
-			return fn.emit(c)
+			return b.emit(c)
 
 		case FieldVal:
 			indices := sel.Index()
@@ -762,7 +762,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			}
 			v.setPos(e.Pos() /*Lbrack*/)
 			v.setType(t.Elem())
-			return fn.emit(v)
+			return b.emit(v)
 
 		case *Map:
 			// Maps are not addressable.
@@ -773,7 +773,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			}
 			v.setPos(e.Pos() /*Lbrack*/)
 			v.setType(mapt.Elem())
-			return fn.emit(v)
+			return b.emit(v)
 
 		case *Basic:
 			// Strings are not addressable.
@@ -783,7 +783,7 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			}
 			v.setPos(e.Pos() /*Lbrack*/)
 			v.setType(tByte)
-			return fn.emit(v)
+			return b.emit(v)
 
 		case *Slice, *Pointer:
 			// Addressable slice/array; use IndexAddr and Load.
@@ -959,12 +959,12 @@ func (b *builder) emitCallArgs(fn *Function, sig *Signature, e *CallExpr, args [
 					Index: intConst(int64(i)),
 				}
 				iaddr.setType(NewPointer(vt))
-				fn.emit(iaddr)
+				b.emit(iaddr)
 				emitStore(b, iaddr, arg, arg.Pos())
 			}
 			s := &SSASlice{X: a}
 			s.setType(st)
-			args[offset+np] = fn.emit(s)
+			args[offset+np] = b.emit(s)
 			args = args[:offset+np+1]
 		}
 	}
@@ -1004,7 +1004,7 @@ func (b *builder) localValueSpec(fn *Function, spec *VarSpec) {
 		// 1:1 assignment
 		for i, id := range spec.NameList {
 			if !isBlankIdent(id) {
-				fn.addLocalForIdent(id)
+				b.addLocalForIdent(id)
 			}
 			lval := b.addr(fn, id, false) // non-escaping
 			b.assign(fn, lval, values[i], true, nil)
@@ -1015,7 +1015,7 @@ func (b *builder) localValueSpec(fn *Function, spec *VarSpec) {
 		// Locals are implicitly zero-initialized.
 		for _, id := range spec.NameList {
 			if !isBlankIdent(id) {
-				lhs := fn.addLocalForIdent(id)
+				lhs := b.addLocalForIdent(id)
 				if fn.debugInfo() {
 					emitDebugRef(b, id, lhs, true)
 				}
@@ -1027,7 +1027,7 @@ func (b *builder) localValueSpec(fn *Function, spec *VarSpec) {
 		tuple := b.exprN(fn, values[0])
 		for i, id := range spec.NameList {
 			if !isBlankIdent(id) {
-				fn.addLocalForIdent(id)
+				b.addLocalForIdent(id)
 				lhs := b.addr(fn, id, false) // non-escaping
 				lhs.store(b, emitExtract(b, tuple, i))
 			}
@@ -1049,7 +1049,7 @@ func (b *builder) assignStmt(fn *Function, lhss, rhss []Expr, isDef bool) {
 		if !isBlankIdent(lhs) {
 			if isDef {
 				if obj := fn.Pkg.info.Defs[lhs.(*Name)]; obj != nil {
-					fn.addNamedLocal(obj.(*Var))
+					b.addNamedLocal(obj.(*Var))
 					isZero[i] = true
 				}
 			}
@@ -1146,7 +1146,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *CompositeLit, isZero bool
 				Field: fieldIndex,
 			}
 			faddr.setType(NewPointer(sf.Type()))
-			fn.emit(faddr)
+			b.emit(faddr)
 			b.assign(fn, &address{addr: faddr, pos: pos, expr: e}, e, isZero, sb)
 		}
 
@@ -1189,7 +1189,7 @@ func (b *builder) compLit(fn *Function, addr Value, e *CompositeLit, isZero bool
 				Index: idx,
 			}
 			iaddr.setType(NewPointer(at.Elem()))
-			fn.emit(iaddr)
+			b.emit(iaddr)
 			if t != at { // slice
 				// backing array is unaliased => storebuf not needed.
 				b.assign(fn, &address{addr: iaddr, pos: pos, expr: e}, e, true, nil)
@@ -1202,14 +1202,14 @@ func (b *builder) compLit(fn *Function, addr Value, e *CompositeLit, isZero bool
 			s := &SSASlice{X: array}
 			s.setPos(e.Pos() /*Lbrace*/)
 			s.setType(typ)
-			sb.store(&address{addr: addr, pos: e.Pos() /*Lbrace*/, expr: e}, fn.emit(s))
+			sb.store(&address{addr: addr, pos: e.Pos() /*Lbrace*/, expr: e}, b.emit(s))
 		}
 
 	case *Map:
 		m := &MakeMap{Reserve: intConst(int64(len(e.ElemList)))}
 		m.setPos(e.Pos() /*Lbrace*/)
 		m.setType(typ)
-		fn.emit(m)
+		b.emit(m)
 		for _, e := range e.ElemList {
 			e := e.(*KeyValueExpr)
 
@@ -1446,7 +1446,7 @@ func (b *builder) typeCaseBody(fn *Function, cc *CaseClause, x Value, done *Basi
 		// In a single-type case, y has that type.
 		// In multi-type cases, 'case nil' and default,
 		// y has the same type as the interface operand.
-		emitStore(b, fn.addNamedLocal(obj.(*Var)), x, obj.Pos())
+		emitStore(b, b.addNamedLocal(obj.(*Var)), x, obj.Pos())
 	}
 	fn.targets = &targets{
 		tail:   fn.targets,
@@ -1561,7 +1561,7 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 	}
 	sel.setType(NewTuple(vars...))
 
-	fn.emit(sel)
+	b.emit(sel)
 	idx := emitExtract(b, sel, 0)
 
 	done := fn.newBasicBlock("select.done")
@@ -1598,7 +1598,7 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 			lhs := unpackExpr(comm.Lhs)
 
 			if comm.Op == Def {
-				fn.addLocalForIdent(lhs[0].(*Name))
+				b.addLocalForIdent(lhs[0].(*Name))
 			}
 			x := b.addr(fn, lhs[0], false) // non-escaping
 			v := emitExtract(b, sel, r)
@@ -1609,7 +1609,7 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 
 			if len(lhs) == 2 { // x, ok := ...
 				if comm.Op == Def {
-					fn.addLocalForIdent(lhs[1].(*Name))
+					b.addLocalForIdent(lhs[1].(*Name))
 				}
 				ok := b.addr(fn, lhs[1], false) // non-escaping
 				ok.store(b, emitExtract(b, sel, 1))
@@ -1632,7 +1632,7 @@ func (b *builder) selectStmt(fn *Function, s *SelectStmt, label *lblock) {
 	} else {
 		// A blocking select must match some case.
 		// (This should really be a runtime.errorString, not a string.)
-		fn.emit(&Panic{
+		b.emit(&Panic{
 			X: emitConv(b, stringConst("blocking select matched no case"), tEface),
 		})
 		fn.currentBlock = fn.newBasicBlock("unreachable")
@@ -1731,10 +1731,10 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 		c.Call.Value = makeLen(x.Type())
 		c.Call.Args = []Value{x}
 		c.setType(tInt)
-		length = fn.emit(&c)
+		length = b.emit(&c)
 	}
 
-	index := fn.addLocal(tInt, NoPos)
+	index := b.addLocal(tInt, NoPos)
 	emitStore(b, index, intConst(-1), pos)
 
 	loop = fn.newBasicBlock("rangeindex.loop")
@@ -1747,7 +1747,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 		Y:  vOne,
 	}
 	incr.setType(tInt)
-	emitStore(b, index, fn.emit(incr), pos)
+	emitStore(b, index, b.emit(incr), pos)
 
 	body := fn.newBasicBlock("rangeindex.body")
 	done = fn.newBasicBlock("rangeindex.done")
@@ -1764,7 +1764,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 			}
 			instr.setType(t.Elem())
 			instr.setPos(x.Pos())
-			v = fn.emit(instr)
+			v = b.emit(instr)
 
 		case *Pointer:
 			instr := &IndexAddr{
@@ -1773,7 +1773,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 			}
 			instr.setType(NewPointer(t.Elem().Underlying().(*Array).Elem()))
 			instr.setPos(x.Pos())
-			v = emitLoad(b, fn.emit(instr))
+			v = emitLoad(b, b.emit(instr))
 
 		case *Slice:
 			instr := &IndexAddr{
@@ -1782,7 +1782,7 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv Type, pos Pos) (k, v Va
 			}
 			instr.setType(NewPointer(t.Elem()))
 			instr.setPos(x.Pos())
-			v = emitLoad(b, fn.emit(instr))
+			v = emitLoad(b, b.emit(instr))
 
 		default:
 			panic("rangeIndexed x:" + t.String())
@@ -1821,7 +1821,7 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv Type, pos Pos) (k, v V
 	rng := &Range{X: x}
 	rng.setPos(pos)
 	rng.setType(tRangeIter)
-	it := fn.emit(rng)
+	it := b.emit(rng)
 
 	loop = fn.newBasicBlock("rangeiter.loop")
 	emitJump(b, loop)
@@ -1838,7 +1838,7 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv Type, pos Pos) (k, v V
 		newVar("k", tk),
 		newVar("v", tv),
 	))
-	fn.emit(okv)
+	b.emit(okv)
 
 	body := fn.newBasicBlock("rangeiter.body")
 	done = fn.newBasicBlock("rangeiter.done")
@@ -1885,7 +1885,7 @@ func (b *builder) rangeChan(fn *Function, x Value, tk Type, pos Pos) (k Value, l
 		newVar("k", x.Type().Underlying().(*Chan).Elem()),
 		varOk,
 	))
-	ko := fn.emit(recv)
+	ko := b.emit(recv)
 	body := fn.newBasicBlock("rangechan.body")
 	done = fn.newBasicBlock("rangechan.done")
 	emitIf(b, emitExtract(b, ko, 1), body, done)
@@ -1919,10 +1919,10 @@ func (b *builder) rangeStmt(fn *Function, s *ForStmt, label *lblock) {
 	// always creates a new one.
 	if clause.Def {
 		if tk != nil {
-			fn.addLocalForIdent(lhs[0].(*Name))
+			b.addLocalForIdent(lhs[0].(*Name))
 		}
 		if tv != nil {
-			fn.addLocalForIdent(lhs[1].(*Name))
+			b.addLocalForIdent(lhs[1].(*Name))
 		}
 	}
 
@@ -2005,7 +2005,7 @@ start:
 		b.expr(fn, s.X)
 
 	case *SendStmt:
-		fn.emit(&Send{
+		b.emit(&Send{
 			Chan: b.expr(fn, s.Chan),
 			X: emitConv(b, b.expr(fn, s.Value),
 				fn.Pkg.typeOf(s.Chan).Underlying().(*Chan).Elem()),
@@ -2032,14 +2032,14 @@ start:
 			// panic is treated like an ordinary function call.
 			v := SSAGo{pos: s.Pos() /*Go*/}
 			b.setCall(fn, s.Call, &v.Call)
-			fn.emit(&v)
+			b.emit(&v)
 
 		case Defer:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
 			v := SSADefer{pos: s.Pos() /*Defer*/}
 			b.setCall(fn, s.Call, &v.Call)
-			fn.emit(&v)
+			b.emit(&v)
 
 			// A deferred call can cause recovery from panic,
 			// and control resumes at the Recover block.
@@ -2076,7 +2076,7 @@ start:
 		}
 		// Run function calls deferred in this
 		// function when explicitly returning from it.
-		fn.emit(new(RunDefers))
+		b.emit(new(RunDefers))
 		if fn.namedResults != nil {
 			// Reload NRPs to form the result tuple.
 			results = results[:0]
@@ -2084,7 +2084,7 @@ start:
 				results = append(results, emitLoad(b, r))
 			}
 		}
-		fn.emit(&Return{Results: results, pos: s.Pos() /*Return*/})
+		b.emit(&Return{Results: results, pos: s.Pos() /*Return*/})
 		fn.currentBlock = fn.newBasicBlock("unreachable")
 
 	case *BranchStmt:
@@ -2331,7 +2331,7 @@ func (p *SSAPackage) build() {
 			v.Call.Value = prereq.Init.member
 			v.Call.pos = init.pos
 			v.setType(NewTuple())
-			init.emit(&v)
+			b.emit(&v)
 		}
 	}
 
@@ -2370,7 +2370,7 @@ func (p *SSAPackage) build() {
 				var v Call
 				v.Call.Value = obj.member
 				v.setType(NewTuple())
-				init.emit(&v)
+				b.emit(&v)
 			}
 		}
 	}

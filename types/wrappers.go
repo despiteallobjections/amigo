@@ -98,7 +98,7 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 				stringConst(sel.Obj().Name()),
 			}
 			c.setType(v.Type())
-			v = fn.emit(&c)
+			v = b.emit(&c)
 		}
 	}
 
