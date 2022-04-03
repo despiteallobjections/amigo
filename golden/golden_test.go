@@ -5,6 +5,7 @@
 package golden_test
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -20,6 +21,10 @@ import (
 
 func TestGolden(t *testing.T) {
 	testenv.NeedsGoPackages(t)
+
+	if strings.HasPrefix(runtime.Version(), "go1.17") {
+		t.Skip("TODO(mdempsky): Get working with Go 1.17")
+	}
 
 	cfg := &packages.Config{Mode: packages.LoadAllSyntax}
 	initial, err := packages.Load(cfg, "runtime", "fmt", "net/http")
