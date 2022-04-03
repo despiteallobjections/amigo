@@ -212,28 +212,28 @@ func TestTestdataFiles(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	var failures []string
 	for _, input := range testdataTests {
-		if !run(t, filepath.Join(cwd, "testdata", input)) {
-			failures = append(failures, input)
-		}
+		input := input
+		t.Run(input, func(t *testing.T) {
+			// TODO(mdempsky): t.Parallel()
+			run(t, filepath.Join(cwd, "testdata", input))
+		})
 	}
-	printFailures(failures)
 }
 
 // TestGorootTest runs the interpreter on $GOROOT/test/*.go.
 func TestGorootTest(t *testing.T) {
-	var failures []string
-
 	for _, input := range gorootTestTests {
+		input := input
+
 		// TODO(mdempsky): Why is this test failing?
 		if input == "named.go" {
 			continue
 		}
 
-		if !run(t, filepath.Join(build.Default.GOROOT, "test", input)) {
-			failures = append(failures, input)
-		}
+		t.Run(input, func(t *testing.T) {
+			// TODO(mdempsky): t.Parallel()
+			run(t, filepath.Join(build.Default.GOROOT, "test", input))
+		})
 	}
-	printFailures(failures)
 }
