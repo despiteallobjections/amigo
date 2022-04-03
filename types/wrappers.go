@@ -40,7 +40,7 @@ import (
 //
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
 //
-func makeWrapper(prog *Program, sel *Selection) *Function {
+func (prog *Program) makeWrapper(sel *Selection) *Function {
 	obj := sel.Obj().(*Func)       // the declared function
 	sig := sel.Type().(*Signature) // type of this wrapper
 
@@ -73,7 +73,7 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 	b := &builder{Prog: prog, Fn: fn}
 	b.startBody()
 	b.addSpilledParam(recv)
-	createParams(b, start)
+	b.createParams(start)
 
 	indices := sel.Index()
 
@@ -138,7 +138,7 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 // Signature.Params, which do not include the receiver.
 // start is the index of the first regular parameter to use.
 //
-func createParams(b *builder, start int) {
+func (b *builder) createParams(start int) {
 	tparams := b.Fn.Signature.Params()
 	for i, n := start, tparams.Len(); i < n; i++ {
 		b.addParamObj(tparams.At(i))
@@ -172,7 +172,7 @@ func createParams(b *builder, start int) {
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
 //
-func makeBound(prog *Program, obj *Func) *Function {
+func (prog *Program) makeBound(obj *Func) *Function {
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
 	fn, ok := prog.bounds[obj]
@@ -194,7 +194,7 @@ func makeBound(prog *Program, obj *Func) *Function {
 		fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}
 		fn.FreeVars = []*FreeVar{fv}
 		b.startBody()
-		createParams(b, 0)
+		b.createParams(0)
 		var c Call
 
 		if !isInterface(recvType(obj)) { // concrete
@@ -240,7 +240,7 @@ func makeBound(prog *Program, obj *Func) *Function {
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
 //
-func makeThunk(prog *Program, sel *Selection) *Function {
+func (prog *Program) makeThunk(sel *Selection) *Function {
 	if sel.Kind() != MethodExpr {
 		panic(sel)
 	}
@@ -266,7 +266,7 @@ func makeThunk(prog *Program, sel *Selection) *Function {
 
 	fn, ok := prog.thunks[key]
 	if !ok {
-		fn = makeWrapper(prog, sel)
+		fn = prog.makeWrapper(sel)
 		if fn.Signature.Recv() != nil {
 			panic(fn) // unexpected receiver
 		}

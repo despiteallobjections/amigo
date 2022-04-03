@@ -80,7 +80,7 @@ func (prog *Program) addMethod(mset *ssaMethodSet, sel *Selection) *Function {
 		needsPromotion := len(sel.Index()) > 1
 		needsIndirection := !isPointer(recvType(obj)) && isPointer(sel.Recv())
 		if needsPromotion || needsIndirection {
-			fn = makeWrapper(prog, sel)
+			fn = prog.makeWrapper(sel)
 		} else {
 			fn = prog.declaredFunc(obj)
 		}

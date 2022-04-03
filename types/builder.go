@@ -722,7 +722,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		case MethodExpr:
 			// (*T).f or T.f, the method f from the method-set of type T.
 			// The result is a "thunk".
-			return emitConv(b, makeThunk(b.Prog, sel), tv.Type)
+			return emitConv(b, b.Prog.makeThunk(sel), tv.Type)
 
 		case MethodVal:
 			// e.f where e is an expression and f is a method.
@@ -739,7 +739,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				emitTypeAssert(b, v, rt, NoPos)
 			}
 			c := &MakeClosure{
-				Fn:       makeBound(b.Prog, obj),
+				Fn:       b.Prog.makeBound(obj),
 				Bindings: []Value{v},
 			}
 			c.setPos(e.Sel.Pos())
