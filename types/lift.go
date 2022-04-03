@@ -395,7 +395,7 @@ func (b *builder) liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fre
 
 	// Don't lift named return values in functions that defer
 	// calls that may recover from panic.
-	if fn := alloc.Parent(); fn.Recover != nil {
+	if b.Fn.Recover != nil {
 		for _, nr := range b.namedResults { // TODO(mdempsky): Seems a suspicious use of a builder field...
 			if nr == alloc {
 				return false
@@ -439,7 +439,7 @@ func (b *builder) liftAlloc(df domFrontier, alloc *Alloc, newPhis newPhiMap, fre
 		fmt.Fprintln(os.Stderr, "\tlifting ", alloc, alloc.Name())
 	}
 
-	fn := alloc.Parent()
+	fn := b.Fn
 
 	// Φ-insertion.
 	//

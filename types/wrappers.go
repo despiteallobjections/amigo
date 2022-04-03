@@ -140,7 +140,7 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 func (b *builder) createParams(start int) {
 	tparams := b.Fn.Signature.Params()
 	for i, n := start, tparams.Len(); i < n; i++ {
-		b.addParamObj(tparams.At(i))
+		b.Fn.addParamObj(tparams.At(i))
 	}
 }
 

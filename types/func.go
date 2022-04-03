@@ -166,16 +166,18 @@ func (b *builder) labelledBlock(label *Name) *lblock {
 	return lb
 }
 
-// addParamObj adds a (non-escaping) parameter to f.Params for the
-// specified Var.
-//
-func (b *builder) addParamObj(obj *Var) { b.addParam(obj, false) }
-
 // addSpilledParam declares a parameter that is pre-spilled to the
 // stack; the function body will load/store the spilled location.
 // Subsequent lifting will eliminate spills where possible.
 //
 func (b *builder) addSpilledParam(obj *Var) { b.addParam(obj, true) }
+
+func (b *builder) addParam(obj *Var, spill bool) {
+	param := b.Fn.addParamObj(obj)
+	if spill {
+		b.spillParam(param)
+	}
+}
 
 // addParamObj adds a (non-escaping) parameter to f.Params for the
 // specified Var.
@@ -184,8 +186,7 @@ func (b *builder) addSpilledParam(obj *Var) { b.addParam(obj, true) }
 // the function body will load/store the spilled location. Subsequent
 // lifting will eliminate spills where possible.
 //
-func (b *builder) addParam(obj *Var, spill bool) {
-	f := b.Fn
+func (f *Function) addParamObj(obj *Var) *Parameter {
 	name := obj.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Params))
@@ -196,16 +197,18 @@ func (b *builder) addParam(obj *Var, spill bool) {
 		parent: f,
 	}
 	f.Params = append(f.Params, param)
+	return param
+}
 
-	if spill {
-		alloc := &Alloc{Comment: obj.Name()}
-		alloc.setType(NewPointer(obj.Type()))
-		alloc.setPos(obj.Pos())
-		b.objects[obj] = alloc
-		f.Locals = append(f.Locals, alloc)
-		b.emit(alloc)
-		b.emit(&Store{Addr: alloc, Val: param})
-	}
+func (b *builder) spillParam(param *Parameter) {
+	obj := param.object
+	alloc := &Alloc{Comment: obj.Name()}
+	alloc.setType(NewPointer(obj.Type()))
+	alloc.setPos(obj.Pos())
+	b.objects[obj] = alloc
+	b.Fn.Locals = append(b.Fn.Locals, alloc)
+	b.emit(alloc)
+	b.emit(&Store{Addr: alloc, Val: param})
 }
 
 // startBody initializes the function prior to generating SSA code for its body.

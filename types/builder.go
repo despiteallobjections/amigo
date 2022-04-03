@@ -80,16 +80,10 @@ type builder struct {
 }
 
 func (prog *Program) build(fn *Function, emitBody func(b *builder)) {
-	prog.buildRaw(fn, func(b *builder) {
-		b.startBody()
-		emitBody(b)
-		b.finishBody()
-	})
-}
-
-func (prog *Program) buildRaw(fn *Function, emitBody func(b *builder)) {
 	b := &builder{Prog: prog, Fn: fn}
+	b.startBody()
 	emitBody(b)
+	b.finishBody()
 }
 
 func (b *builder) String() string { return b.Fn.String() }
@@ -2198,17 +2192,15 @@ func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
 			// the degenerate empty case repeatedly.
 			// TODO(adonovan): opt: don't do that.
 
-			prog.buildRaw(fn, func(b *builder) {
-				// We set Function.Params even though there is no body
-				// code to reference them.  This simplifies clients.
-				if recv := b.Fn.Signature.Recv(); recv != nil {
-					b.addParamObj(recv)
-				}
-				params := b.Fn.Signature.Params()
-				for i, n := 0, params.Len(); i < n; i++ {
-					b.addParamObj(params.At(i))
-				}
-			})
+			// We set Function.Params even though there is no body
+			// code to reference them.  This simplifies clients.
+			if recv := fn.Signature.Recv(); recv != nil {
+				fn.addParamObj(recv)
+			}
+			params := fn.Signature.Params()
+			for i, n := 0, params.Len(); i < n; i++ {
+				fn.addParamObj(params.At(i))
+			}
 		}
 		return
 	}
