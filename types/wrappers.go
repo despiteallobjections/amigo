@@ -171,6 +171,10 @@ func (b *builder) createParams(start int) {
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
 //
 func (prog *Program) makeBound(obj *Func) *Function {
+	sig := obj.Type().(*Signature)
+	recv := sig.Recv()
+	assert(recv != nil)
+
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
 	fn, ok := prog.bounds[obj]
@@ -182,11 +186,10 @@ func (prog *Program) makeBound(obj *Func) *Function {
 		fn = &Function{
 			name:      obj.Name() + "$bound",
 			object:    obj,
-			Signature: changeRecv(obj.Type().(*Signature), nil), // drop receiver
+			Signature: changeRecv(sig, nil), // drop receiver
 			Synthetic: description,
 		}
 		prog.build(fn, nil, func(b *builder) {
-			recv := obj.Type().(*Signature).Recv()
 			fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}
 			fn.FreeVars = []*FreeVar{fv}
 			b.createParams(0)

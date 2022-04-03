@@ -193,7 +193,7 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 			s.errorf("no type: %s = %s", v.Name(), v)
 		} else if t == tRangeIter {
 			// not a proper type; ignore.
-		} else if b, ok := t.Underlying().(*Basic); ok && b.Info()&IsUntyped != 0 {
+		} else if isUntyped(t) {
 			s.errorf("instruction has 'untyped' result: %s = %s : %s", v.Name(), v, t)
 		}
 		s.checkReferrerList(v)
@@ -341,10 +341,8 @@ func (s *sanity) checkBlock(b *BasicBlock, index int) {
 
 			// Check that "untyped" types only appear on constant operands.
 			if _, ok := (*op).(*SSAConst); !ok {
-				if basic, ok := (*op).Type().(*Basic); ok {
-					if basic.Info()&IsUntyped != 0 {
-						s.errorf("operand #%d of %s is untyped: %s", i, instr, basic)
-					}
+				if typ := (*op).Type(); isUntyped(typ) {
+					s.errorf("operand #%d of %s is untyped: %s", i, instr, typ)
 				}
 			}
 

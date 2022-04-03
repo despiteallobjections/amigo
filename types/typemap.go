@@ -4,7 +4,7 @@
 
 // Package typeutil defines various utilities for types, such as Map,
 // a mapping from types.Type to interface{} values.
-package types // import "github.com/mdempsky/amigo/typeutil"
+package types
 
 import (
 	"bytes"

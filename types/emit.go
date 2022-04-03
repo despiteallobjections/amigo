@@ -209,7 +209,7 @@ func (b *builder) emitConv(val Value, typ Type) Value {
 		}
 
 		// Convert (non-nil) "untyped" literals to their default type.
-		if t, ok := ut_src.(*Basic); ok && t.Info()&IsUntyped != 0 {
+		if isUntyped(ut_src) {
 			val = b.emitConv(val, Default(ut_src))
 		}
 
