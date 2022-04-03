@@ -15,29 +15,29 @@ import (
 // emitNew emits to f a new (heap Alloc) instruction allocating an
 // object of type typ.  pos is the optional source location.
 //
-func emitNew(f *Function, typ Type, pos Pos) *Alloc {
+func emitNew(b *Function, typ Type, pos Pos) *Alloc {
 	v := &Alloc{Heap: true}
 	v.setType(NewPointer(typ))
 	v.setPos(pos)
-	f.emit(v)
+	b.emit(v)
 	return v
 }
 
 // emitLoad emits to f an instruction to load the address addr into a
 // new temporary, and returns the value so defined.
 //
-func emitLoad(f *Function, addr Value) *UnOp {
+func emitLoad(b *Function, addr Value) *UnOp {
 	v := &UnOp{Op: Mul, X: addr}
 	v.setType(ssaDeref(addr.Type()))
-	f.emit(v)
+	b.emit(v)
 	return v
 }
 
 // emitDebugRef emits to f a DebugRef pseudo-instruction associating
 // expression e with value v.
 //
-func emitDebugRef(f *Function, e Expr, v Value, isAddr bool) {
-	if !f.debugInfo() {
+func emitDebugRef(b *Function, e Expr, v Value, isAddr bool) {
+	if !b.debugInfo() {
 		return // debugging not enabled
 	}
 	if v == nil || e == nil {
@@ -49,13 +49,13 @@ func emitDebugRef(f *Function, e Expr, v Value, isAddr bool) {
 		if isBlankIdent(id) {
 			return
 		}
-		obj = f.Pkg.objectOf(id)
+		obj = b.Pkg.objectOf(id)
 		switch obj.(type) {
 		case *Nil, *Const, *Builtin:
 			return
 		}
 	}
-	f.emit(&DebugRef{
+	b.emit(&DebugRef{
 		X:      v,
 		Expr:   e,
 		IsAddr: isAddr,
@@ -68,19 +68,19 @@ func emitDebugRef(f *Function, e Expr, v Value, isAddr bool) {
 // (Use emitCompare() for comparisons and Builder.logicalBinop() for
 // non-eager operations.)
 //
-func emitArith(f *Function, op Operator, x, y Value, t Type, pos Pos) Value {
+func emitArith(b *Function, op Operator, x, y Value, t Type, pos Pos) Value {
 	switch op {
 	case Shl, Shr:
-		x = emitConv(f, x, t)
+		x = emitConv(b, x, t)
 		// y may be signed or an 'untyped' constant.
 		// TODO(adonovan): whence signed values?
 		if yt, ok := y.Type().Underlying().(*Basic); ok && yt.Info()&IsUnsigned == 0 {
-			y = emitConv(f, y, Typ[Uint64])
+			y = emitConv(b, y, Typ[Uint64])
 		}
 
 	case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
-		x = emitConv(f, x, t)
-		y = emitConv(f, y, t)
+		x = emitConv(b, x, t)
+		y = emitConv(b, y, t)
 
 	default:
 		panic("illegal op in emitArith: " + op.String())
@@ -93,13 +93,13 @@ func emitArith(f *Function, op Operator, x, y Value, t Type, pos Pos) Value {
 	}
 	v.setPos(pos)
 	v.setType(t)
-	return f.emit(v)
+	return b.emit(v)
 }
 
 // emitCompare emits to f code compute the boolean result of
 // comparison comparison 'x op y'.
 //
-func emitCompare(f *Function, op Operator, x, y Value, pos Pos) Value {
+func emitCompare(b *Function, op Operator, x, y Value, pos Pos) Value {
 	xt := x.Type().Underlying()
 	yt := y.Type().Underlying()
 
@@ -119,13 +119,13 @@ func emitCompare(f *Function, op Operator, x, y Value, pos Pos) Value {
 	if Identical(xt, yt) {
 		// no conversion necessary
 	} else if _, ok := xt.(*Interface); ok {
-		y = emitConv(f, y, x.Type())
+		y = emitConv(b, y, x.Type())
 	} else if _, ok := yt.(*Interface); ok {
-		x = emitConv(f, x, y.Type())
+		x = emitConv(b, x, y.Type())
 	} else if _, ok := x.(*SSAConst); ok {
-		x = emitConv(f, x, y.Type())
+		x = emitConv(b, x, y.Type())
 	} else if _, ok := y.(*SSAConst); ok {
-		y = emitConv(f, y, x.Type())
+		y = emitConv(b, y, x.Type())
 	} else {
 		// other cases, e.g. channels.  No-op.
 	}
@@ -137,7 +137,7 @@ func emitCompare(f *Function, op Operator, x, y Value, pos Pos) Value {
 	}
 	v.setPos(pos)
 	v.setType(tBool)
-	return f.emit(v)
+	return b.emit(v)
 }
 
 // isValuePreserving returns true if a conversion from ut_src to
@@ -169,7 +169,7 @@ func isValuePreserving(ut_src, ut_dst Type) bool {
 // by language assignability rules in assignments, parameter passing,
 // etc.
 //
-func emitConv(f *Function, val Value, typ Type) Value {
+func emitConv(b *Function, val Value, typ Type) Value {
 	t_src := val.Type()
 
 	// Identical types?  Conversion is a no-op.
@@ -184,7 +184,7 @@ func emitConv(f *Function, val Value, typ Type) Value {
 	if isValuePreserving(ut_src, ut_dst) {
 		c := &ChangeType{X: val}
 		c.setType(typ)
-		return f.emit(c)
+		return b.emit(c)
 	}
 
 	// Conversion to, or construction of a value of, an interface type?
@@ -193,7 +193,7 @@ func emitConv(f *Function, val Value, typ Type) Value {
 		if _, ok := ut_src.(*Interface); ok {
 			c := &ChangeInterface{X: val}
 			c.setType(typ)
-			return f.emit(c)
+			return b.emit(c)
 		}
 
 		// Untyped nil constant?  Return interface-typed nil constant.
@@ -203,13 +203,13 @@ func emitConv(f *Function, val Value, typ Type) Value {
 
 		// Convert (non-nil) "untyped" literals to their default type.
 		if t, ok := ut_src.(*Basic); ok && t.Info()&IsUntyped != 0 {
-			val = emitConv(f, val, Default(ut_src))
+			val = emitConv(b, val, Default(ut_src))
 		}
 
-		f.Pkg.Prog.needMethodsOf(val.Type())
+		b.Pkg.Prog.needMethodsOf(val.Type())
 		mi := &MakeInterface{X: val}
 		mi.setType(typ)
-		return f.emit(mi)
+		return b.emit(mi)
 	}
 
 	// Conversion of a compile-time constant value?
@@ -233,7 +233,7 @@ func emitConv(f *Function, val Value, typ Type) Value {
 			if arr, ok := ptr.Elem().Underlying().(*Array); ok && Identical(slice.Elem(), arr.Elem()) {
 				c := &SliceToArrayPointer{X: val}
 				c.setType(ut_dst)
-				return f.emit(c)
+				return b.emit(c)
 			}
 		}
 	}
@@ -245,70 +245,70 @@ func emitConv(f *Function, val Value, typ Type) Value {
 	if ok1 || ok2 {
 		c := &Convert{X: val}
 		c.setType(typ)
-		return f.emit(c)
+		return b.emit(c)
 	}
 
-	panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", f, val, val.Type(), typ))
+	panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", b, val, val.Type(), typ))
 }
 
 // emitStore emits to f an instruction to store value val at location
 // addr, applying implicit conversions as required by assignability rules.
 //
-func emitStore(f *Function, addr, val Value, pos Pos) *Store {
+func emitStore(b *Function, addr, val Value, pos Pos) *Store {
 	s := &Store{
 		Addr: addr,
-		Val:  emitConv(f, val, ssaDeref(addr.Type())),
+		Val:  emitConv(b, val, ssaDeref(addr.Type())),
 		pos:  pos,
 	}
-	f.emit(s)
+	b.emit(s)
 	return s
 }
 
 // emitJump emits to f a jump to target, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
-func emitJump(f *Function, target *BasicBlock) {
-	block := f.currentBlock
+func emitJump(b *Function, target *BasicBlock) {
+	block := b.currentBlock
 	block.emit(new(Jump))
 	addEdge(block, target)
-	f.currentBlock = nil
+	b.currentBlock = nil
 }
 
 // emitIf emits to f a conditional jump to tblock or fblock based on
 // cond, and updates the control-flow graph.
 // Postcondition: f.currentBlock is nil.
 //
-func emitIf(f *Function, cond Value, tblock, fblock *BasicBlock) {
-	block := f.currentBlock
+func emitIf(b *Function, cond Value, tblock, fblock *BasicBlock) {
+	block := b.currentBlock
 	block.emit(&If{Cond: cond})
 	addEdge(block, tblock)
 	addEdge(block, fblock)
-	f.currentBlock = nil
+	b.currentBlock = nil
 }
 
 // emitExtract emits to f an instruction to extract the index'th
 // component of tuple.  It returns the extracted value.
 //
-func emitExtract(f *Function, tuple Value, index int) Value {
+func emitExtract(b *Function, tuple Value, index int) Value {
 	e := &Extract{Tuple: tuple, Index: index}
 	e.setType(tuple.Type().(*Tuple).At(index).Type())
-	return f.emit(e)
+	return b.emit(e)
 }
 
 // emitTypeAssert emits to f a type assertion value := x.(t) and
 // returns the value.  x.Type() must be an interface.
 //
-func emitTypeAssert(f *Function, x Value, t Type, pos Pos) Value {
+func emitTypeAssert(b *Function, x Value, t Type, pos Pos) Value {
 	a := &TypeAssert{X: x, AssertedType: t}
 	a.setPos(pos)
 	a.setType(t)
-	return f.emit(a)
+	return b.emit(a)
 }
 
 // emitTypeTest emits to f a type test value,ok := x.(t) and returns
 // a (value, ok) tuple.  x.Type() must be an interface.
 //
-func emitTypeTest(f *Function, x Value, t Type, pos Pos) Value {
+func emitTypeTest(b *Function, x Value, t Type, pos Pos) Value {
 	a := &TypeAssert{
 		X:            x,
 		AssertedType: t,
@@ -319,7 +319,7 @@ func emitTypeTest(f *Function, x Value, t Type, pos Pos) Value {
 		newVar("value", t),
 		varOk,
 	))
-	return f.emit(a)
+	return b.emit(a)
 }
 
 // emitTailCall emits to f a function call in tail position.  The
@@ -328,15 +328,15 @@ func emitTypeTest(f *Function, x Value, t Type, pos Pos) Value {
 // Precondition: f does/will not use deferred procedure calls.
 // Postcondition: f.currentBlock is nil.
 //
-func emitTailCall(f *Function, call *Call) {
-	tresults := f.Signature.Results()
+func emitTailCall(b *Function, call *Call) {
+	tresults := b.Signature.Results()
 	nr := tresults.Len()
 	if nr == 1 {
 		call.typ = tresults.At(0).Type()
 	} else {
 		call.typ = tresults
 	}
-	tuple := f.emit(call)
+	tuple := b.emit(call)
 	var ret Return
 	switch nr {
 	case 0:
@@ -345,7 +345,7 @@ func emitTailCall(f *Function, call *Call) {
 		ret.Results = []Value{tuple}
 	default:
 		for i := 0; i < nr; i++ {
-			v := emitExtract(f, tuple, i)
+			v := emitExtract(b, tuple, i)
 			// TODO(adonovan): in principle, this is required:
 			//   v = emitConv(f, o.Type, f.Signature.Results[i].Type)
 			// but in practice emitTailCall is only used when
@@ -353,8 +353,8 @@ func emitTailCall(f *Function, call *Call) {
 			ret.Results = append(ret.Results, v)
 		}
 	}
-	f.emit(&ret)
-	f.currentBlock = nil
+	b.emit(&ret)
+	b.currentBlock = nil
 }
 
 // emitImplicitSelections emits to f code to apply the sequence of
@@ -365,7 +365,7 @@ func emitTailCall(f *Function, call *Call) {
 // a field; if it is the value of a struct, the result will be the
 // value of a field.
 //
-func emitImplicitSelections(f *Function, v Value, indices []int) Value {
+func emitImplicitSelections(b *Function, v Value, indices []int) Value {
 	for _, index := range indices {
 		fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 
@@ -375,10 +375,10 @@ func emitImplicitSelections(f *Function, v Value, indices []int) Value {
 				Field: index,
 			}
 			instr.setType(NewPointer(fld.Type()))
-			v = f.emit(instr)
+			v = b.emit(instr)
 			// Load the field's value iff indirectly embedded.
 			if isPointer(fld.Type()) {
-				v = emitLoad(f, v)
+				v = emitLoad(b, v)
 			}
 		} else {
 			instr := &SSAField{
@@ -386,7 +386,7 @@ func emitImplicitSelections(f *Function, v Value, indices []int) Value {
 				Field: index,
 			}
 			instr.setType(fld.Type())
-			v = f.emit(instr)
+			v = b.emit(instr)
 		}
 	}
 	return v
@@ -399,7 +399,7 @@ func emitImplicitSelections(f *Function, v Value, indices []int) Value {
 // field's value.
 // Ident id is used for position and debug info.
 //
-func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *Name) Value {
+func emitFieldSelection(b *Function, v Value, index int, wantAddr bool, id *Name) Value {
 	fld := ssaDeref(v.Type()).Underlying().(*Struct).Field(index)
 	if isPointer(v.Type()) {
 		instr := &FieldAddr{
@@ -408,10 +408,10 @@ func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *Name
 		}
 		instr.setPos(id.Pos())
 		instr.setType(NewPointer(fld.Type()))
-		v = f.emit(instr)
+		v = b.emit(instr)
 		// Load the field's value iff we don't want its address.
 		if !wantAddr {
-			v = emitLoad(f, v)
+			v = emitLoad(b, v)
 		}
 	} else {
 		instr := &SSAField{
@@ -420,19 +420,19 @@ func emitFieldSelection(f *Function, v Value, index int, wantAddr bool, id *Name
 		}
 		instr.setPos(id.Pos())
 		instr.setType(fld.Type())
-		v = f.emit(instr)
+		v = b.emit(instr)
 	}
-	emitDebugRef(f, id, v, wantAddr)
+	emitDebugRef(b, id, v, wantAddr)
 	return v
 }
 
 // zeroValue emits to f code to produce a zero value of type t,
 // and returns it.
 //
-func zeroValue(f *Function, t Type) Value {
+func zeroValue(b *Function, t Type) Value {
 	switch t.Underlying().(type) {
 	case *Struct, *Array:
-		return emitLoad(f, f.addLocal(t, NoPos))
+		return emitLoad(b, b.addLocal(t, NoPos))
 	default:
 		return zeroConst(t)
 	}
@@ -447,31 +447,31 @@ func zeroValue(f *Function, t Type) Value {
 //
 // Idempotent.
 //
-func createRecoverBlock(f *Function) {
-	if f.Recover != nil {
+func createRecoverBlock(b *Function) {
+	if b.Recover != nil {
 		return // already created
 	}
-	saved := f.currentBlock
+	saved := b.currentBlock
 
-	f.Recover = f.newBasicBlock("recover")
-	f.currentBlock = f.Recover
+	b.Recover = b.newBasicBlock("recover")
+	b.currentBlock = b.Recover
 
 	var results []Value
-	if f.namedResults != nil {
+	if b.namedResults != nil {
 		// Reload NRPs to form value tuple.
-		for _, r := range f.namedResults {
-			results = append(results, emitLoad(f, r))
+		for _, r := range b.namedResults {
+			results = append(results, emitLoad(b, r))
 		}
 	} else {
-		R := f.Signature.Results()
+		R := b.Signature.Results()
 		for i, n := 0, R.Len(); i < n; i++ {
 			T := R.At(i).Type()
 
 			// Return zero value of each result type.
-			results = append(results, zeroValue(f, T))
+			results = append(results, zeroValue(b, T))
 		}
 	}
-	f.emit(&Return{Results: results})
+	b.emit(&Return{Results: results})
 
-	f.currentBlock = saved
+	b.currentBlock = saved
 }

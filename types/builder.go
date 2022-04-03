@@ -68,7 +68,11 @@ var (
 
 // builder holds state associated with the function currently being built.
 // Its methods contain all the logic for AST-to-SSA conversion.
-type builder struct{}
+type builder struct {
+	Fn *Function
+}
+
+func (b *builder) emit(instr Instruction) Value { return b.Fn.emit(instr) }
 
 // cond emits to fn code to evaluate boolean condition e and jump
 // to t or f depending on its value, performing various simplifications.
@@ -552,7 +556,8 @@ func (b *builder) expr0(fn *Function, e Expr, tv TypeAndValue) Value {
 			syntax:    e,
 		}
 		fn.AnonFuncs = append(fn.AnonFuncs, fn2)
-		b.buildFunction(fn2)
+		b2 := builder{Fn: fn2}
+		b2.buildFunction()
 		if fn2.FreeVars == nil {
 			return fn2
 		}
@@ -2163,7 +2168,8 @@ start:
 }
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
-func (b *builder) buildFunction(fn *Function) {
+func (b *builder) buildFunction() {
+	fn := b.Fn
 	if fn.Blocks != nil {
 		return // building already started
 	}
@@ -2270,8 +2276,8 @@ func (p *SSAPackage) build() {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
 				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					var b builder
-					b.buildFunction(obj.member)
+					b := builder{Fn: obj.member}
+					b.buildFunction()
 				}
 			}
 		}
@@ -2299,9 +2305,9 @@ func (p *SSAPackage) build() {
 		}
 	}
 
-	var b builder
-
 	init := p.Init.member
+	b := builder{Fn: init}
+
 	init.startBody()
 
 	var done *BasicBlock
