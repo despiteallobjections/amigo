@@ -70,7 +70,6 @@ var (
 // Its methods contain all the logic for AST-to-SSA conversion.
 type builder struct {
 	Prog *Program
-	Pkg  *SSAPackage // TODO(mdempsky): What about shared wrappers? Allow this to be nil, or remove it as a field entirely?
 	Fn   *Function
 
 	currentBlock *BasicBlock        // where to emit code
@@ -563,7 +562,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			syntax:    e,
 		}
 		b.Fn.AnonFuncs = append(b.Fn.AnonFuncs, fn2)
-		b2 := &builder{Prog: b.Prog, Pkg: b.Pkg, Fn: fn2}
+		b2 := &builder{Prog: b.Prog, Fn: fn2}
 		b2.buildFunction()
 		if fn2.FreeVars == nil {
 			return fn2
@@ -2283,7 +2282,7 @@ func (p *SSAPackage) build(prog *Program) {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
 				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					b := builder{Prog: prog, Pkg: p, Fn: obj.member}
+					b := builder{Prog: prog, Fn: obj.member}
 					b.buildFunction()
 				}
 			}
@@ -2313,7 +2312,7 @@ func (p *SSAPackage) build(prog *Program) {
 	}
 
 	init := p.Init.member
-	b := &builder{Prog: prog, Pkg: p, Fn: init}
+	b := &builder{Prog: prog, Fn: init}
 
 	b.startBody()
 
