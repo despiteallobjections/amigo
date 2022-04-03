@@ -44,6 +44,8 @@ func TestGolden(t *testing.T) {
 			continue
 		}
 
+		// TODO(mdempsky): Validate that all Syntax and Info match too.
+
 		newPkg := newProg.ImportedPackage(path)
 		if newPkg == nil {
 			t.Errorf("missing package %q in newProg", path)
