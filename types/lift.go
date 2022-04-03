@@ -95,7 +95,8 @@ func (df domFrontier) build(u *BasicBlock) {
 	}
 }
 
-func buildDomFrontier(fn *Function) domFrontier {
+func buildDomFrontier(b *builder) domFrontier {
+	fn := b.Fn
 	df := make(domFrontier, len(fn.Blocks))
 	df.build(fn.Blocks[0])
 	if fn.Recover != nil {
@@ -128,7 +129,8 @@ func removeInstr(refs []Instruction, instr Instruction) []Instruction {
 // - Def/use info (Operands and Referrers) is up-to-date.
 // - The dominator tree is up-to-date.
 //
-func lift(fn *Function) {
+func lift(b *builder) {
+	fn := b.Fn
 	// TODO(adonovan): opt: lots of little optimizations may be
 	// worthwhile here, especially if they cause us to avoid
 	// buildDomFrontier.  For example:
@@ -147,7 +149,7 @@ func lift(fn *Function) {
 	//   Unclear.
 	//
 	// But we will start with the simplest correct code.
-	df := buildDomFrontier(fn)
+	df := buildDomFrontier(b)
 
 	if debugLifting {
 		title := false

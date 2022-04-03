@@ -169,13 +169,13 @@ func (f *Function) labelledBlock(label *Name) *lblock {
 // addParamObj adds a (non-escaping) parameter to f.Params for the
 // specified Var.
 //
-func (f *Function) addParamObj(obj *Var) { f.addParam(obj, false) }
+func (b *builder) addParamObj(obj *Var) { b.addParam(obj, false) }
 
 // addSpilledParam declares a parameter that is pre-spilled to the
 // stack; the function body will load/store the spilled location.
 // Subsequent lifting will eliminate spills where possible.
 //
-func (f *Function) addSpilledParam(obj *Var) { f.addParam(obj, true) }
+func (b *builder) addSpilledParam(obj *Var) { b.addParam(obj, true) }
 
 // addParamObj adds a (non-escaping) parameter to f.Params for the
 // specified Var.
@@ -184,7 +184,8 @@ func (f *Function) addSpilledParam(obj *Var) { f.addParam(obj, true) }
 // the function body will load/store the spilled location. Subsequent
 // lifting will eliminate spills where possible.
 //
-func (f *Function) addParam(obj *Var, spill bool) {
+func (b *builder) addParam(obj *Var, spill bool) {
+	f := b.Fn
 	name := obj.Name()
 	if name == "" {
 		name = fmt.Sprintf("arg%d", len(f.Params))
@@ -210,7 +211,8 @@ func (f *Function) addParam(obj *Var, spill bool) {
 // startBody initializes the function prior to generating SSA code for its body.
 // Precondition: f.Type() already set.
 //
-func (f *Function) startBody() {
+func (b *builder) startBody() {
+	f := b.Fn
 	f.currentBlock = f.newBasicBlock("entry")
 	f.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
 }
@@ -224,16 +226,17 @@ func (f *Function) startBody() {
 // Postcondition:
 // len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
 //
-func (f *Function) createSyntacticParams() {
+func (b *builder) createSyntacticParams() {
+	f := b.Fn
 	if recv := f.Signature.Recv(); recv != nil {
-		f.addParam(recv, recv.Name() != "")
+		b.addParam(recv, recv.Name() != "")
 	}
 
 	// Parameters.
 	params := f.Signature.Params()
 	for i := 0; i < params.Len(); i++ {
 		param := params.At(i)
-		f.addParam(param, param.Name() != "")
+		b.addParam(param, param.Name() != "")
 	}
 
 	// Named results.
@@ -255,7 +258,8 @@ type setNumable interface {
 // (value-defining Instructions) in f, to aid debugging.
 // (Non-Instruction Values are named at construction.)
 //
-func numberRegisters(f *Function) {
+func numberRegisters(b *builder) {
+	f := b.Fn
 	v := 0
 	for _, b := range f.Blocks {
 		for _, instr := range b.Instrs {
@@ -271,7 +275,8 @@ func numberRegisters(f *Function) {
 // buildReferrers populates the def/use information in all non-nil
 // Value.Referrers slice.
 // Precondition: all such slices are initially empty.
-func buildReferrers(f *Function) {
+func buildReferrers(b *builder) {
+	f := b.Fn
 	var rands []*Value
 	for _, b := range f.Blocks {
 		for _, instr := range b.Instrs {
@@ -288,7 +293,8 @@ func buildReferrers(f *Function) {
 }
 
 // finishBody() finalizes the function after SSA code generation of its body.
-func (f *Function) finishBody() {
+func (b *builder) finishBody() {
+	f := b.Fn
 	f.objects = nil
 	f.currentBlock = nil
 	f.lblocks = nil
@@ -308,22 +314,22 @@ func (f *Function) finishBody() {
 	}
 	f.Locals = f.Locals[:j]
 
-	optimizeBlocks(f)
+	optimizeBlocks(b)
 
-	buildReferrers(f)
+	buildReferrers(b)
 
-	buildDomTree(f)
+	buildDomTree(b)
 
 	if f.Prog.mode&NaiveForm == 0 {
 		// For debugging pre-state of lifting pass:
 		// numberRegisters(f)
 		// f.WriteTo(os.Stderr)
-		lift(f)
+		lift(b)
 	}
 
 	f.namedResults = nil // (used by lifting)
 
-	numberRegisters(f)
+	numberRegisters(b)
 
 	if f.Prog.mode&PrintFunctions != 0 {
 		printMu.Lock()

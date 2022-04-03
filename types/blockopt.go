@@ -151,7 +151,8 @@ func fuseBlocks(f *Function, a *BasicBlock) bool {
 // completed function: dead block elimination, block fusion, jump
 // threading.
 //
-func optimizeBlocks(f *Function) {
+func optimizeBlocks(b *builder) {
+	f := b.Fn
 	deleteUnreachableBlocks(f)
 
 	// Loop until no further progress.

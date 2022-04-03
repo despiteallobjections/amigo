@@ -2197,11 +2197,11 @@ func (b *builder) buildFunction() {
 			// We set Function.Params even though there is no body
 			// code to reference them.  This simplifies clients.
 			if recv := fn.Signature.Recv(); recv != nil {
-				fn.addParamObj(recv)
+				b.addParamObj(recv)
 			}
 			params := fn.Signature.Params()
 			for i, n := 0, params.Len(); i < n; i++ {
-				fn.addParamObj(params.At(i))
+				b.addParamObj(params.At(i))
 			}
 		}
 		return
@@ -2209,8 +2209,8 @@ func (b *builder) buildFunction() {
 	if fn.Prog.mode&LogSource != 0 {
 		defer logStack("build function %s @ %s", fn, fn.pos)()
 	}
-	fn.startBody()
-	fn.createSyntacticParams()
+	b.startBody()
+	b.createSyntacticParams()
 	b.stmt(fn, body)
 	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
 		// Control fell off the end of the function's body block.
@@ -2308,7 +2308,7 @@ func (p *SSAPackage) build() {
 	init := p.Init.member
 	b := builder{Fn: init}
 
-	init.startBody()
+	b.startBody()
 
 	var done *BasicBlock
 

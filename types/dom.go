@@ -111,13 +111,14 @@ func (lt *ltState) link(v, w *BasicBlock) {
 // buildDomTree computes the dominator tree of f using the LT algorithm.
 // Precondition: all blocks are reachable (e.g. optimizeBlocks has been run).
 //
-func buildDomTree(f *Function) {
+func buildDomTree(b *builder) {
+	f := b.Fn
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
 
 	// Clear any previous domInfo.
-	for _, b := range f.Blocks {
-		b.dom = domInfo{}
+	for _, block := range f.Blocks {
+		block.dom = domInfo{}
 	}
 
 	n := len(f.Blocks)

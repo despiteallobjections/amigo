@@ -71,9 +71,10 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 		Prog:      prog,
 		pos:       obj.Pos(),
 	}
-	fn.startBody()
-	fn.addSpilledParam(recv)
-	createParams(fn, start)
+	b := &builder{Fn: fn}
+	b.startBody()
+	b.addSpilledParam(recv)
+	createParams(b, start)
 
 	indices := sel.Index()
 
@@ -138,10 +139,10 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 // Signature.Params, which do not include the receiver.
 // start is the index of the first regular parameter to use.
 //
-func createParams(fn *Function, start int) {
-	tparams := fn.Signature.Params()
+func createParams(b *builder, start int) {
+	tparams := b.Fn.Signature.Params()
 	for i, n := start, tparams.Len(); i < n; i++ {
-		fn.addParamObj(tparams.At(i))
+		b.addParamObj(tparams.At(i))
 	}
 }
 
@@ -189,11 +190,12 @@ func makeBound(prog *Program, obj *Func) *Function {
 			Prog:      prog,
 			pos:       obj.Pos(),
 		}
+		b := &builder{Fn: fn}
 
 		fv := &FreeVar{name: "recv", typ: recvType(obj), parent: fn}
 		fn.FreeVars = []*FreeVar{fv}
-		fn.startBody()
-		createParams(fn, 0)
+		b.startBody()
+		createParams(b, 0)
 		var c Call
 
 		if !isInterface(recvType(obj)) { // concrete
