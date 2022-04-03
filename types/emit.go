@@ -452,9 +452,9 @@ func createRecoverBlock(b *builder) {
 	if fn.Recover != nil {
 		return // already created
 	}
-	saved := fn.currentBlock
+	saved := b.Fn.currentBlock
 
-	fn.Recover = fn.newBasicBlock("recover")
+	fn.Recover = b.newBasicBlock("recover")
 	b.Fn.currentBlock = b.Fn.Recover
 
 	var results []Value

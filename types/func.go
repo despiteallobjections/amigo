@@ -149,7 +149,8 @@ type lblock struct {
 // labelledBlock returns the branch target associated with the
 // specified label, creating it if needed.
 //
-func (f *Function) labelledBlock(label *Name) *lblock {
+func (b *builder) labelledBlock(label *Name) *lblock {
+	f := b.Fn
 	// TODO(mdempsky): This used to be keyed by label.Object, but now
 	// I'm using label.Value. I think that's safe, but double check that
 	// it doesn't cause problems with closures and identically named
@@ -157,7 +158,7 @@ func (f *Function) labelledBlock(label *Name) *lblock {
 
 	lb := f.lblocks[label.Value]
 	if lb == nil {
-		lb = &lblock{_goto: f.newBasicBlock(label.Value)}
+		lb = &lblock{_goto: b.newBasicBlock(label.Value)}
 		if f.lblocks == nil {
 			f.lblocks = make(map[string]*lblock)
 		}
@@ -212,9 +213,9 @@ func (b *builder) addParam(obj *Var, spill bool) {
 // Precondition: f.Type() already set.
 //
 func (b *builder) startBody() {
-	f := b.Fn
-	f.currentBlock = f.newBasicBlock("entry")
-	f.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
+	fn := b.Fn
+	b.Fn.currentBlock = b.newBasicBlock("entry")
+	fn.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
 }
 
 // createSyntacticParams populates f.Params and generates code (spills
@@ -296,7 +297,7 @@ func buildReferrers(b *builder) {
 func (b *builder) finishBody() {
 	f := b.Fn
 	f.objects = nil
-	f.currentBlock = nil
+	b.Fn.currentBlock = nil
 	f.lblocks = nil
 	f.syntax = nil
 
@@ -436,8 +437,8 @@ func (f *Function) lookup(obj *Var, escaping bool) Value {
 }
 
 // emit emits the specified instruction to function f.
-func (f *Function) emit(instr Instruction) Value {
-	return f.currentBlock.emit(instr)
+func (b *builder) emit(instr Instruction) Value {
+	return b.Fn.currentBlock.emit(instr)
 }
 
 // RelString returns the full name of this function, qualified by
@@ -637,15 +638,16 @@ func WriteFunction(buf *bytes.Buffer, f *Function) {
 // not automatically become the current block for subsequent calls to emit.
 // comment is an optional string for more readable debugging output.
 //
-func (f *Function) newBasicBlock(comment string) *BasicBlock {
-	b := &BasicBlock{
+func (b *builder) newBasicBlock(comment string) *BasicBlock {
+	f := b.Fn
+	block := &BasicBlock{
 		Index:   len(f.Blocks),
 		Comment: comment,
 		parent:  f,
 	}
-	b.Succs = b.succs2[:0]
-	f.Blocks = append(f.Blocks, b)
-	return b
+	block.Succs = block.succs2[:0]
+	f.Blocks = append(f.Blocks, block)
+	return block
 }
 
 // NewFunction returns a new synthetic Function instance belonging to
