@@ -73,9 +73,16 @@ func (b *builder) emitArith(op Operator, x, y Value, t Type, pos Pos) Value {
 	case Shl, Shr:
 		x = b.emitConv(x, t)
 		// y may be signed or an 'untyped' constant.
-		// TODO(adonovan): whence signed values?
-		if yt, ok := y.Type().Underlying().(*Basic); ok && yt.Info()&IsUnsigned == 0 {
-			y = b.emitConv(y, Typ[Uint64])
+
+		// There is a runtime panic if y is signed and <0. Instead of inserting a check for y<0
+		// and converting to an unsigned value (like the compiler) leave y as is.
+
+		if isUntyped(y.Type().Underlying()) {
+			// Untyped conversion:
+			// Spec https://go.dev/ref/spec#Operators:
+			// The right operand in a shift expression must have integer type or be an untyped constant
+			// representable by a value of type uint.
+			y = b.emitConv(y, Typ[Uint])
 		}
 
 	case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
