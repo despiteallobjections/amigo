@@ -529,7 +529,7 @@ func WriteFunction(buf *bytes.Buffer, f *Function) {
 		fmt.Fprintln(buf, "# Synthetic:", syn)
 	}
 	if pos := f.Pos(); pos.IsValid() {
-		fmt.Fprintf(buf, "# Location: %s\n", pos)
+		fmt.Fprintf(buf, "# Location: %s\n", pos.Format(false))
 	}
 
 	if f.parent != nil {

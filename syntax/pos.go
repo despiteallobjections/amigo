@@ -98,12 +98,16 @@ func (p Pos) Cmp(q Pos) int {
 	return 0
 }
 
-func (pos Pos) String() string {
+func (pos Pos) String() string { return pos.Format(true) }
+
+func (pos Pos) Format(showOrig bool) string {
 	rel := position_{pos.RelFilename(), pos.RelLine(), pos.RelCol()}
-	abs := position_{pos.Base().Pos().RelFilename(), pos.Line(), pos.Col()}
 	s := rel.String()
-	if rel != abs {
-		s += "[" + abs.String() + "]"
+	if showOrig {
+		abs := position_{pos.Base().Pos().RelFilename(), pos.Line(), pos.Col()}
+		if rel != abs {
+			s += "[" + abs.String() + "]"
+		}
 	}
 	return s
 }

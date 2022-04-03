@@ -19,11 +19,6 @@ import (
 )
 
 func TestGolden(t *testing.T) {
-	// TODO(mdempsky): Fix ASAP.
-	if testing.Short() {
-		t.Skip("golden tests not yet working")
-	}
-
 	testenv.NeedsGoPackages(t)
 
 	cfg := &packages.Config{Mode: packages.LoadAllSyntax}
@@ -39,6 +34,10 @@ func TestGolden(t *testing.T) {
 
 	for _, oldPkg := range oldProg.AllPackages() {
 		path := oldPkg.Pkg.Path()
+		if path == "unsafe" {
+			continue
+		}
+
 		newPkg := newProg.ImportedPackage(path)
 		if newPkg == nil {
 			t.Errorf("missing package %q in newProg", path)
