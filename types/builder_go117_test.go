@@ -22,7 +22,7 @@ import (
 // safe again once we finish unifying Object and Member.
 //
 // TODO(mdempsky): Change to true and remove.
-const parallelOK = false
+const parallelOK = true
 
 func TestBuildPackageGo117(t *testing.T) {
 	tests := []struct {

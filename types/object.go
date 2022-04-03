@@ -323,10 +323,9 @@ func (obj *TypeName) IsAlias() bool {
 // A Variable represents a declared variable (including function parameters and results, and struct fields).
 type Var struct {
 	object
-	member   *Global // TODO(mdempsky): Remove.
-	embedded bool    // if set, the variable is an embedded struct field, and name is the type name
-	isField  bool    // var is struct field
-	used     bool    // set if the variable was used
+	embedded bool // if set, the variable is an embedded struct field, and name is the type name
+	isField  bool // var is struct field
+	used     bool // set if the variable was used
 }
 
 // NewVar returns a new variable.
@@ -364,7 +363,6 @@ func (*Var) isDependency() {} // a variable may be a dependency of an initializa
 // An abstract method may belong to many interfaces due to embedding.
 type Func struct {
 	object
-	member      *Function // TODO(mdempsky): Remove.
 	labels      []*Label
 	hasPtrRecv_ bool // only valid for methods that don't have a type yet; use hasPtrRecv() to read
 }
@@ -377,7 +375,7 @@ func NewFunc(pos Pos, pkg *Package, name string, sig *Signature) *Func {
 	if sig != nil {
 		typ = sig
 	}
-	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, nil, false}
+	return &Func{object{nil, pos, pkg, name, typ, 0, colorFor(typ), nopos}, nil, false}
 }
 
 // NewFuncLit returns a new function representing a function literal.

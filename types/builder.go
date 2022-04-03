@@ -71,6 +71,7 @@ var (
 type builder struct {
 	Prog *Program
 	Fn   *Function
+	info *Info
 
 	currentBlock *BasicBlock    // where to emit code
 	objects      map[*Var]Value // addresses of local variables
@@ -79,8 +80,8 @@ type builder struct {
 	lblocks      []*lblock      // labelled blocks
 }
 
-func (prog *Program) build(fn *Function, emitBody func(b *builder)) {
-	b := &builder{Prog: prog, Fn: fn}
+func (prog *Program) build(fn *Function, info *Info, emitBody func(b *builder)) {
+	b := &builder{Prog: prog, Fn: fn, info: info}
 	b.startBody()
 	emitBody(b)
 	b.finishBody()
@@ -384,7 +385,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		return b.addr(e.X, escaping)
 
 	case *SelectorExpr:
-		sel, ok := b.Fn.Pkg.info.Selections[e]
+		sel, ok := b.info.Selections[e]
 		if !ok {
 			// qualified identifier
 			return b.addr(e.Sel, escaping)
@@ -534,7 +535,7 @@ func (b *builder) assign(loc lvalue, e Expr, isZero bool, sb *storebuf) {
 func (b *builder) expr(e Expr) Value {
 	e = Unparen(e)
 
-	tv := b.Fn.Pkg.info.Types[e]
+	tv := b.info.Types[e]
 
 	// Is expression a constant?
 	if tv.Value != nil {
@@ -562,7 +563,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		panic("non-constant BasicLit") // unreachable
 
 	case *FuncLit:
-		obj := b.Fn.Pkg.info.Implicits[e].(*Func)
+		obj := b.info.Implicits[e].(*Func)
 		fn2 := &Function{
 			name:      fmt.Sprintf("%s$%d", b.Fn.Name(), 1+len(b.Fn.AnonFuncs)),
 			object:    obj,
@@ -571,7 +572,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			Pkg:       b.Fn.Pkg,
 		}
 		b.Fn.AnonFuncs = append(b.Fn.AnonFuncs, fn2)
-		b.Prog.buildFunction(fn2, e.Body)
+		b.Prog.buildFunction(b.info, fn2, e.Body)
 		if fn2.FreeVars == nil {
 			return fn2
 		}
@@ -587,7 +588,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		return b.emitTypeAssert(b.expr(e.X), tv.Type, e.Pos() /*Lparen*/)
 
 	case *CallExpr:
-		if b.Fn.Pkg.info.Types[e.Fun].IsType() {
+		if b.info.Types[e.Fun].IsType() {
 			// Explicit type conversion, e.g. string(x) or big.Int(x)
 			x := b.expr(e.ArgList[0])
 			y := b.emitConv(x, tv.Type)
@@ -607,7 +608,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		}
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := Unparen(e.Fun).(*Name); ok {
-			if obj, ok := b.Fn.Pkg.info.Uses[id].(*Builtin); ok {
+			if obj, ok := b.info.Uses[id].(*Builtin); ok {
 				if v := b.builtin(obj, e.ArgList, tv.Type, e.Pos() /*Lparen*/); v != nil {
 					return v
 				}
@@ -699,7 +700,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		return b.emit(v)
 
 	case *Name:
-		obj := b.Fn.Pkg.info.Uses[e]
+		obj := b.info.Uses[e]
 		// Universal built-in or nil?
 		switch obj := obj.(type) {
 		case *Builtin:
@@ -718,10 +719,10 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		return b.emitLoad(b.lookup(b.Fn, obj.(*Var), false)) // var (address)
 
 	case *SelectorExpr:
-		sel, ok := b.Fn.Pkg.info.Selections[e]
+		sel, ok := b.info.Selections[e]
 		if !ok {
 			// builtin unsafe.{Add,Slice}
-			if obj, ok := b.Fn.Pkg.info.Uses[e.Sel].(*Builtin); ok {
+			if obj, ok := b.info.Uses[e.Sel].(*Builtin); ok {
 				return &SSABuiltin{name: obj.Name(), sig: tv.Type.(*Signature)}
 			}
 			// qualified identifier
@@ -858,7 +859,7 @@ func (b *builder) setCallFunc(e *CallExpr, c *CallCommon) {
 
 	// Is this a method call?
 	if selector, ok := Unparen(e.Fun).(*SelectorExpr); ok {
-		sel, ok := b.Fn.Pkg.info.Selections[selector]
+		sel, ok := b.info.Selections[selector]
 		if ok && sel.Kind() == MethodVal {
 			obj := sel.Obj().(*Func)
 			recv := recvType(obj)
@@ -1018,7 +1019,7 @@ func (b *builder) localValueSpec(spec *VarSpec) {
 		// 1:1 assignment
 		for i, id := range spec.NameList {
 			if !isBlankIdent(id) {
-				b.addLocalForIdent(id)
+				b.defLocal(id)
 			}
 			lval := b.addr(id, false) // non-escaping
 			b.assign(lval, values[i], true, nil)
@@ -1029,7 +1030,7 @@ func (b *builder) localValueSpec(spec *VarSpec) {
 		// Locals are implicitly zero-initialized.
 		for _, id := range spec.NameList {
 			if !isBlankIdent(id) {
-				lhs := b.addLocalForIdent(id)
+				lhs := b.defLocal(id)
 				if b.Fn.debugInfo() {
 					b.emitDebugRef(id, lhs, true)
 				}
@@ -1041,7 +1042,7 @@ func (b *builder) localValueSpec(spec *VarSpec) {
 		tuple := b.exprN(values[0])
 		for i, id := range spec.NameList {
 			if !isBlankIdent(id) {
-				b.addLocalForIdent(id)
+				b.defLocal(id)
 				lhs := b.addr(id, false) // non-escaping
 				lhs.store(b, b.emitExtract(tuple, i))
 			}
@@ -1062,7 +1063,7 @@ func (b *builder) assignStmt(lhss, rhss []Expr, isDef bool) {
 		var lval lvalue = blank{}
 		if !isBlankIdent(lhs) {
 			if isDef {
-				if obj := b.Fn.Pkg.info.Defs[lhs.(*Name)]; obj != nil {
+				if obj := b.info.Defs[lhs.(*Name)]; obj != nil {
 					b.addNamedLocal(obj.(*Var))
 					isZero[i] = true
 				}
@@ -1454,7 +1455,7 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, label *lblock) {
 }
 
 func (b *builder) typeCaseBody(cc *CaseClause, x Value, done *BasicBlock) {
-	if obj := b.Fn.Pkg.info.Implicits[cc]; obj != nil {
+	if obj := b.info.Implicits[cc]; obj != nil {
 		// In a switch y := x.(type), each case clause
 		// implicitly declares a distinct object y.
 		// In a single-type case, y has that type.
@@ -1612,7 +1613,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			lhs := unpackExpr(comm.Lhs)
 
 			if comm.Op == Def {
-				b.addLocalForIdent(lhs[0].(*Name))
+				b.defLocal(lhs[0].(*Name))
 			}
 			x := b.addr(lhs[0], false) // non-escaping
 			v := b.emitExtract(sel, r)
@@ -1623,7 +1624,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 
 			if len(lhs) == 2 { // x, ok := ...
 				if comm.Op == Def {
-					b.addLocalForIdent(lhs[1].(*Name))
+					b.defLocal(lhs[1].(*Name))
 				}
 				ok := b.addr(lhs[1], false) // non-escaping
 				ok.store(b, b.emitExtract(sel, 1))
@@ -1933,10 +1934,10 @@ func (b *builder) rangeStmt(s *ForStmt, label *lblock) {
 	// always creates a new one.
 	if clause.Def {
 		if tk != nil {
-			b.addLocalForIdent(lhs[0].(*Name))
+			b.defLocal(lhs[0].(*Name))
 		}
 		if tv != nil {
-			b.addLocalForIdent(lhs[1].(*Name))
+			b.defLocal(lhs[1].(*Name))
 		}
 	}
 
@@ -2009,7 +2010,7 @@ start:
 		}
 
 	case *LabeledStmt:
-		label = b.labelledBlock(b.Fn.Pkg.info.Defs[s.Label].(*Label))
+		label = b.labelledBlock(b.info.Defs[s.Label].(*Label))
 		b.emitJump(label._goto)
 		b.currentBlock = label._goto
 		_s = s.Stmt
@@ -2106,7 +2107,7 @@ start:
 		switch s.Tok {
 		case Break:
 			if s.Label != nil {
-				block = b.labelledBlock(b.Fn.Pkg.info.Uses[s.Label].(*Label))._break
+				block = b.labelledBlock(b.info.Uses[s.Label].(*Label))._break
 			} else {
 				for t := b.targets; t != nil && block == nil; t = t.tail {
 					block = t._break
@@ -2115,7 +2116,7 @@ start:
 
 		case Continue:
 			if s.Label != nil {
-				block = b.labelledBlock(b.Fn.Pkg.info.Uses[s.Label].(*Label))._continue
+				block = b.labelledBlock(b.info.Uses[s.Label].(*Label))._continue
 			} else {
 				for t := b.targets; t != nil && block == nil; t = t.tail {
 					block = t._continue
@@ -2128,7 +2129,7 @@ start:
 			}
 
 		case Goto:
-			block = b.labelledBlock(b.Fn.Pkg.info.Uses[s.Label].(*Label))._goto
+			block = b.labelledBlock(b.info.Uses[s.Label].(*Label))._goto
 		}
 		b.emitJump(block)
 		b.currentBlock = b.newBasicBlock("unreachable")
@@ -2182,7 +2183,7 @@ start:
 }
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
-func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
+func (prog *Program) buildFunction(info *Info, fn *Function, body *BlockStmt) {
 	if fn.Blocks != nil {
 		return // building already started
 	}
@@ -2211,7 +2212,7 @@ func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
 		defer logStack("build function %s @ %s", fn, fn.Pos())()
 	}
 
-	prog.build(fn, func(b *builder) {
+	prog.build(fn, p.info, func(b *builder) {
 		b.createSyntacticParams()
 		b.stmt(body)
 		if cb := b.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
@@ -2263,7 +2264,8 @@ func (prog *Program) Build() {
 func (p *SSAPackage) Build(prog *Program) { p.buildOnce.Do(func() { p.build(prog) }) }
 
 func (p *SSAPackage) build(prog *Program) {
-	if p.info == nil {
+	info := p.info
+	if info == nil {
 		return // synthetic package, e.g. "testmain"
 	}
 
@@ -2276,8 +2278,8 @@ func (p *SSAPackage) build(prog *Program) {
 	for _, file := range p.files {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
-				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					prog.buildFunction(obj.member, decl.Body)
+				if obj := info.Defs[decl.Name].(*Func); obj.Name() != "_" {
+					prog.buildFunction(p.info, p.values[obj].(*Function), decl.Body)
 				}
 			}
 		}
@@ -2333,7 +2335,7 @@ func (p *SSAPackage) build(prog *Program) {
 		}
 
 		// Initialize package-level vars in correct order.
-		for _, varinit := range p.info.InitOrder {
+		for _, varinit := range info.InitOrder {
 			if prog.mode&LogSource != 0 {
 				fmt.Fprintf(os.Stderr, "build global initializer %v @ %s\n",
 					varinit.Lhs, varinit.Rhs.Pos())
@@ -2342,7 +2344,7 @@ func (p *SSAPackage) build(prog *Program) {
 				// 1:1 initialization: var x, y = a(), b()
 				var lval lvalue
 				if v := varinit.Lhs[0]; v.Name() != "_" {
-					lval = &address{addr: v.member, pos: v.Pos()}
+					lval = &address{addr: b.Prog.packageLevelValue(v), pos: v.Pos()}
 				} else {
 					lval = blank{}
 				}
@@ -2354,7 +2356,7 @@ func (p *SSAPackage) build(prog *Program) {
 					if v.Name() == "_" {
 						continue
 					}
-					b.emitStore(v.member, b.emitExtract(tuple, i), v.Pos())
+					b.emitStore(b.Prog.packageLevelValue(v), b.emitExtract(tuple, i), v.Pos())
 				}
 			}
 		}
@@ -2363,9 +2365,9 @@ func (p *SSAPackage) build(prog *Program) {
 		for _, file := range p.files {
 			for _, decl := range file.DeclList {
 				if decl, ok := decl.(*FuncDecl); ok && decl.Recv == nil && decl.Name.Value == "init" {
-					obj := p.info.Defs[decl.Name].(*Func)
+					obj := b.info.Defs[decl.Name].(*Func)
 					var v Call
-					v.Call.Value = obj.member
+					v.Call.Value = p.values[obj]
 					// TODO(mdempsky): Set v.Call.Pos to obj.Pos()?
 					v.setType(NewTuple())
 					b.emit(&v)
@@ -2391,7 +2393,7 @@ func (p *SSAPackage) build(prog *Program) {
 // Like ObjectOf, but panics instead of returning nil.
 // Only valid during p's create and build phases.
 func (b *builder) objectOf(id *Name) Object {
-	if o := b.Fn.Pkg.info.ObjectOf(id); o != nil {
+	if o := b.info.ObjectOf(id); o != nil {
 		return o
 	}
 	panic(fmt.Sprintf("no types.Object for syntax.Name %s @ %s",
@@ -2401,7 +2403,7 @@ func (b *builder) objectOf(id *Name) Object {
 // Like TypeOf, but panics instead of returning nil.
 // Only valid during p's create and build phases.
 func (b *builder) typeOf(e Expr) Type {
-	if T := b.Fn.Pkg.info.TypeOf(e); T != nil {
+	if T := b.info.TypeOf(e); T != nil {
 		return T
 	}
 	panic(fmt.Sprintf("no type for %T @ %s",

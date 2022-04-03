@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/mdempsky/amigo/syntax"
 	. "github.com/mdempsky/amigo/syntax"
 )
 
@@ -42,7 +43,7 @@ func NewProgram(mode BuilderMode) *Program {
 // tree (for funcs and vars only); it will be used during the build
 // phase.
 //
-func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
+func memberFromObject(pkg *SSAPackage, obj Object, haveSyntax bool) {
 	name := obj.Name()
 	switch obj := obj.(type) {
 	case *Builtin:
@@ -58,7 +59,7 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			object: obj,
 			typ:    NewPointer(obj.Type()), // address
 		}
-		obj.member = g
+		pkg.values[obj] = g
 		pkg.Members[name] = g
 
 	case *Func:
@@ -76,11 +77,11 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			Signature: sig,
 			Pkg:       pkg,
 		}
-		if syntax == nil {
+		if !haveSyntax {
 			fn.Synthetic = "loaded from gc object file"
 		}
 
-		obj.member = fn
+		pkg.values[obj] = fn
 		if sig.Recv() == nil {
 			pkg.Members[name] = fn // package-level function
 		}
@@ -94,38 +95,32 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 // typechecker object (var, func, const or type) associated with the
 // specified decl.
 //
-func membersFromDecl(pkg *SSAPackage, decl Decl) {
+func membersFromDecl(pkg *SSAPackage, info *Info, decl Decl) {
+	declare := func(idents ...*syntax.Name) {
+		for _, id := range idents {
+			if !isBlankIdent(id) {
+				memberFromObject(pkg, info.Defs[id], true)
+			}
+		}
+	}
+
 	switch decl := decl.(type) {
 	case *GenDecl:
 		for _, spec := range decl.SpecList {
 			switch spec := spec.(type) {
 			case *ConstSpec:
-				for _, id := range spec.NameList {
-					if !isBlankIdent(id) {
-						memberFromObject(pkg, pkg.info.Defs[id], nil)
-					}
-				}
+				declare(spec.NameList...)
 
 			case *VarSpec:
-				for _, id := range spec.NameList {
-					if !isBlankIdent(id) {
-						memberFromObject(pkg, pkg.info.Defs[id], decl)
-					}
-				}
+				declare(spec.NameList...)
 
 			case *TypeSpec:
-				id := spec.Name
-				if !isBlankIdent(id) {
-					memberFromObject(pkg, pkg.info.Defs[id], nil)
-				}
+				declare(spec.Name)
 			}
 		}
 
 	case *FuncDecl:
-		id := decl.Name
-		if !isBlankIdent(id) {
-			memberFromObject(pkg, pkg.info.Defs[id], decl)
-		}
+		declare(decl.Name)
 	}
 }
 
@@ -141,8 +136,9 @@ func membersFromDecl(pkg *SSAPackage, decl Decl) {
 //
 func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, importable bool) *SSAPackage {
 	p := &SSAPackage{
-		Members: make(map[string]Member),
 		Pkg:     pkg,
+		Members: make(map[string]Member),
+		values:  make(map[Object]Value),
 		info:    info,  // transient (CREATE and BUILD phases)
 		files:   files, // transient (CREATE and BUILD phases)
 	}
@@ -156,7 +152,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		Synthetic: "package initializer",
 		Pkg:       p,
 	}
-	obj.member = fn
 	p.Init = fn
 	p.Members[fn.name] = fn
 
@@ -166,7 +161,7 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		// Go source package.
 		for _, file := range files {
 			for _, decl := range file.DeclList {
-				membersFromDecl(p, decl)
+				membersFromDecl(p, p.info, decl)
 			}
 		}
 	} else {
@@ -176,11 +171,11 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		scope := p.Pkg.Scope()
 		for _, name := range scope.Names() {
 			obj := scope.Lookup(name)
-			memberFromObject(p, obj, nil)
+			memberFromObject(p, obj, false)
 			if obj, ok := obj.(*TypeName); ok {
 				if named, ok := obj.Type().(*Named); ok {
 					for i, n := 0, named.NumMethods(); i < n; i++ {
-						memberFromObject(p, named.Method(i), nil)
+						memberFromObject(p, named.Method(i), false)
 					}
 				}
 			}
@@ -194,7 +189,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 			object: obj,
 			typ:    NewPointer(obj.Type()), // address
 		}
-		obj.member = initguard
 		p.InitGuard = initguard
 		p.Members[initguard.Name()] = initguard
 	}

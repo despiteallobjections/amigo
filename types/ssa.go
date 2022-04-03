@@ -45,6 +45,8 @@ type SSAPackage struct {
 	// all package members keyed by name (incl. init and init#%d)
 	Members map[string]Member
 
+	values map[Object]Value
+
 	Init      *Function // the package's synthetic init function
 	InitGuard *Global   // the package's synthetic initializer guard
 

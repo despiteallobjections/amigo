@@ -26,15 +26,8 @@ func (prog *Program) Package(obj *Package) *SSAPackage {
 // prog.  It returns nil if the object is not found.
 //
 func (prog *Program) packageLevelValue(obj Object) Value {
-	switch obj := obj.(type) {
-	case *Func:
-		if obj.member != nil {
-			return obj.member
-		}
-	case *Var:
-		if obj.member != nil {
-			return obj.member
-		}
+	if pkg := prog.Package(obj.Pkg()); pkg != nil {
+		return pkg.values[obj]
 	}
 	return nil
 }

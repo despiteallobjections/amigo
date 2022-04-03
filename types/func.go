@@ -383,8 +383,8 @@ func (b *builder) addNamedLocal(obj *Var) *Alloc {
 	return l
 }
 
-func (b *builder) addLocalForIdent(id *Name) *Alloc {
-	return b.addNamedLocal(b.Fn.Pkg.info.Defs[id].(*Var))
+func (b *builder) defLocal(id *Name) *Alloc {
+	return b.addNamedLocal(b.info.Defs[id].(*Var))
 }
 
 // addLocal creates an anonymous local variable of type typ, adds it
@@ -415,9 +415,6 @@ func (b *builder) lookup(f *Function, obj *Var, escaping bool) Value {
 
 	// Definition must be in an enclosing function;
 	// plumb it through intervening closures.
-	if f.parent == nil {
-		panic("no ssa.Value for " + obj.String())
-	}
 	v := &FreeVar{
 		object: obj,
 		typ:    NewPointer(obj.Type()),
