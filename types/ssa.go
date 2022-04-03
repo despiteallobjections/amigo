@@ -345,14 +345,10 @@ type BasicBlock struct {
 // belongs to an enclosing function.
 //
 type FreeVar struct {
-	name      string
+	object    *Var
 	typ       Type
-	pos       Pos
 	parent    *Function
 	referrers []Instruction
-
-	// Transiently needed during building.
-	outer Value // the Value captured from the enclosing context.
 }
 
 // A Parameter represents an input parameter of a function.
@@ -1385,9 +1381,9 @@ func (v *SSABuiltin) Object() Object          { return Universe.Lookup(v.name) }
 func (v *SSABuiltin) Parent() *Function       { return nil }
 
 func (v *FreeVar) Type() Type                { return v.typ }
-func (v *FreeVar) Name() string              { return v.name }
+func (v *FreeVar) Name() string              { return v.object.Name() }
 func (v *FreeVar) Referrers() *[]Instruction { return &v.referrers }
-func (v *FreeVar) Pos() Pos                  { return v.pos }
+func (v *FreeVar) Pos() Pos                  { return v.object.Pos() }
 func (v *FreeVar) Parent() *Function         { return v.parent }
 
 func (v *Global) Type() Type                     { return v.typ }

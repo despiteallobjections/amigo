@@ -192,7 +192,8 @@ func makeBound(prog *Program, obj *Func) *Function {
 		}
 		b := &builder{Fn: fn}
 
-		fv := &FreeVar{name: "recv", typ: recvType(obj), parent: fn}
+		recv := obj.Type().(*Signature).Recv()
+		fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}
 		fn.FreeVars = []*FreeVar{fv}
 		b.startBody()
 		createParams(b, 0)

@@ -421,12 +421,9 @@ func (b *builder) lookup(f *Function, obj *Var, escaping bool) Value {
 	if f.parent == nil {
 		panic("no ssa.Value for " + obj.String())
 	}
-	outer := b.lookup(f.parent, obj, true) // escaping
 	v := &FreeVar{
-		name:   obj.Name(),
-		typ:    outer.Type(),
-		pos:    outer.Pos(),
-		outer:  outer,
+		object: obj,
+		typ:    NewPointer(obj.Type()),
 		parent: f,
 	}
 	b.objects[obj] = v
