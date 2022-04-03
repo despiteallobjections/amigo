@@ -75,7 +75,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			name:      name,
 			object:    obj,
 			Signature: sig,
-			pos:       obj.Pos(),
 			Pkg:       pkg,
 		}
 		if syntax == nil {
@@ -156,7 +155,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		object:    obj,
 		Signature: obj.Type().(*Signature),
 		Synthetic: "package initializer",
-		pos:       obj.Pos(),
 		Pkg:       p,
 	}
 	obj.member = fn

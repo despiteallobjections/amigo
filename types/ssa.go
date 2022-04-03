@@ -276,7 +276,6 @@ type Function struct {
 	object    Object     // a declared *types.Func or one of its wrappers
 	method    *Selection // info about provenance of synthetic methods
 	Signature *Signature
-	pos       Pos // TODO(mdempsky): Replace with object.Pos()
 
 	Synthetic string        // provenance of synthetic function; "" for true source functions
 	parent    *Function     // enclosing function if anon; nil if global
@@ -1391,9 +1390,14 @@ func (v *Global) Object() Object                 { return v.object }
 func (v *Global) String() string                 { return v.RelString(nil) }
 func (v *Global) RelString(from *Package) string { return relString(v, from) }
 
-func (v *Function) Name() string      { return v.name }
-func (v *Function) Type() Type        { return v.Signature }
-func (v *Function) Pos() Pos          { return v.pos }
+func (v *Function) Name() string { return v.name }
+func (v *Function) Type() Type   { return v.Signature }
+func (v *Function) Pos() Pos {
+	if v.object != nil {
+		return v.object.Pos()
+	}
+	return NoPos
+}
 func (v *Function) Object() Object    { return v.object }
 func (v *Function) String() string    { return v.RelString(nil) }
 func (v *Function) Parent() *Function { return v.parent }

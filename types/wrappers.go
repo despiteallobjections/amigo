@@ -68,7 +68,6 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 		object:    obj,
 		Signature: sig,
 		Synthetic: description,
-		pos:       obj.Pos(),
 	}
 	prog.build(fn, func(b *builder) {
 		b.addSpilledParam(recv)
@@ -185,7 +184,6 @@ func (prog *Program) makeBound(obj *Func) *Function {
 			object:    obj,
 			Signature: changeRecv(obj.Type().(*Signature), nil), // drop receiver
 			Synthetic: description,
-			pos:       obj.Pos(),
 		}
 		prog.build(fn, func(b *builder) {
 			recv := obj.Type().(*Signature).Recv()

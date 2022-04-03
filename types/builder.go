@@ -565,7 +565,6 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			name:      fmt.Sprintf("%s$%d", b.Fn.Name(), 1+len(b.Fn.AnonFuncs)),
 			object:    obj,
 			Signature: obj.Type().(*Signature),
-			pos:       obj.Pos(),
 			parent:    b.Fn,
 			Pkg:       b.Fn.Pkg,
 		}
@@ -2207,7 +2206,7 @@ func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
 		return
 	}
 	if prog.mode&LogSource != 0 {
-		defer logStack("build function %s @ %s", fn, fn.pos)()
+		defer logStack("build function %s @ %s", fn, fn.Pos())()
 	}
 
 	prog.build(fn, func(b *builder) {
@@ -2326,7 +2325,7 @@ func (p *SSAPackage) build(prog *Program) {
 				}
 				var v Call
 				v.Call.Value = prereq.Init.member
-				v.Call.pos = init.pos
+				v.Call.pos = init.Pos()
 				v.setType(NewTuple())
 				b.emit(&v)
 			}
