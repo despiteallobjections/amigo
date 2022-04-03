@@ -42,52 +42,41 @@ func NewProgram(mode BuilderMode) *Program {
 // tree (for funcs and vars only); it will be used during the build
 // phase.
 //
-func memberFromObject(pkg *SSAPackage, obj Object) {
+func memberFromFunc(pkg *SSAPackage, obj *Func) *Function {
 	name := obj.Name()
-	switch obj := obj.(type) {
-	case *Builtin:
-		if pkg.Pkg != Unsafe {
-			panic("unexpected builtin object: " + obj.String())
+	sig := obj.Type().(*Signature)
+	if sig.Recv() == nil && name == "init" {
+		ninit := 0
+		for obj.Pkg().inits[ninit] != obj {
+			ninit++
 		}
-
-	case *Const, *TypeName:
-		// ignore
-
-	case *Var:
-		g := &Global{
-			object: obj,
-			typ:    NewPointer(obj.Type()), // address
-		}
-		pkg.values[obj] = g
-		pkg.Members[name] = g
-
-	case *Func:
-		sig := obj.Type().(*Signature)
-		if sig.Recv() == nil && name == "init" {
-			ninit := 0
-			for obj.Pkg().inits[ninit] != obj {
-				ninit++
-			}
-			name = fmt.Sprintf("init#%d", 1+ninit)
-		}
-		fn := &Function{
-			name:      name,
-			object:    obj,
-			Signature: sig,
-			Pkg:       pkg,
-		}
-		if pkg.info == nil {
-			fn.Synthetic = "loaded from gc object file"
-		}
-
-		pkg.values[obj] = fn
-		if sig.Recv() == nil {
-			pkg.Members[name] = fn // package-level function
-		}
-
-	default: // (incl. *types.Package)
-		panic("unexpected Object type: " + obj.String())
+		name = fmt.Sprintf("init#%d", 1+ninit)
 	}
+	fn := &Function{
+		name:      name,
+		object:    obj,
+		Signature: sig,
+		Pkg:       pkg,
+	}
+	if pkg.info == nil {
+		fn.Synthetic = "loaded from gc object file"
+	}
+
+	pkg.values[obj] = fn
+	if sig.Recv() == nil {
+		pkg.Members[name] = fn // package-level function
+	}
+	return fn
+}
+
+func memberFromVar(pkg *SSAPackage, obj *Var) *Global {
+	g := &Global{
+		object: obj,
+		typ:    NewPointer(obj.Type()), // address
+	}
+	pkg.values[obj] = g
+	pkg.Members[obj.Name()] = g
+	return g
 }
 
 // CreatePackage constructs and returns an SSA Package from the
@@ -124,31 +113,29 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 	// Allocate all package members: vars, funcs, consts and types.
 
 	for _, init := range p.Pkg.inits {
-		memberFromObject(p, init)
+		memberFromFunc(p, init)
 	}
 
 	scope := p.Pkg.Scope()
 	for _, name := range scope.Names() {
-		obj := scope.Lookup(name)
-		memberFromObject(p, obj)
-		if obj, ok := obj.(*TypeName); ok {
+		switch obj := scope.Lookup(name).(type) {
+		case *Func:
+			memberFromFunc(p, obj)
+		case *TypeName:
 			if named, ok := obj.Type().(*Named); ok {
 				for i, n := 0, named.NumMethods(); i < n; i++ {
-					memberFromObject(p, named.Method(i))
+					memberFromFunc(p, named.Method(i))
 				}
 			}
+		case *Var:
+			memberFromVar(p, obj)
 		}
 	}
 
 	if prog.mode&BareInits == 0 {
 		// Add initializer guard variable.
-		obj := NewVar(NoPos, pkg, "init$guard", tBool)
-		initguard := &Global{
-			object: obj,
-			typ:    NewPointer(obj.Type()), // address
-		}
-		p.InitGuard = initguard
-		p.Members[initguard.Name()] = initguard
+		initGuard := NewVar(NoPos, pkg, "init$guard", tBool)
+		p.InitGuard = memberFromVar(p, initGuard)
 	}
 
 	if prog.mode&PrintPackages != 0 {
