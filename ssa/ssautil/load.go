@@ -175,7 +175,7 @@ func CreateProgram(lprog *loader.Program, mode types.BuilderMode) *types.Program
 //
 // See ../example_test.go for an example.
 //
-func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mode types.BuilderMode) (*types.SSAPackage, *types.Info, error) {
+func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mode types.BuilderMode) (*types.Program, *types.SSAPackage, *types.Info, error) {
 	if pkg.Path() == "" {
 		panic("package has no import path")
 	}
@@ -192,9 +192,9 @@ func BuildPackage(tc *types.Config, pkg *types.Package, files []*syntax.File, mo
 		Selections: make(map[*syntax.SelectorExpr]*types.Selection),
 	}
 	if err := types.NewChecker(tc, pkg, info).Files(files); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Return the primary package, created/built by the type checker.
-	return prog.Package(pkg), info, nil
+	return prog, prog.Package(pkg), info, nil
 }

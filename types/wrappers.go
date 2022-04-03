@@ -68,10 +68,9 @@ func makeWrapper(prog *Program, sel *Selection) *Function {
 		object:    obj,
 		Signature: sig,
 		Synthetic: description,
-		Prog:      prog,
 		pos:       obj.Pos(),
 	}
-	b := &builder{Fn: fn}
+	b := &builder{Prog: prog, Fn: fn}
 	b.startBody()
 	b.addSpilledParam(recv)
 	createParams(b, start)
@@ -187,10 +186,9 @@ func makeBound(prog *Program, obj *Func) *Function {
 			object:    obj,
 			Signature: changeRecv(obj.Type().(*Signature), nil), // drop receiver
 			Synthetic: description,
-			Prog:      prog,
 			pos:       obj.Pos(),
 		}
-		b := &builder{Fn: fn}
+		b := &builder{Prog: prog, Fn: fn}
 
 		recv := obj.Type().(*Signature).Recv()
 		fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}

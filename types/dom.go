@@ -203,7 +203,7 @@ func buildDomTree(b *builder) {
 	// printDomTreeDot(os.Stderr, f)        // debugging
 	// printDomTreeText(os.Stderr, root, 0) // debugging
 
-	if f.Prog.mode&SanityCheckFunctions != 0 {
+	if b.Prog.mode&SanityCheckFunctions != 0 {
 		sanityCheckDomTree(f)
 	}
 }

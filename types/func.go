@@ -319,7 +319,7 @@ func (b *builder) finishBody() {
 
 	buildDomTree(b)
 
-	if f.Prog.mode&NaiveForm == 0 {
+	if b.Prog.mode&NaiveForm == 0 {
 		// For debugging pre-state of lifting pass:
 		// numberRegisters(f)
 		// f.WriteTo(os.Stderr)
@@ -330,13 +330,13 @@ func (b *builder) finishBody() {
 
 	numberRegisters(b)
 
-	if f.Prog.mode&PrintFunctions != 0 {
+	if b.Prog.mode&PrintFunctions != 0 {
 		printMu.Lock()
 		f.WriteTo(os.Stdout)
 		printMu.Unlock()
 	}
 
-	if f.Prog.mode&SanityCheckFunctions != 0 {
+	if b.Prog.mode&SanityCheckFunctions != 0 {
 		mustSanityCheck(f, nil)
 	}
 }
@@ -661,5 +661,5 @@ func (b *builder) newBasicBlock(comment string) *BasicBlock {
 // TODO(adonovan): think harder about the API here.
 //
 func (prog *Program) NewFunction(name string, sig *Signature, provenance string) *Function {
-	return &Function{Prog: prog, name: name, Signature: sig, Synthetic: provenance}
+	return &Function{name: name, Signature: sig, Synthetic: provenance}
 }

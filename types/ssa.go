@@ -40,8 +40,7 @@ type Program struct {
 // and unspecified other things too.
 //
 type SSAPackage struct {
-	Prog *Program // the owning program
-	Pkg  *Package // the corresponding github.com/mdempsky/amigo/types.Package
+	Pkg *Package // the corresponding github.com/mdempsky/amigo/types.Package
 
 	// all package members keyed by name (incl. init and init#%d)
 	//
@@ -284,7 +283,6 @@ type Function struct {
 	syntax    Node          // *syntax.Func{Decl,Lit}; replaced with simple syntax.Node after build, unless debug mode
 	parent    *Function     // enclosing function if anon; nil if global
 	Pkg       *SSAPackage   // enclosing package; nil for shared funcs (wrappers and error.Error)
-	Prog      *Program      // enclosing program
 	Params    []*Parameter  // function parameters; for methods, includes receiver
 	FreeVars  []*FreeVar    // free variables whose values must be supplied by closure
 	Locals    []*Alloc      // local variables of this function

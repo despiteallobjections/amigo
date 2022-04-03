@@ -404,9 +404,6 @@ func (s *sanity) checkFunction(fn *Function) bool {
 	// - check transient fields are nil
 	// - warn if any fn.Locals do not appear among block instructions.
 	s.fn = fn
-	if fn.Prog == nil {
-		s.errorf("nil Prog")
-	}
 
 	_ = fn.String()            // must not crash
 	_ = fn.RelString(fn.pkg()) // must not crash

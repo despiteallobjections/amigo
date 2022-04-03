@@ -361,7 +361,7 @@ func (check *Checker) checkFiles(files []*File) (err error) {
 
 	if prog := check.conf.Prog; prog != nil {
 		pkg := prog.CreatePackage(check.pkg, files, check.Info, false)
-		pkg.Build()
+		pkg.Build(prog)
 	}
 
 	// TODO(gri) There's more memory we should release at this point.

@@ -500,20 +500,19 @@ func ext۰reflect۰error۰Error(fr *frame, args []value) value {
 }
 
 // newMethod creates a new method of the specified name, package and receiver type.
-func newMethod(pkg *types.SSAPackage, recvType types.Type, name string) *types.Function {
+func newMethod(prog *types.Program, pkg *types.SSAPackage, recvType types.Type, name string) *types.Function {
 	// TODO(adonovan): fix: hack: currently the only part of Signature
 	// that is needed is the "pointerness" of Recv.Type, and for
 	// now, we'll set it to always be false since we're only
 	// concerned with rtype.  Encapsulate this better.
 	sig := types.NewSignatureType(types.NewVar(syntax.NoPos, nil, "recv", recvType), nil, nil, nil, nil, false)
-	fn := pkg.Prog.NewFunction(name, sig, "fake reflect method")
+	fn := prog.NewFunction(name, sig, "fake reflect method")
 	fn.Pkg = pkg
 	return fn
 }
 
 func initReflect(i *interpreter) {
 	i.reflectPackage = &types.SSAPackage{
-		Prog:    i.prog,
 		Pkg:     reflectTypesPackage,
 		Members: make(map[string]types.Member),
 	}
@@ -549,20 +548,20 @@ func initReflect(i *interpreter) {
 	}
 
 	i.rtypeMethods = methodSet{
-		"Bits":      newMethod(i.reflectPackage, rtypeType, "Bits"),
-		"Elem":      newMethod(i.reflectPackage, rtypeType, "Elem"),
-		"Field":     newMethod(i.reflectPackage, rtypeType, "Field"),
-		"In":        newMethod(i.reflectPackage, rtypeType, "In"),
-		"Kind":      newMethod(i.reflectPackage, rtypeType, "Kind"),
-		"NumField":  newMethod(i.reflectPackage, rtypeType, "NumField"),
-		"NumIn":     newMethod(i.reflectPackage, rtypeType, "NumIn"),
-		"NumMethod": newMethod(i.reflectPackage, rtypeType, "NumMethod"),
-		"NumOut":    newMethod(i.reflectPackage, rtypeType, "NumOut"),
-		"Out":       newMethod(i.reflectPackage, rtypeType, "Out"),
-		"Size":      newMethod(i.reflectPackage, rtypeType, "Size"),
-		"String":    newMethod(i.reflectPackage, rtypeType, "String"),
+		"Bits":      newMethod(i.prog, i.reflectPackage, rtypeType, "Bits"),
+		"Elem":      newMethod(i.prog, i.reflectPackage, rtypeType, "Elem"),
+		"Field":     newMethod(i.prog, i.reflectPackage, rtypeType, "Field"),
+		"In":        newMethod(i.prog, i.reflectPackage, rtypeType, "In"),
+		"Kind":      newMethod(i.prog, i.reflectPackage, rtypeType, "Kind"),
+		"NumField":  newMethod(i.prog, i.reflectPackage, rtypeType, "NumField"),
+		"NumIn":     newMethod(i.prog, i.reflectPackage, rtypeType, "NumIn"),
+		"NumMethod": newMethod(i.prog, i.reflectPackage, rtypeType, "NumMethod"),
+		"NumOut":    newMethod(i.prog, i.reflectPackage, rtypeType, "NumOut"),
+		"Out":       newMethod(i.prog, i.reflectPackage, rtypeType, "Out"),
+		"Size":      newMethod(i.prog, i.reflectPackage, rtypeType, "Size"),
+		"String":    newMethod(i.prog, i.reflectPackage, rtypeType, "String"),
 	}
 	i.errorMethods = methodSet{
-		"Error": newMethod(i.reflectPackage, errorType, "Error"),
+		"Error": newMethod(i.prog, i.reflectPackage, errorType, "Error"),
 	}
 }

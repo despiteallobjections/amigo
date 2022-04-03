@@ -178,7 +178,7 @@ func run(t *testing.T, input string) bool {
 	interp.CapturedOutput = new(bytes.Buffer)
 
 	hint = fmt.Sprintf("To trace execution, run:\n%% go build golang.org/x/tools/cmd/ssadump && ./ssadump -build=C -test -run --interp=T %s\n", input)
-	exitCode := interp.Interpret(mainPkg, 0, &types.StdSizes{WordSize: 8, MaxAlign: 8}, input, []string{})
+	exitCode := interp.Interpret(prog, mainPkg, 0, &types.StdSizes{WordSize: 8, MaxAlign: 8}, input, []string{})
 	if exitCode != 0 {
 		t.Fatalf("interpreting %s: exit code was %d", input, exitCode)
 	}

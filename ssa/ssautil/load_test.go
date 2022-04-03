@@ -38,7 +38,7 @@ func TestBuildPackage(t *testing.T) {
 	}
 
 	pkg := types.NewPackage("hello", "")
-	ssapkg, _, err := ssautil.BuildPackage(&types.Config{Importer: importer.Default()}, pkg, []*syntax.File{f}, 0)
+	_, ssapkg, _, err := ssautil.BuildPackage(&types.Config{Importer: importer.Default()}, pkg, []*syntax.File{f}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,9 +63,9 @@ func TestPackages(t *testing.T) {
 		t.Fatal("there were errors")
 	}
 
-	_, pkgs := ssautil.Packages(initial, 0)
+	prog, pkgs := ssautil.Packages(initial, 0)
 	bytesNewBuffer := pkgs[0].Func("NewBuffer")
-	bytesNewBuffer.Pkg.Build()
+	bytesNewBuffer.Pkg.Build(prog)
 
 	// We'll dump the SSA of bytes.NewBuffer because it is small and stable.
 	out := new(bytes.Buffer)
@@ -99,7 +99,7 @@ func TestBuildPackage_MissingImport(t *testing.T) {
 	}
 
 	pkg := types.NewPackage("bad", "")
-	ssapkg, _, err := ssautil.BuildPackage(new(types.Config), pkg, []*syntax.File{f}, 0)
+	_, ssapkg, _, err := ssautil.BuildPackage(new(types.Config), pkg, []*syntax.File{f}, 0)
 	if err == nil || ssapkg != nil {
 		t.Fatal("BuildPackage succeeded unexpectedly")
 	}

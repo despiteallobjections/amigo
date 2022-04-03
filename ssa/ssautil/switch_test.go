@@ -43,7 +43,7 @@ func TestSwitches(t *testing.T) {
 
 	prog := ssautil.CreateProgram(iprog, 0)
 	mainPkg := prog.Package(iprog.Created[0].Pkg)
-	mainPkg.Build()
+	mainPkg.Build(prog)
 
 	for _, mem := range mainPkg.Members {
 		if fn, ok := mem.(*types.Function); ok {

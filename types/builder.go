@@ -69,7 +69,9 @@ var (
 // builder holds state associated with the function currently being built.
 // Its methods contain all the logic for AST-to-SSA conversion.
 type builder struct {
-	Fn *Function
+	Prog *Program
+	Pkg  *SSAPackage // TODO(mdempsky): What about shared wrappers? Allow this to be nil, or remove it as a field entirely?
+	Fn   *Function
 
 	currentBlock *BasicBlock        // where to emit code
 	objects      map[*Var]Value     // addresses of local variables
@@ -352,7 +354,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 			return blank{}
 		}
 		obj := b.Fn.Pkg.objectOf(e).(*Var)
-		v := b.Fn.Prog.packageLevelValue(obj) // var (address)
+		v := b.Prog.packageLevelValue(obj) // var (address)
 		if v == nil {
 			v = b.lookup(b.Fn, obj, escaping)
 		}
@@ -558,11 +560,10 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			pos:       e.Type.Pos(), /*Func*/
 			parent:    b.Fn,
 			Pkg:       b.Fn.Pkg,
-			Prog:      b.Fn.Prog,
 			syntax:    e,
 		}
 		b.Fn.AnonFuncs = append(b.Fn.AnonFuncs, fn2)
-		b2 := &builder{Fn: fn2}
+		b2 := &builder{Prog: b.Prog, Pkg: b.Pkg, Fn: fn2}
 		b2.buildFunction()
 		if fn2.FreeVars == nil {
 			return fn2
@@ -700,7 +701,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			return nilConst(tv.Type)
 		}
 		// Package-level func or var?
-		if v := b.Fn.Prog.packageLevelValue(obj); v != nil {
+		if v := b.Prog.packageLevelValue(obj); v != nil {
 			if _, ok := obj.(*Var); ok {
 				return emitLoad(b, v) // var (address)
 			}
@@ -723,7 +724,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		case MethodExpr:
 			// (*T).f or T.f, the method f from the method-set of type T.
 			// The result is a "thunk".
-			return emitConv(b, makeThunk(b.Fn.Prog, sel), tv.Type)
+			return emitConv(b, makeThunk(b.Prog, sel), tv.Type)
 
 		case MethodVal:
 			// e.f where e is an expression and f is a method.
@@ -740,7 +741,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				emitTypeAssert(b, v, rt, NoPos)
 			}
 			c := &MakeClosure{
-				Fn:       makeBound(b.Fn.Prog, obj),
+				Fn:       makeBound(b.Prog, obj),
 				Bindings: []Value{v},
 			}
 			c.setPos(e.Sel.Pos())
@@ -863,7 +864,7 @@ func (b *builder) setCallFunc(e *CallExpr, c *CallCommon) {
 				c.Method = obj
 			} else {
 				// "Call"-mode call.
-				c.Value = b.Fn.Prog.declaredFunc(obj)
+				c.Value = b.Prog.declaredFunc(obj)
 				c.Args = append(c.Args, v)
 			}
 			return
@@ -2212,7 +2213,7 @@ func (b *builder) buildFunction() {
 		}
 		return
 	}
-	if b.Fn.Prog.mode&LogSource != 0 {
+	if b.Prog.mode&LogSource != 0 {
 		defer logStack("build function %s @ %s", fn, fn.pos)()
 	}
 	b.startBody()
@@ -2244,11 +2245,11 @@ func (prog *Program) Build() {
 	var wg sync.WaitGroup
 	for _, p := range prog.packages {
 		if prog.mode&BuildSerially != 0 {
-			p.Build()
+			p.Build(prog)
 		} else {
 			wg.Add(1)
 			go func(p *SSAPackage) {
-				p.Build()
+				p.Build(prog)
 				wg.Done()
 			}(p)
 		}
@@ -2264,14 +2265,14 @@ func (prog *Program) Build() {
 //
 // Build is idempotent and thread-safe.
 //
-func (p *SSAPackage) Build() { p.buildOnce.Do(p.build) }
+func (p *SSAPackage) Build(prog *Program) { p.buildOnce.Do(func() { p.build(prog) }) }
 
-func (p *SSAPackage) build() {
+func (p *SSAPackage) build(prog *Program) {
 	if p.info == nil {
 		return // synthetic package, e.g. "testmain"
 	}
 
-	if p.Prog.mode&LogSource != 0 {
+	if prog.mode&LogSource != 0 {
 		defer logStack("build %s", p)()
 	}
 
@@ -2282,7 +2283,7 @@ func (p *SSAPackage) build() {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
 				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					b := builder{Fn: obj.member}
+					b := builder{Prog: prog, Pkg: p, Fn: obj.member}
 					b.buildFunction()
 				}
 			}
@@ -2307,18 +2308,18 @@ func (p *SSAPackage) build() {
 				typ = NewPointer(typ)
 			}
 
-			p.Prog.needMethodsOf(typ)
+			prog.needMethodsOf(typ)
 		}
 	}
 
 	init := p.Init.member
-	b := &builder{Fn: init}
+	b := &builder{Prog: prog, Pkg: p, Fn: init}
 
 	b.startBody()
 
 	var done *BasicBlock
 
-	if p.Prog.mode&BareInits == 0 {
+	if prog.mode&BareInits == 0 {
 		// Make init() skip if package is already initialized.
 		initguard := p.Var("init$guard")
 		doinit := b.newBasicBlock("init.start")
@@ -2329,7 +2330,7 @@ func (p *SSAPackage) build() {
 
 		// Call the init() function of each package we import.
 		for _, pkg := range p.Pkg.Imports() {
-			prereq := p.Prog.packages[pkg]
+			prereq := prog.packages[pkg]
 			if prereq == nil {
 				panic(fmt.Sprintf("Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called", p.Pkg.Path(), pkg.Path()))
 			}
@@ -2343,7 +2344,7 @@ func (p *SSAPackage) build() {
 
 	// Initialize package-level vars in correct order.
 	for _, varinit := range p.info.InitOrder {
-		if init.Prog.mode&LogSource != 0 {
+		if prog.mode&LogSource != 0 {
 			fmt.Fprintf(os.Stderr, "build global initializer %v @ %s\n",
 				varinit.Lhs, varinit.Rhs.Pos())
 		}
@@ -2382,7 +2383,7 @@ func (p *SSAPackage) build() {
 	}
 
 	// Finish up init().
-	if p.Prog.mode&BareInits == 0 {
+	if prog.mode&BareInits == 0 {
 		emitJump(b, done)
 		b.currentBlock = done
 	}
@@ -2391,7 +2392,7 @@ func (p *SSAPackage) build() {
 
 	p.info = nil // We no longer need ASTs or github.com/mdempsky/amigo/types deductions.
 
-	if p.Prog.mode&SanityCheckFunctions != 0 {
+	if prog.mode&SanityCheckFunctions != 0 {
 		sanityCheckPackage(p)
 	}
 }

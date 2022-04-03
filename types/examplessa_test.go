@@ -64,7 +64,7 @@ func Example_buildPackage() {
 
 	// Type-check the package, load dependencies.
 	// Create and build the SSA program.
-	hello, _, err := ssautil.BuildPackage(
+	_, hello, _, err := ssautil.BuildPackage(
 		&Config{Importer: importer.Default()}, pkg, files, types.SanityCheckFunctions)
 	if err != nil {
 		fmt.Print(err) // type error in some package
@@ -138,7 +138,7 @@ func Example_loadPackages() {
 	// Build SSA code for the well-typed initial packages.
 	for _, p := range pkgs {
 		if p != nil {
-			p.Build()
+			p.Build(prog)
 		}
 	}
 }

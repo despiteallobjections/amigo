@@ -75,7 +75,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			syntax:    syntax,
 			pos:       obj.Pos(),
 			Pkg:       pkg,
-			Prog:      pkg.Prog,
 		}
 		if syntax == nil {
 			fn.Synthetic = "loaded from gc object file"
@@ -142,7 +141,6 @@ func membersFromDecl(pkg *SSAPackage, decl Decl) {
 //
 func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, importable bool) *SSAPackage {
 	p := &SSAPackage{
-		Prog:    prog,
 		Members: make(map[string]Member),
 		Pkg:     pkg,
 		info:    info,  // transient (CREATE and BUILD phases)
@@ -158,7 +156,6 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		Synthetic: "package initializer",
 		pos:       obj.Pos(),
 		Pkg:       p,
-		Prog:      prog,
 	}
 	obj.member = fn
 	p.Init = obj

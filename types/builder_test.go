@@ -53,7 +53,7 @@ func main() {
 
 	// Build an SSA program from the parsed file.
 	// Load its dependencies from gc binary export data.
-	mainPkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
+	prog, mainPkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
 		NewPackage("main", ""), []*File{f}, types.SanityCheckFunctions)
 	if err != nil {
 		t.Error(err)
@@ -69,7 +69,6 @@ func main() {
 		"sync", "unicode", "time",
 	}
 
-	prog := mainPkg.Prog
 	all := prog.AllPackages()
 	if len(all) <= len(deps) {
 		t.Errorf("unexpected set of loaded packages: %q", all)
@@ -221,7 +220,7 @@ func TestRuntimeTypes(t *testing.T) {
 
 		// Create a single-file main package.
 		// Load dependencies from gc binary export data.
-		ssapkg, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
+		prog, _, _, err := ssautil.BuildPackage(&Config{Importer: importer.Default()},
 			NewPackage("p", ""), []*File{f}, types.SanityCheckFunctions)
 		if err != nil {
 			t.Errorf("test %q: %s", test.input[:15], err)
@@ -229,7 +228,7 @@ func TestRuntimeTypes(t *testing.T) {
 		}
 
 		var typstrs []string
-		for _, T := range ssapkg.Prog.RuntimeTypes() {
+		for _, T := range prog.RuntimeTypes() {
 			typstrs = append(typstrs, T.String())
 		}
 		sort.Strings(typstrs)
@@ -477,7 +476,7 @@ func h(error)
 	// Create and build SSA
 	prog := ssautil.CreateProgram(lprog, 0)
 	p := prog.Package(lprog.Package("p").Pkg)
-	p.Build()
+	p.Build(prog)
 	g := p.Func("g")
 
 	phis := 0
