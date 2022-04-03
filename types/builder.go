@@ -433,6 +433,8 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		return &address{addr: b.emit(v), pos: e.Pos() /*Lbrack*/, expr: e}
 
 	case *Operation:
+		assert(e.Op == Mul)
+		assert(e.Y == nil)
 		return &address{addr: b.expr(e.X), pos: e.Pos() /*Star*/, expr: e}
 	}
 
