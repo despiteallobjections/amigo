@@ -269,7 +269,7 @@ type SSANode interface {
 //
 type Function struct {
 	name      string
-	object    Object     // a declared *types.Func or one of its wrappers
+	object    *Func      // a declared *types.Func or one of its wrappers
 	method    *Selection // info about provenance of synthetic methods
 	Signature *Signature
 
@@ -1394,7 +1394,12 @@ func (v *Function) Pos() Pos {
 	}
 	return NoPos
 }
-func (v *Function) Object() Object    { return v.object }
+func (v *Function) Object() Object {
+	if v.object != nil {
+		return v.object
+	}
+	return nil
+}
 func (v *Function) String() string    { return v.RelString(nil) }
 func (v *Function) Parent() *Function { return v.parent }
 func (v *Function) Referrers() *[]Instruction {

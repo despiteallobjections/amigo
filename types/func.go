@@ -209,7 +209,7 @@ func (b *builder) spillParam(param *Parameter) {
 func (b *builder) startBody() {
 	b.currentBlock = b.newBasicBlock("entry")
 	b.objects = make(map[*Var]Value) // needed for some synthetics, e.g. init
-	if obj, ok := b.Fn.object.(*Func); ok {
+	if obj := b.Fn.object; obj != nil {
 		b.lblocks = make([]*lblock, len(obj.labels))
 	}
 }

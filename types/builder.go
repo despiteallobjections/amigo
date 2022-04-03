@@ -570,7 +570,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			Pkg:       b.Fn.Pkg,
 		}
 		b.Fn.AnonFuncs = append(b.Fn.AnonFuncs, fn2)
-		b.Prog.buildFunction(b.info, fn2, e.Body)
+		b.Prog.buildFunction(b.info, fn2)
 		if fn2.FreeVars == nil {
 			return fn2
 		}
@@ -2176,11 +2176,12 @@ start:
 }
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
-func (prog *Program) buildFunction(info *Info, fn *Function, body *BlockStmt) {
+func (prog *Program) buildFunction(info *Info, fn *Function) {
 	if fn.Blocks != nil {
 		return // building already started
 	}
 
+	body := fn.object.body
 	if body == nil {
 		// External function.
 		if fn.Params == nil {
@@ -2267,8 +2268,8 @@ func (p *SSAPackage) build(prog *Program) {
 		defer logStack("build %s", p)()
 	}
 
-	build := func(obj *Func) {
-		prog.buildFunction(info, prog.declaredFunc(obj), obj.body)
+	buildFunc := func(obj *Func) {
+		prog.buildFunction(info, prog.declaredFunc(obj))
 	}
 
 	pkgScope := p.Pkg.Scope()
@@ -2278,11 +2279,13 @@ func (p *SSAPackage) build(prog *Program) {
 		// Build all package-level functions and methods.
 		switch obj := obj.(type) {
 		case *Func:
-			build(obj)
+			buildFunc(obj)
 		case *TypeName:
-			if named, ok := obj.Type().(*Named); ok {
-				for i, n := 0, named.NumMethods(); i < n; i++ {
-					build(named.Method(i))
+			if !obj.IsAlias() {
+				if named, ok := obj.Type().(*Named); ok {
+					for i, n := 0, named.NumMethods(); i < n; i++ {
+						buildFunc(named.Method(i))
+					}
 				}
 			}
 		}
@@ -2309,7 +2312,7 @@ func (p *SSAPackage) build(prog *Program) {
 
 	// Build init functions too.
 	for _, init := range p.Pkg.inits {
-		build(init)
+		buildFunc(init)
 	}
 
 	prog.build(p.InitFunc, info, func(b *builder) {

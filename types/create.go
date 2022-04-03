@@ -122,9 +122,11 @@ func (prog *Program) CreatePackage(pkg *Package, files []*File, info *Info, impo
 		case *Func:
 			memberFromFunc(p, obj)
 		case *TypeName:
-			if named, ok := obj.Type().(*Named); ok {
-				for i, n := 0, named.NumMethods(); i < n; i++ {
-					memberFromFunc(p, named.Method(i))
+			if !obj.IsAlias() {
+				if named, ok := obj.Type().(*Named); ok {
+					for i, n := 0, named.NumMethods(); i < n; i++ {
+						memberFromFunc(p, named.Method(i))
+					}
 				}
 			}
 		case *Var:
