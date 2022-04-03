@@ -5,6 +5,7 @@
 package golden_test
 
 import (
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -14,58 +15,60 @@ import (
 	newssautil "github.com/mdempsky/amigo/ssa/ssautil"
 	"github.com/mdempsky/amigo/testenv"
 	newssa "github.com/mdempsky/amigo/types"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 func TestGolden(t *testing.T) {
+	// TODO(mdempsky): Fix ASAP.
+	if testing.Short() {
+		t.Skip("golden tests not yet working")
+	}
+
 	testenv.NeedsGoPackages(t)
 
 	cfg := &packages.Config{Mode: packages.LoadAllSyntax}
-	initial, err := packages.Load(cfg, "fmt", "net/http")
+	initial, err := packages.Load(cfg, "runtime", "fmt", "net/http")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	oldProg, oldPkgs := oldssautil.AllPackages(initial, 0)
+	oldProg, _ := oldssautil.AllPackages(initial, 0)
 	oldProg.Build()
 
-	newProg, newPkgs := newssautil.AllPackages(initial, 0)
-	newProg.Build()
+	newProg, _ := newssautil.AllPackages(initial, 0)
 
-	if len(oldPkgs) != len(newPkgs) {
-		t.Fatalf("%v != %v", len(oldPkgs), len(newPkgs))
-	}
+	for _, oldPkg := range oldProg.AllPackages() {
+		path := oldPkg.Pkg.Path()
+		newPkg := newProg.ImportedPackage(path)
+		if newPkg == nil {
+			t.Errorf("missing package %q in newProg", path)
+			continue
+		}
 
-	for i, oldPkg := range oldPkgs {
-		newPkg := newPkgs[i]
 		for name, oldMem := range oldPkg.Members {
 			if oldFn, ok := oldMem.(*oldssa.Function); ok {
 				newFn := newPkg.Members[name].(*newssa.Function)
 
-				if len(oldFn.Blocks) != len(newFn.Blocks) {
-					t.Fatalf("%v != %v", len(oldFn.Blocks), len(newFn.Blocks))
-				}
+				var oldBuf, newBuf strings.Builder
+				oldFn.WriteTo(&oldBuf)
+				newFn.WriteTo(&newBuf)
 
-				for j, oldBlock := range oldFn.Blocks {
-					newBlock := newFn.Blocks[j]
-
-					if oldBlock.Comment != newBlock.Comment {
-						t.Errorf("block Comment: %q != %q at %v", oldBlock.Comment, newBlock.Comment, newBlock.Instrs[0].Pos())
+				oldStr := oldBuf.String()
+				newStr := newBuf.String()
+				if oldStr != newStr {
+					diff := difflib.UnifiedDiff{
+						A:        difflib.SplitLines(oldStr),
+						B:        difflib.SplitLines(newStr),
+						FromFile: "Original",
+						ToFile:   "Current",
+						Context:  3,
+					}
+					text, err := difflib.GetUnifiedDiffString(diff)
+					if err != nil {
+						t.Fatal(err)
 					}
 
-					if len(oldBlock.Instrs) != len(newBlock.Instrs) {
-						t.Fatalf("%v != %v", len(oldBlock.Instrs), len(newBlock.Instrs))
-					}
-
-					for k, oldInstr := range oldBlock.Instrs {
-						newInstr := newBlock.Instrs[k]
-
-						oldString := oldInstr.String()
-						newString := newInstr.String()
-
-						if oldString != newString {
-							t.Errorf("Instr.String: %q != %q", oldString, newString)
-						}
-					}
+					t.Error(text)
 				}
 			}
 		}

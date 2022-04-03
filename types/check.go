@@ -360,7 +360,7 @@ func (check *Checker) checkFiles(files []*File) (err error) {
 	check.ctxt = nil
 
 	if prog := check.conf.Prog; prog != nil {
-		pkg := prog.CreatePackage(check.pkg, files, check.Info, false)
+		pkg := prog.CreatePackage(check.pkg, files, check.Info, true)
 		pkg.Build(prog)
 	}
 

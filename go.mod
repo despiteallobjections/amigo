@@ -3,6 +3,7 @@ module github.com/mdempsky/amigo
 go 1.17
 
 require (
+	github.com/pmezard/go-difflib v1.0.0
 	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654
 	golang.org/x/text v0.3.7
 	golang.org/x/tools v0.1.10
