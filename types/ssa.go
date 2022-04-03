@@ -1364,12 +1364,12 @@ func (s *Call) Value() *Call     { return s }
 func (s *SSADefer) Value() *Call { return nil }
 func (s *SSAGo) Value() *Call    { return nil }
 
-func (v *SSABuiltin) Type() Type              { return v.sig }
-func (v *SSABuiltin) Name() string            { return v.name }
-func (*SSABuiltin) Referrers() *[]Instruction { return nil }
-func (v *SSABuiltin) Pos() Pos                { return NoPos }
-func (v *SSABuiltin) Object() Object          { return Universe.Lookup(v.name) }
-func (v *SSABuiltin) Parent() *Function       { return nil }
+func (v *SSABuiltin) Type() Type                { return v.sig }
+func (v *SSABuiltin) Name() string              { return v.name }
+func (v *SSABuiltin) Referrers() *[]Instruction { return nil }
+func (v *SSABuiltin) Pos() Pos                  { return NoPos }
+func (v *SSABuiltin) Object() Object            { return Universe.Lookup(v.name) }
+func (v *SSABuiltin) Parent() *Function         { return nil }
 
 func (v *FreeVar) Type() Type                { return v.typ }
 func (v *FreeVar) Name() string              { return v.object.Name() }

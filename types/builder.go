@@ -1269,11 +1269,6 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 		b.stmt(s.Init)
 	}
 
-	done := b.newBasicBlock("switch.done")
-	if label != nil {
-		label._break = done
-	}
-
 	// We treat SwitchStmt like a sequential if-else chain.
 	// Multiway dispatch can be recovered later by ssautil.Switches()
 	// to those cases that are free of side effects.
@@ -1282,12 +1277,18 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 	if s.Tag != nil {
 		if guard, ok := s.Tag.(*TypeSwitchGuard); ok {
 			// Actually a type switch.
-			b.typeSwitchStmt(s, guard, done)
+			b.typeSwitchStmt(s, guard, label)
 			return
 		}
 
 		tag = b.expr(s.Tag)
 	}
+
+	done := b.newBasicBlock("switch.done")
+	if label != nil {
+		label._break = done
+	}
+
 	// We pull the default case (if present) down to the end.
 	// But each fallthrough label must point to the next
 	// body block in source order, so we preallocate a
@@ -1359,7 +1360,7 @@ func (b *builder) switchStmt(s *SwitchStmt, label *lblock) {
 // typeSwitchStmt emits to fn code for the type switch statement s, optionally
 // labelled by label.
 //
-func (b *builder) typeSwitchStmt(s *SwitchStmt, guard *TypeSwitchGuard, done *BasicBlock) {
+func (b *builder) typeSwitchStmt(s *SwitchStmt, guard *TypeSwitchGuard, label *lblock) {
 	// Typeswitch lowering:
 	//
 	// var x X
@@ -1403,6 +1404,11 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, guard *TypeSwitchGuard, done *Ba
 	// .done:
 
 	x := b.expr(guard.X)
+
+	done := b.newBasicBlock("typeswitch.done")
+	if label != nil {
+		label._break = done
+	}
 
 	var default_ *CaseClause
 	for _, clause := range s.Body {
@@ -2262,7 +2268,7 @@ func (p *SSAPackage) build(prog *Program) {
 	}
 
 	build := func(obj *Func) {
-		prog.buildFunction(info, p.values[obj].(*Function), obj.body)
+		prog.buildFunction(info, prog.declaredFunc(obj), obj.body)
 	}
 
 	pkgScope := p.Pkg.Scope()
@@ -2362,7 +2368,7 @@ func (p *SSAPackage) build(prog *Program) {
 		// Call user declared init functions in source order.
 		for _, init := range p.Pkg.inits {
 			var v Call
-			v.Call.Value = p.values[init]
+			v.Call.Value = prog.declaredFunc(init)
 			// TODO(mdempsky): Set v.Call.Pos to obj.Pos()?
 			v.setType(NewTuple())
 			b.emit(&v)
