@@ -5,6 +5,7 @@
 package golden_test
 
 import (
+	"bytes"
 	"runtime"
 	"strings"
 	"testing"
@@ -53,9 +54,9 @@ func TestGolden(t *testing.T) {
 			if oldFn, ok := oldMem.(*oldssa.Function); ok {
 				newFn := newPkg.Members[name].(*newssa.Function)
 
-				var oldBuf, newBuf strings.Builder
-				oldFn.WriteTo(&oldBuf)
-				newFn.WriteTo(&newBuf)
+				var oldBuf, newBuf bytes.Buffer
+				oldssa.WriteFunction(&oldBuf, oldFn)
+				newssa.WriteFunction(&newBuf, newFn)
 
 				oldStr := oldBuf.String()
 				newStr := newBuf.String()
@@ -72,7 +73,13 @@ func TestGolden(t *testing.T) {
 						t.Fatal(err)
 					}
 
-					t.Error(text)
+					if text != "" {
+						t.Error(text)
+						continue
+					}
+
+					// TODO(mdempsky): Validate Instruction.Pos.
+					// TODO(mdempsky): Anything else not included in Function.WriteTo output?
 				}
 			}
 		}
