@@ -185,7 +185,7 @@ func (b *builder) logicalBinop(e *Operation) Value {
 	b.currentBlock = done
 
 	phi := &Phi{Edges: edges, Comment: e.Op.String()}
-	phi.pos = tokenPos(e, "OpPos")
+	phi.pos = tokenPos(e, _OpPos)
 	phi.typ = t
 	return done.emit(phi)
 }
@@ -222,11 +222,11 @@ func (b *builder) exprN(e Expr) Value {
 			CommaOk: true,
 		}
 		lookup.setType(typ)
-		lookup.setPos(tokenPos(e, "Lbrack"))
+		lookup.setPos(tokenPos(e, _Lbrack))
 		return b.emit(lookup)
 
 	case *AssertExpr:
-		return b.emitTypeTest(b.expr(e.X), typ.At(0).Type(), tokenPos(e, "Lparen"))
+		return b.emitTypeTest(b.expr(e.X), typ.At(0).Type(), tokenPos(e, _Lparen))
 
 	case *Operation:
 		unop := &UnOp{
@@ -235,7 +235,7 @@ func (b *builder) exprN(e Expr) Value {
 			CommaOk: true,
 		}
 		unop.setType(typ)
-		unop.setPos(tokenPos(e, "OpPos"))
+		unop.setPos(tokenPos(e, _OpPos))
 		return b.emit(unop)
 	}
 	panic(fmt.Sprintf("exprN(%T) in %s", e, b.Fn))
@@ -371,15 +371,15 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		t := ssaDeref(b.typeOf(e))
 		var v *Alloc
 		if escaping {
-			v = b.emitNew(t, tokenPos(e, "Lbrace"))
+			v = b.emitNew(t, tokenPos(e, _Lbrace))
 		} else {
-			v = b.addLocal(t, tokenPos(e, "Lbrace"))
+			v = b.addLocal(t, tokenPos(e, _Lbrace))
 		}
 		v.Comment = "complit"
 		var sb storebuf
 		b.compLit(v, e, true, &sb)
 		sb.emit(b)
-		return &address{addr: v, pos: tokenPos(e, "Lbrace"), expr: e}
+		return &address{addr: v, pos: tokenPos(e, _Lbrace), expr: e}
 
 	case *ParenExpr:
 		return b.addr(e.X, escaping)
@@ -420,7 +420,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 				m:   b.expr(e.X),
 				k:   b.emitConv(b.expr(e.Index), t.Key()),
 				t:   t.Elem(),
-				pos: tokenPos(e, "Lbrack"),
+				pos: tokenPos(e, _Lbrack),
 			}
 		default:
 			panic("unexpected container type in IndexExpr: " + t.String())
@@ -429,14 +429,14 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 			X:     x,
 			Index: b.emitConv(b.expr(e.Index), tInt),
 		}
-		v.setPos(tokenPos(e, "Lbrack"))
+		v.setPos(tokenPos(e, _Lbrack))
 		v.setType(et)
-		return &address{addr: b.emit(v), pos: tokenPos(e, "Lbrack"), expr: e}
+		return &address{addr: b.emit(v), pos: tokenPos(e, _Lbrack), expr: e}
 
 	case *Operation:
 		assert(e.Op == Mul)
 		assert(e.Y == nil)
-		return &address{addr: b.expr(e.X), pos: tokenPos(e, "OpPos"), expr: e}
+		return &address{addr: b.expr(e.X), pos: tokenPos(e, _OpPos), expr: e}
 	}
 
 	panic(fmt.Sprintf("unexpected address expression: %T", e))
@@ -583,7 +583,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		return b.emit(v)
 
 	case *AssertExpr:
-		return b.emitTypeAssert(b.expr(e.X), tv.Type, tokenPos(e, "Lparen"))
+		return b.emitTypeAssert(b.expr(e.X), tv.Type, tokenPos(e, _Lparen))
 
 	case *CallExpr:
 		if b.info.Types[e.Fun].IsType() {
@@ -591,7 +591,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			x := b.expr(e.ArgList[0])
 			y := b.emitConv(x, tv.Type)
 			if y != x {
-				pos := tokenPos(e, "Lparen")
+				pos := tokenPos(e, _Lparen)
 				switch y := y.(type) {
 				// TODO(mdempsky): Add default panic?
 				case *Convert:
@@ -609,7 +609,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := Unparen(e.Fun).(*Name); ok {
 			if obj, ok := b.info.Uses[id].(*Builtin); ok {
-				if v := b.builtin(obj, e.ArgList, tv.Type, tokenPos(e, "Lparen")); v != nil {
+				if v := b.builtin(obj, e.ArgList, tv.Type, tokenPos(e, _Lparen)); v != nil {
 					return v
 				}
 			}
@@ -640,7 +640,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 					Op: e.Op,
 					X:  b.expr(e.X),
 				}
-				v.setPos(tokenPos(e, "OpPos"))
+				v.setPos(tokenPos(e, _OpPos))
 				v.setType(tv.Type)
 				return b.emit(v)
 			case Mul:
@@ -656,10 +656,10 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			case Shl, Shr:
 				fallthrough
 			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
-				return b.emitArith(e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, tokenPos(e, "OpPos"))
+				return b.emitArith(e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, tokenPos(e, _OpPos))
 
 			case Eql, Neq, Gtr, Lss, Leq, Geq:
-				cmp := b.emitCompare(e.Op, b.expr(e.X), b.expr(e.Y), tokenPos(e, "OpPos"))
+				cmp := b.emitCompare(e.Op, b.expr(e.X), b.expr(e.Y), tokenPos(e, _OpPos))
 				// The type of x==y may be UntypedBool.
 				return b.emitConv(cmp, Default(tv.Type))
 			default:
@@ -695,7 +695,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			High: high,
 			Max:  max,
 		}
-		v.setPos(tokenPos(e, "Lbrack"))
+		v.setPos(tokenPos(e, _Lbrack))
 		v.setType(tv.Type)
 		return b.emit(v)
 
@@ -772,7 +772,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				X:     b.expr(e.X),
 				Index: b.emitConv(b.expr(e.Index), tInt),
 			}
-			v.setPos(tokenPos(e, "Lbrack"))
+			v.setPos(tokenPos(e, _Lbrack))
 			v.setType(t.Elem())
 			return b.emit(v)
 
@@ -783,7 +783,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				X:     b.expr(e.X),
 				Index: b.emitConv(b.expr(e.Index), mapt.Key()),
 			}
-			v.setPos(tokenPos(e, "Lbrack"))
+			v.setPos(tokenPos(e, _Lbrack))
 			v.setType(mapt.Elem())
 			return b.emit(v)
 
@@ -793,7 +793,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 				X:     b.expr(e.X),
 				Index: b.expr(e.Index),
 			}
-			v.setPos(tokenPos(e, "Lbrack"))
+			v.setPos(tokenPos(e, _Lbrack))
 			v.setType(tByte)
 			return b.emit(v)
 
@@ -852,7 +852,7 @@ func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) Valu
 // occurring in e.
 //
 func (b *builder) setCallFunc(e *CallExpr, c *CallCommon) {
-	c.pos = tokenPos(e, "Lparen")
+	c.pos = tokenPos(e, _Lparen)
 
 	// Is this a method call?
 	if selector, ok := Unparen(e.Fun).(*SelectorExpr); ok {
@@ -963,7 +963,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 			// Replace a suffix of args with a slice containing it.
 			at := NewArray(vt, int64(len(varargs)))
 			a := b.emitNew(at, NoPos)
-			a.setPos(tokenPos(e, "Rparen"))
+			a.setPos(tokenPos(e, _Rparen))
 			a.Comment = "varargs"
 			for i, arg := range varargs {
 				iaddr := &IndexAddr{
@@ -1131,7 +1131,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 	case *Struct:
 		if !isZero && len(e.ElemList) != t.NumFields() {
 			// memclear
-			sb.store(&address{addr, tokenPos(e, "Lbrace"), nil},
+			sb.store(&address{addr, tokenPos(e, _Lbrace), nil},
 				zeroValue(b, ssaDeref(addr.Type())))
 			isZero = true
 		}
@@ -1144,7 +1144,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 					sf := t.Field(i)
 					if sf.Name() == fname {
 						fieldIndex = i
-						pos = tokenPos(kv, "Colon")
+						pos = tokenPos(kv, _Colon)
 						e = kv.Value
 						break
 					}
@@ -1166,7 +1166,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 		switch t := t.(type) {
 		case *Slice:
 			at = NewArray(t.Elem(), b.arrayLen(e.ElemList))
-			alloc := b.emitNew(at, tokenPos(e, "Lbrace"))
+			alloc := b.emitNew(at, tokenPos(e, _Lbrace))
 			alloc.Comment = "slicelit"
 			array = alloc
 		case *Array:
@@ -1175,7 +1175,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 
 			if !isZero && int64(len(e.ElemList)) != at.Len() {
 				// memclear
-				sb.store(&address{array, tokenPos(e, "Lbrace"), nil},
+				sb.store(&address{array, tokenPos(e, _Lbrace), nil},
 					zeroValue(b, ssaDeref(array.Type())))
 			}
 		}
@@ -1185,7 +1185,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 			pos := e.Pos()
 			if kv, ok := e.(*KeyValueExpr); ok {
 				idx = b.expr(kv.Key).(*SSAConst)
-				pos = tokenPos(kv, "Colon")
+				pos = tokenPos(kv, _Colon)
 				e = kv.Value
 			} else {
 				var idxval int64
@@ -1210,14 +1210,14 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 
 		if t != at { // slice
 			s := &SSASlice{X: array}
-			s.setPos(tokenPos(e, "Lbrace"))
+			s.setPos(tokenPos(e, _Lbrace))
 			s.setType(typ)
-			sb.store(&address{addr: addr, pos: tokenPos(e, "Lbrace"), expr: e}, b.emit(s))
+			sb.store(&address{addr: addr, pos: tokenPos(e, _Lbrace), expr: e}, b.emit(s))
 		}
 
 	case *Map:
 		m := &MakeMap{Reserve: intConst(int64(len(e.ElemList)))}
-		m.setPos(tokenPos(e, "Lbrace"))
+		m.setPos(tokenPos(e, _Lbrace))
 		m.setType(typ)
 		b.emit(m)
 		for _, e := range e.ElemList {
@@ -1243,7 +1243,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 				m:   m,
 				k:   b.emitConv(key, t.Key()),
 				t:   t.Elem(),
-				pos: tokenPos(e, "Colon"),
+				pos: tokenPos(e, _Colon),
 			}
 
 			// We call assign() only because it takes care
@@ -1254,7 +1254,7 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 			// and no storebuf is needed.
 			b.assign(&loc, e.Value, true, nil)
 		}
-		sb.store(&address{addr: addr, pos: tokenPos(e, "Lbrace"), expr: e}, m)
+		sb.store(&address{addr: addr, pos: tokenPos(e, _Lbrace), expr: e}, m)
 
 	default:
 		panic("unexpected CompositeLit type: " + t.String())
@@ -1438,7 +1438,7 @@ func (b *builder) typeSwitchStmt(s *SwitchStmt, guard *TypeSwitchGuard, label *l
 				condv = b.emitCompare(Eql, x, nilConst(x.Type()), NoPos)
 				ti = x
 			} else {
-				yok := b.emitTypeTest(x, casetype, tokenPos(cc, "Case"))
+				yok := b.emitTypeTest(x, casetype, tokenPos(cc, _Case))
 				ti = b.emitExtract(yok, 0)
 				condv = b.emitExtract(yok, 1)
 			}
@@ -1514,7 +1514,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 				Chan: ch,
 				Send: b.emitConv(b.expr(comm.Value),
 					ch.Type().Underlying().(*Chan).Elem()),
-				Pos: tokenPos(comm, "Arrow"),
+				Pos: tokenPos(comm, _Arrow),
 			}
 			if debugInfo {
 				st.DebugNode = comm
@@ -1525,7 +1525,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			st = &SelectState{
 				Dir:  RecvOnly,
 				Chan: b.expr(recv.X),
-				Pos:  tokenPos(recv, "OpPos"),
+				Pos:  tokenPos(recv, _OpPos),
 			}
 			if debugInfo {
 				st.DebugNode = recv
@@ -1536,7 +1536,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 			st = &SelectState{
 				Dir:  RecvOnly,
 				Chan: b.expr(recv.X),
-				Pos:  tokenPos(recv, "OpPos"),
+				Pos:  tokenPos(recv, _OpPos),
 			}
 			if debugInfo {
 				st.DebugNode = recv
@@ -1561,7 +1561,7 @@ func (b *builder) selectStmt(s *SelectStmt, label *lblock) {
 		States:   states,
 		Blocking: blocking,
 	}
-	sel.setPos(tokenPos(s, "Select"))
+	sel.setPos(tokenPos(s, _Select))
 	var vars []*Var
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
@@ -1931,13 +1931,13 @@ func (b *builder) rangeStmt(s *ForStmt, clause *RangeClause, label *lblock) {
 	var loop, done *BasicBlock
 	switch rt := x.Type().Underlying().(type) {
 	case *Slice, *Array, *Pointer:
-		k, v, loop, done = b.rangeIndexed(x, tv, tokenPos(s, "For"))
+		k, v, loop, done = b.rangeIndexed(x, tv, tokenPos(s, _For))
 
 	case *Chan:
-		k, loop, done = b.rangeChan(x, tk, tokenPos(s, "For"))
+		k, loop, done = b.rangeChan(x, tk, tokenPos(s, _For))
 
 	case *Map, *Basic:
-		k, v, loop, done = b.rangeIter(x, tk, tv, tokenPos(s, "For"))
+		k, v, loop, done = b.rangeIter(x, tk, tv, tokenPos(s, _For))
 
 	default:
 		panic("Cannot range over: " + rt.String())
@@ -2002,7 +2002,7 @@ start:
 			Chan: b.expr(s.Chan),
 			X: b.emitConv(b.expr(s.Value),
 				b.typeOf(s.Chan).Underlying().(*Chan).Elem()),
-			pos: tokenPos(s, "Arrow"),
+			pos: tokenPos(s, _Arrow),
 		})
 
 	case *AssignStmt:
@@ -2023,14 +2023,14 @@ start:
 		case Go:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
-			v := SSAGo{pos: tokenPos(s, "Go")}
+			v := SSAGo{pos: tokenPos(s, _Go)}
 			b.setCall(s.Call, &v.Call)
 			b.emit(&v)
 
 		case Defer:
 			// The "intrinsics" new/make/len/cap are forbidden here.
 			// panic is treated like an ordinary function call.
-			v := SSADefer{pos: tokenPos(s, "Defer")}
+			v := SSADefer{pos: tokenPos(s, _Defer)}
 			b.setCall(s.Call, &v.Call)
 			b.emit(&v)
 
@@ -2064,7 +2064,7 @@ start:
 			// Function has named result parameters (NRPs).
 			// Perform parallel assignment of return operands to NRPs.
 			for i, r := range results {
-				b.emitStore(b.namedResults[i], r, tokenPos(s, "Return"))
+				b.emitStore(b.namedResults[i], r, tokenPos(s, _Return))
 			}
 		}
 		// Run function calls deferred in this
@@ -2077,7 +2077,7 @@ start:
 				results = append(results, b.emitLoad(r))
 			}
 		}
-		b.emit(&Return{Results: results, pos: tokenPos(s, "Return")})
+		b.emit(&Return{Results: results, pos: tokenPos(s, _Return)})
 		b.currentBlock = b.newBasicBlock("unreachable")
 
 	case *BranchStmt:

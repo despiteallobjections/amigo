@@ -38,4 +38,22 @@ func (prog *Program) packageLevelValue(obj Object) Value {
 //
 // It exists just for internal documentation purposes, to help remind
 // which token position package ssa was originally accessing.
-func tokenPos(n Node, which string) Pos { return n.Pos() }
+func tokenPos(n Node, _ tokName) Pos { return n.Pos() }
+
+type tokName int
+
+const (
+	_Arrow tokName = iota
+	_Case
+	_Colon
+	_Defer
+	_For
+	_Go
+	_Lbrace
+	_Lbrack
+	_Lparen
+	_OpPos
+	_Return
+	_Rparen
+	_Select
+)
