@@ -5,7 +5,6 @@
 package types_test
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -912,7 +911,7 @@ func TestImplicitsInfo(t *testing.T) {
 }
 
 func predString(tv TypeAndValue) string {
-	var buf bytes.Buffer
+	var buf strings.Builder
 	pred := func(b bool, s string) {
 		if b {
 			if buf.Len() > 0 {

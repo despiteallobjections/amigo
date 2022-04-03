@@ -7,9 +7,9 @@
 package types
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // TypeMap is a hash-table-based mapping from types (types.Type) to
@@ -169,7 +169,7 @@ func (m *TypeMap) toString(values bool) string {
 	if m == nil {
 		return "{}"
 	}
-	var buf bytes.Buffer
+	var buf strings.Builder
 	fmt.Fprint(&buf, "{")
 	sep := ""
 	m.Iterate(func(key Type, value interface{}) {

@@ -13,6 +13,7 @@ import (
 	"io"
 	"reflect"
 	"sort"
+	"strings"
 
 	. "github.com/mdempsky/amigo/syntax"
 )
@@ -81,7 +82,7 @@ func (v *Alloc) String() string {
 }
 
 func (v *Phi) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	b.WriteString("phi [")
 	for i, edge := range v.Edges {
 		if i > 0 {
@@ -112,7 +113,7 @@ func (v *Phi) String() string {
 }
 
 func printCall(v *CallCommon, prefix string, instr Instruction) string {
-	var b bytes.Buffer
+	var b strings.Builder
 	b.WriteString(prefix)
 	if !v.IsInvoke() {
 		b.WriteString(relName(v.Value, instr))
@@ -165,7 +166,7 @@ func (v *SliceToArrayPointer) String() string { return printConv("slice to array
 func (v *MakeInterface) String() string       { return printConv("make", v, v.X) }
 
 func (v *MakeClosure) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	fmt.Fprintf(&b, "make closure %s", relName(v.Fn, v))
 	if v.Bindings != nil {
 		b.WriteString(" [")
@@ -189,7 +190,7 @@ func (v *MakeSlice) String() string {
 }
 
 func (v *SSASlice) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	b.WriteString("slice ")
 	b.WriteString(relName(v.X, v))
 	b.WriteString("[")
@@ -299,7 +300,7 @@ func (s *Panic) String() string {
 }
 
 func (s *Return) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	b.WriteString("return")
 	for i, r := range s.Results {
 		if i == 0 {
@@ -325,7 +326,7 @@ func (s *SSADefer) String() string {
 }
 
 func (s *Select) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	for i, st := range s.States {
 		if i > 0 {
 			b.WriteString(", ")

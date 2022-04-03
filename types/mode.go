@@ -7,8 +7,8 @@ package types
 // This file defines the BuilderMode type and its command-line flag.
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 )
 
 // BuilderMode is a bitmask of options for diagnostics and checking.
@@ -44,7 +44,7 @@ I	build bare [I]nit functions: no init guards or calls to dependent inits.
 `
 
 func (m BuilderMode) String() string {
-	var buf bytes.Buffer
+	var buf strings.Builder
 	if m&GlobalDebug != 0 {
 		buf.WriteByte('D')
 	}

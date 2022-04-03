@@ -25,9 +25,9 @@
 package types
 
 import (
-	"bytes"
 	"fmt"
 	"go/constant"
+	"strings"
 
 	. "github.com/mdempsky/amigo/syntax"
 )
@@ -369,7 +369,7 @@ type Initializer struct {
 }
 
 func (init *Initializer) String() string {
-	var buf bytes.Buffer
+	var buf strings.Builder
 	for i, lhs := range init.Lhs {
 		if i > 0 {
 			buf.WriteString(", ")
