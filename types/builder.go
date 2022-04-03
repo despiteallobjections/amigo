@@ -71,13 +71,25 @@ var (
 type builder struct {
 	Prog *Program
 	Fn   *Function
-	Body *BlockStmt
 
 	currentBlock *BasicBlock        // where to emit code
 	objects      map[*Var]Value     // addresses of local variables
 	namedResults []*Alloc           // tuple of named results
 	targets      *targets           // linked stack of branch targets
 	lblocks      map[string]*lblock // labelled blocks
+}
+
+func (prog *Program) build(fn *Function, emitBody func(b *builder)) {
+	prog.buildRaw(fn, func(b *builder) {
+		b.startBody()
+		emitBody(b)
+		b.finishBody()
+	})
+}
+
+func (prog *Program) buildRaw(fn *Function, emitBody func(b *builder)) {
+	b := &builder{Prog: prog, Fn: fn}
+	emitBody(b)
 }
 
 func (b *builder) String() string { return b.Fn.String() }
@@ -2174,8 +2186,6 @@ start:
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
 func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
-	b := &builder{Prog: prog, Fn: fn, Body: body}
-
 	if fn.Blocks != nil {
 		return // building already started
 	}
@@ -2188,36 +2198,39 @@ func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
 			// the degenerate empty case repeatedly.
 			// TODO(adonovan): opt: don't do that.
 
-			// We set Function.Params even though there is no body
-			// code to reference them.  This simplifies clients.
-			if recv := b.Fn.Signature.Recv(); recv != nil {
-				b.addParamObj(recv)
-			}
-			params := b.Fn.Signature.Params()
-			for i, n := 0, params.Len(); i < n; i++ {
-				b.addParamObj(params.At(i))
-			}
+			prog.buildRaw(fn, func(b *builder) {
+				// We set Function.Params even though there is no body
+				// code to reference them.  This simplifies clients.
+				if recv := b.Fn.Signature.Recv(); recv != nil {
+					b.addParamObj(recv)
+				}
+				params := b.Fn.Signature.Params()
+				for i, n := 0, params.Len(); i < n; i++ {
+					b.addParamObj(params.At(i))
+				}
+			})
 		}
 		return
 	}
-	if b.Prog.mode&LogSource != 0 {
+	if prog.mode&LogSource != 0 {
 		defer logStack("build function %s @ %s", fn, fn.pos)()
 	}
-	b.startBody()
-	b.createSyntacticParams()
-	b.stmt(body)
-	if cb := b.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
-		// Control fell off the end of the function's body block.
-		//
-		// Block optimizations eliminate the current block, if
-		// unreachable.  It is a builder invariant that
-		// if this no-arg return is ill-typed for
-		// b.Fn.Signature.Results, this block must be
-		// unreachable.  The sanity checker checks this.
-		b.emit(new(RunDefers))
-		b.emit(new(Return))
-	}
-	b.finishBody()
+
+	prog.build(fn, func(b *builder) {
+		b.createSyntacticParams()
+		b.stmt(body)
+		if cb := b.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
+			// Control fell off the end of the function's body block.
+			//
+			// Block optimizations eliminate the current block, if
+			// unreachable.  It is a builder invariant that
+			// if this no-arg return is ill-typed for
+			// b.Fn.Signature.Results, this block must be
+			// unreachable.  The sanity checker checks this.
+			b.emit(new(RunDefers))
+			b.emit(new(Return))
+		}
+	})
 }
 
 // Build calls Package.Build for each package in prog.
@@ -2263,8 +2276,7 @@ func (p *SSAPackage) build(prog *Program) {
 		defer logStack("build %s", p)()
 	}
 
-	// Build all package-level functions, init functions
-	// and methods.
+	// Build all package-level functions, init functions, and methods.
 	// We build them in source order, but it's not significant.
 	for _, file := range p.files {
 		for _, decl := range file.DeclList {
@@ -2279,6 +2291,7 @@ func (p *SSAPackage) build(prog *Program) {
 	// Ensure we have runtime type info for all exported members.
 	// TODO(adonovan): ideally belongs in memberFromObject, but
 	// that would require package creation in topological order.
+	// TODO(mdempsky): Why would that require topological order?
 	pkgScope := p.Pkg.Scope()
 	for _, name := range pkgScope.Names() {
 		if token.IsExported(name) {
@@ -2299,82 +2312,79 @@ func (p *SSAPackage) build(prog *Program) {
 	}
 
 	init := p.Init.member
-	b := &builder{Prog: prog, Fn: init}
+	prog.build(init, func(b *builder) {
+		var done *BasicBlock
 
-	b.startBody()
+		if prog.mode&BareInits == 0 {
+			// Make init() skip if package is already initialized.
+			initguard := p.Var("init$guard")
+			doinit := b.newBasicBlock("init.start")
+			done = b.newBasicBlock("init.done")
+			emitIf(b, emitLoad(b, initguard), done, doinit)
+			b.currentBlock = doinit
+			emitStore(b, initguard, vTrue, NoPos)
 
-	var done *BasicBlock
-
-	if prog.mode&BareInits == 0 {
-		// Make init() skip if package is already initialized.
-		initguard := p.Var("init$guard")
-		doinit := b.newBasicBlock("init.start")
-		done = b.newBasicBlock("init.done")
-		emitIf(b, emitLoad(b, initguard), done, doinit)
-		b.currentBlock = doinit
-		emitStore(b, initguard, vTrue, NoPos)
-
-		// Call the init() function of each package we import.
-		for _, pkg := range p.Pkg.Imports() {
-			prereq := prog.packages[pkg]
-			if prereq == nil {
-				panic(fmt.Sprintf("Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called", p.Pkg.Path(), pkg.Path()))
-			}
-			var v Call
-			v.Call.Value = prereq.Init.member
-			v.Call.pos = init.pos
-			v.setType(NewTuple())
-			b.emit(&v)
-		}
-	}
-
-	// Initialize package-level vars in correct order.
-	for _, varinit := range p.info.InitOrder {
-		if prog.mode&LogSource != 0 {
-			fmt.Fprintf(os.Stderr, "build global initializer %v @ %s\n",
-				varinit.Lhs, varinit.Rhs.Pos())
-		}
-		if len(varinit.Lhs) == 1 {
-			// 1:1 initialization: var x, y = a(), b()
-			var lval lvalue
-			if v := varinit.Lhs[0]; v.Name() != "_" {
-				lval = &address{addr: v.member, pos: v.Pos()}
-			} else {
-				lval = blank{}
-			}
-			b.assign(lval, varinit.Rhs, true, nil)
-		} else {
-			// n:1 initialization: var x, y = f()
-			tuple := b.exprN(varinit.Rhs)
-			for i, v := range varinit.Lhs {
-				if v.Name() == "_" {
-					continue
+			// Call the init() function of each package we import.
+			for _, pkg := range p.Pkg.Imports() {
+				prereq := prog.packages[pkg]
+				if prereq == nil {
+					panic(fmt.Sprintf("Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called", p.Pkg.Path(), pkg.Path()))
 				}
-				emitStore(b, v.member, emitExtract(b, tuple, i), v.Pos())
-			}
-		}
-	}
-
-	// Call user declared init functions in source order.
-	for _, file := range p.files {
-		for _, decl := range file.DeclList {
-			if decl, ok := decl.(*FuncDecl); ok && decl.Recv == nil && decl.Name.Value == "init" {
-				obj := p.info.Defs[decl.Name].(*Func)
 				var v Call
-				v.Call.Value = obj.member
+				v.Call.Value = prereq.Init.member
+				v.Call.pos = init.pos
 				v.setType(NewTuple())
 				b.emit(&v)
 			}
 		}
-	}
 
-	// Finish up init().
-	if prog.mode&BareInits == 0 {
-		emitJump(b, done)
-		b.currentBlock = done
-	}
-	b.emit(new(Return))
-	b.finishBody()
+		// Initialize package-level vars in correct order.
+		for _, varinit := range p.info.InitOrder {
+			if prog.mode&LogSource != 0 {
+				fmt.Fprintf(os.Stderr, "build global initializer %v @ %s\n",
+					varinit.Lhs, varinit.Rhs.Pos())
+			}
+			if len(varinit.Lhs) == 1 {
+				// 1:1 initialization: var x, y = a(), b()
+				var lval lvalue
+				if v := varinit.Lhs[0]; v.Name() != "_" {
+					lval = &address{addr: v.member, pos: v.Pos()}
+				} else {
+					lval = blank{}
+				}
+				b.assign(lval, varinit.Rhs, true, nil)
+			} else {
+				// n:1 initialization: var x, y = f()
+				tuple := b.exprN(varinit.Rhs)
+				for i, v := range varinit.Lhs {
+					if v.Name() == "_" {
+						continue
+					}
+					emitStore(b, v.member, emitExtract(b, tuple, i), v.Pos())
+				}
+			}
+		}
+
+		// Call user declared init functions in source order.
+		for _, file := range p.files {
+			for _, decl := range file.DeclList {
+				if decl, ok := decl.(*FuncDecl); ok && decl.Recv == nil && decl.Name.Value == "init" {
+					obj := p.info.Defs[decl.Name].(*Func)
+					var v Call
+					v.Call.Value = obj.member
+					v.setType(NewTuple())
+					b.emit(&v)
+				}
+			}
+		}
+
+		// Finish up init().
+		if prog.mode&BareInits == 0 {
+			emitJump(b, done)
+			b.currentBlock = done
+		}
+		b.emit(new(Return))
+	})
 
 	p.info = nil // We no longer need ASTs or github.com/mdempsky/amigo/types deductions.
 

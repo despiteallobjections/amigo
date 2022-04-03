@@ -70,67 +70,66 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 		Synthetic: description,
 		pos:       obj.Pos(),
 	}
-	b := &builder{Prog: prog, Fn: fn}
-	b.startBody()
-	b.addSpilledParam(recv)
-	b.createParams(start)
+	prog.build(fn, func(b *builder) {
+		b.addSpilledParam(recv)
+		b.createParams(start)
 
-	indices := sel.Index()
+		indices := sel.Index()
 
-	var v Value = fn.Locals[0] // spilled receiver
-	if isPointer(sel.Recv()) {
-		v = emitLoad(b, v)
-
-		// For simple indirection wrappers, perform an informative nil-check:
-		// "value method (T).f called using nil *T pointer"
-		if len(indices) == 1 && !isPointer(recvType(obj)) {
-			var c Call
-			c.Call.Value = &SSABuiltin{
-				name: "ssa:wrapnilchk",
-				sig: NewSignatureType(nil, nil, nil,
-					NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),
-					NewTuple(anonVar(sel.Recv())), false),
-			}
-			c.Call.Args = []Value{
-				v,
-				stringConst(ssaDeref(sel.Recv()).String()),
-				stringConst(sel.Obj().Name()),
-			}
-			c.setType(v.Type())
-			v = b.emit(&c)
-		}
-	}
-
-	// Invariant: v is a pointer, either
-	//   value of *A receiver param, or
-	// address of  A spilled receiver.
-
-	// We use pointer arithmetic (FieldAddr possibly followed by
-	// Load) in preference to value extraction (Field possibly
-	// preceded by Load).
-
-	v = emitImplicitSelections(b, v, indices[:len(indices)-1])
-
-	// Invariant: v is a pointer, either
-	//   value of implicit *C field, or
-	// address of implicit  C field.
-
-	var c Call
-	if r := recvType(obj); !isInterface(r) { // concrete method
-		if !isPointer(r) {
+		var v Value = fn.Locals[0] // spilled receiver
+		if isPointer(sel.Recv()) {
 			v = emitLoad(b, v)
+
+			// For simple indirection wrappers, perform an informative nil-check:
+			// "value method (T).f called using nil *T pointer"
+			if len(indices) == 1 && !isPointer(recvType(obj)) {
+				var c Call
+				c.Call.Value = &SSABuiltin{
+					name: "ssa:wrapnilchk",
+					sig: NewSignatureType(nil, nil, nil,
+						NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),
+						NewTuple(anonVar(sel.Recv())), false),
+				}
+				c.Call.Args = []Value{
+					v,
+					stringConst(ssaDeref(sel.Recv()).String()),
+					stringConst(sel.Obj().Name()),
+				}
+				c.setType(v.Type())
+				v = b.emit(&c)
+			}
 		}
-		c.Call.Value = prog.declaredFunc(obj)
-		c.Call.Args = append(c.Call.Args, v)
-	} else {
-		c.Call.Method = obj
-		c.Call.Value = emitLoad(b, v)
-	}
-	for _, arg := range fn.Params[1:] {
-		c.Call.Args = append(c.Call.Args, arg)
-	}
-	emitTailCall(b, &c)
-	b.finishBody()
+
+		// Invariant: v is a pointer, either
+		//   value of *A receiver param, or
+		// address of  A spilled receiver.
+
+		// We use pointer arithmetic (FieldAddr possibly followed by
+		// Load) in preference to value extraction (Field possibly
+		// preceded by Load).
+
+		v = emitImplicitSelections(b, v, indices[:len(indices)-1])
+
+		// Invariant: v is a pointer, either
+		//   value of implicit *C field, or
+		// address of implicit  C field.
+
+		var c Call
+		if r := recvType(obj); !isInterface(r) { // concrete method
+			if !isPointer(r) {
+				v = emitLoad(b, v)
+			}
+			c.Call.Value = prog.declaredFunc(obj)
+			c.Call.Args = append(c.Call.Args, v)
+		} else {
+			c.Call.Method = obj
+			c.Call.Value = emitLoad(b, v)
+		}
+		for _, arg := range fn.Params[1:] {
+			c.Call.Args = append(c.Call.Args, arg)
+		}
+		emitTailCall(b, &c)
+	})
 	return fn
 }
 
@@ -188,27 +187,25 @@ func (prog *Program) makeBound(obj *Func) *Function {
 			Synthetic: description,
 			pos:       obj.Pos(),
 		}
-		b := &builder{Prog: prog, Fn: fn}
+		prog.build(fn, func(b *builder) {
+			recv := obj.Type().(*Signature).Recv()
+			fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}
+			fn.FreeVars = []*FreeVar{fv}
+			b.createParams(0)
+			var c Call
 
-		recv := obj.Type().(*Signature).Recv()
-		fv := &FreeVar{object: recv, typ: recv.Type(), parent: fn}
-		fn.FreeVars = []*FreeVar{fv}
-		b.startBody()
-		b.createParams(0)
-		var c Call
-
-		if !isInterface(recvType(obj)) { // concrete
-			c.Call.Value = prog.declaredFunc(obj)
-			c.Call.Args = []Value{fv}
-		} else {
-			c.Call.Value = fv
-			c.Call.Method = obj
-		}
-		for _, arg := range fn.Params {
-			c.Call.Args = append(c.Call.Args, arg)
-		}
-		emitTailCall(b, &c)
-		b.finishBody()
+			if !isInterface(recvType(obj)) { // concrete
+				c.Call.Value = prog.declaredFunc(obj)
+				c.Call.Args = []Value{fv}
+			} else {
+				c.Call.Value = fv
+				c.Call.Method = obj
+			}
+			for _, arg := range fn.Params {
+				c.Call.Args = append(c.Call.Args, arg)
+			}
+			emitTailCall(b, &c)
+		})
 
 		prog.bounds[obj] = fn
 	}

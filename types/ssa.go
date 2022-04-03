@@ -45,7 +45,7 @@ type SSAPackage struct {
 	// all package members keyed by name (incl. init and init#%d)
 	//
 	// Deprecated: Use Pkg.Scope() instead, but beware it does not
-	// include Init or InitGuard.
+	// include Init, InitGuard, or Pkg.inits.
 	Members map[string]Member
 
 	Init      *Func // the package's synthetic init function
@@ -56,7 +56,6 @@ type SSAPackage struct {
 	// The following fields are set transiently, then cleared
 	// after building.
 	buildOnce sync.Once // ensures package building occurs once
-	ninit     int32     // number of init functions
 	info      *Info     // package type information
 	files     []*File   // package ASTs
 }

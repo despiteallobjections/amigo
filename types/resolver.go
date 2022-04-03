@@ -450,6 +450,7 @@ func (check *Checker) collectObjects() {
 					if name == "init" {
 						obj.parent = pkg.scope
 						check.recordDef(decl.Name, obj)
+						pkg.inits = append(pkg.inits, obj)
 						// init functions must have a body
 						if decl.Body == nil {
 							// TODO(gri) make this error message consistent with the others above

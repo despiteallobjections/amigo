@@ -65,8 +65,11 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 	case *Func:
 		sig := obj.Type().(*Signature)
 		if sig.Recv() == nil && name == "init" {
-			pkg.ninit++
-			name = fmt.Sprintf("init#%d", pkg.ninit)
+			ninit := 0
+			for obj.Pkg().inits[ninit] != obj {
+				ninit++
+			}
+			name = fmt.Sprintf("init#%d", 1+ninit)
 		}
 		fn := &Function{
 			name:      name,

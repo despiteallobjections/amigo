@@ -14,6 +14,7 @@ type Package struct {
 	name     string
 	scope    *Scope
 	imports  []*Package
+	inits    []*Func
 	complete bool
 	fake     bool // scope lookup errors are silently dropped if package is fake (internal use only)
 	cgo      bool // uses of this package will be rewritten into uses of declarations from _cgo_gotypes.go
