@@ -71,6 +71,7 @@ var (
 type builder struct {
 	Prog *Program
 	Fn   *Function
+	Body *BlockStmt
 
 	currentBlock *BasicBlock        // where to emit code
 	objects      map[*Var]Value     // addresses of local variables
@@ -559,11 +560,9 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			pos:       e.Type.Pos(), /*Func*/
 			parent:    b.Fn,
 			Pkg:       b.Fn.Pkg,
-			syntax:    e,
 		}
 		b.Fn.AnonFuncs = append(b.Fn.AnonFuncs, fn2)
-		b2 := &builder{Prog: b.Prog, Fn: fn2}
-		b2.buildFunction()
+		b.Prog.buildFunction(fn2, e.Body)
 		if fn2.FreeVars == nil {
 			return fn2
 		}
@@ -2174,22 +2173,11 @@ start:
 }
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
-func (b *builder) buildFunction() {
-	fn := b.Fn
+func (prog *Program) buildFunction(fn *Function, body *BlockStmt) {
+	b := &builder{Prog: prog, Fn: fn, Body: body}
+
 	if fn.Blocks != nil {
 		return // building already started
-	}
-
-	var body *BlockStmt
-	switch n := fn.syntax.(type) {
-	case nil:
-		return // not a Go source function.  (Synthetic, or from object file.)
-	case *FuncDecl:
-		body = n.Body
-	case *FuncLit:
-		body = n.Body
-	default:
-		panic(n)
 	}
 
 	if body == nil {
@@ -2282,8 +2270,7 @@ func (p *SSAPackage) build(prog *Program) {
 		for _, decl := range file.DeclList {
 			if decl, ok := decl.(*FuncDecl); ok {
 				if obj := p.info.Defs[decl.Name].(*Func); obj.Name() != "_" {
-					b := builder{Prog: prog, Fn: obj.member}
-					b.buildFunction()
+					prog.buildFunction(obj.member, decl.Body)
 				}
 			}
 		}

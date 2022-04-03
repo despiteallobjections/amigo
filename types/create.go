@@ -72,7 +72,6 @@ func memberFromObject(pkg *SSAPackage, obj Object, syntax Node) {
 			name:      name,
 			object:    obj,
 			Signature: sig,
-			syntax:    syntax,
 			pos:       obj.Pos(),
 			Pkg:       pkg,
 		}

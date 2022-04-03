@@ -280,7 +280,6 @@ type Function struct {
 	pos       Pos
 
 	Synthetic string        // provenance of synthetic function; "" for true source functions
-	syntax    Node          // *syntax.Func{Decl,Lit}; replaced with simple syntax.Node after build, unless debug mode
 	parent    *Function     // enclosing function if anon; nil if global
 	Pkg       *SSAPackage   // enclosing package; nil for shared funcs (wrappers and error.Error)
 	Params    []*Parameter  // function parameters; for methods, includes receiver

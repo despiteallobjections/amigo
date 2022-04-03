@@ -297,7 +297,6 @@ func (b *builder) finishBody() {
 	b.objects = nil
 	b.currentBlock = nil
 	b.lblocks = nil
-	f.syntax = nil
 
 	// Remove from f.Locals any Allocs that escape to the heap.
 	j := 0
