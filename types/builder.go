@@ -698,6 +698,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			panic("unreachable")
 		}
 		// TODO(mdempsky): Why do we evaluate high before low?
+		// See go.dev/issue/52142.
 		if e.Index[1] != nil {
 			high = b.expr(e.Index[1])
 		}
