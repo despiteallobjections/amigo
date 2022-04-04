@@ -117,10 +117,8 @@ func (b *builder) emitCompare(op Operator, x, y Value, pos Pos) Value {
 	//   if e==true { ... }
 	// even in the case when e's type is an interface.
 	// TODO(adonovan): opt: generalise to x==true, false!=y, etc.
-	if x == vTrue && op == Eql {
-		if yt, ok := yt.(*Basic); ok && yt.Info()&IsBoolean != 0 {
-			return y
-		}
+	if x == vTrue && op == Eql && isBoolean(yt) {
+		return y
 	}
 
 	if Identical(xt, yt) {

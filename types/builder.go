@@ -80,6 +80,17 @@ type builder struct {
 	lblocks      []lblock       // labelled blocks
 }
 
+func (b *builder) unexpected(what string, p poser) error {
+	return fmt.Errorf("%s: unexpected %s: %v", p.Pos(), what, p)
+}
+
+// golden reports whether we should emit instructions identical to
+// x/tools/go/ssa.
+//
+// note is a source comment to describe why amigo intentionally
+// diverges from x/tools/go/ssa.
+func (b *builder) golden(note string) bool { return false }
+
 func (prog *Program) build(fn *Function, info *Info, emitBody func(b *builder)) {
 	b := &builder{Prog: prog, Fn: fn, info: info}
 	b.startBody()
@@ -439,7 +450,7 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		return &address{addr: b.expr(e.X), pos: tokenPos(e, _OpPos), expr: e}
 	}
 
-	panic(fmt.Sprintf("unexpected address expression: %T", e))
+	panic(b.unexpected("address", e))
 }
 
 type store struct {
@@ -593,9 +604,16 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 			if y != x {
 				pos := tokenPos(e, _Lparen)
 				switch y := y.(type) {
-				// TODO(mdempsky): Add default panic?
+				default:
+					panic(fmt.Errorf("%s: unexpected conversion: %T", e.Pos(), y))
+				case *SSAConst:
+					// ok; doesn't track position
 				case *Convert:
 					y.pos = pos
+				case *ChangeInterface:
+					if !b.golden("x/tools/go/ssa is missing this case") {
+						y.pos = pos
+					}
 				case *ChangeType:
 					y.pos = pos
 				case *MakeInterface:
@@ -810,7 +828,7 @@ func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
 		return b.addr(e, false).load(b)
 	}
 
-	panic(fmt.Sprintf("unexpected expr: %T", e))
+	panic(b.unexpected("expr", e))
 }
 
 // stmtList emits to fn code for all statements in list.
@@ -2121,7 +2139,7 @@ start:
 		b.forStmt(s, label)
 
 	default:
-		panic(fmt.Sprintf("unexpected statement kind: %T", s))
+		panic(b.unexpected("statement", s))
 	}
 }
 
