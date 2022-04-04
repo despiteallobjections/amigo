@@ -25,7 +25,7 @@ Today, the gc toolchain suite includes a few tools:
   files to parse and type check, and a configuration file that
   specifies how to handle `import` declarations (i.e., how to resolve
   local and vendored import paths, and where to find the compiler
-  artifacts for those imported packages). It's primary result is
+  artifacts for those imported packages). Its primary result is
   writing out the compiler and linker artifacts, described further in
   the next section.
 
@@ -70,11 +70,11 @@ kinds of build artifacts:
   will "re-export" that type declaration from package A.
 
   The file also contains some compiler-specific optimization details,
-  like ininable function bodies and escape analysis summaries. These
+  like inlinable function bodies and escape analysis summaries. These
   details are ignored by go/types.Importer implementations.
 
 * Linker artifacts. These files are similar to traditional UNIX object
-  file, with symbols, definitions, and relocations. For compiled
+  files, with symbols, definitions, and relocations. For compiled
   functions, the symbol definitions will be machine instructions
   suitable for execution by the target CPU.
 
@@ -128,12 +128,12 @@ A notable example of the current limited parallelism is if you run `go
 build -a -v std` (i.e., re-build the entire standard library without
 caching, and print packages as they're compiled).
 
-Even though there's tons of packages to compile, you'll almost always
-notice a small stutter in output near the beginning, shortly after
-"runtime" is printed. This is because a lot of packages depend on
-package runtime, and it has a very large linker object. So the entire
-build graph stalls waiting for package runtime's linker object, even
-though `go build -a -v std` never even invokes cmd/link.
+Even though there are tons of packages to compile, you'll almost
+always notice a small stutter in output near the beginning, shortly
+after "runtime" is printed. This is because a lot of packages depend
+on package runtime, and it has a very large linker object. So the
+entire build graph stalls waiting for package runtime's linker object,
+even though `go build -a -v std` never even invokes cmd/link.
 
 ### Example: `go build -a -n runtime/cgo`
 
@@ -165,8 +165,8 @@ grained. Ideally, we want to minimize how much work happens along the
 critical path of package dependencies.
 
 At a minimum, we need to split cmd/compile into two steps: one that
-writes out the compiler artifact, and a separate that writes out the
-linker artifact.
+writes out the compiler artifact, and a separate one that writes out
+the linker artifact.
 
 Longer term, I can imagine more than two steps. For example, the
 compiler artifact currently includes some compiler-specific
