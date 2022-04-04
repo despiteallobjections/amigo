@@ -11,6 +11,9 @@ type anyBuffer struct {
 	off int           // read at &buf[off], write at &buf[len(buf)]
 }
 
+// empty reports whether the unread portion of the buffer is empty.
+func (b *anyBuffer) empty() bool { return len(b.buf) <= b.off }
+
 // Reset resets the buffer to be empty.
 func (b *anyBuffer) Reset() {
 	b.buf = b.buf[:0]

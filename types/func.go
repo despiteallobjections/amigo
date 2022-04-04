@@ -160,16 +160,20 @@ func (lb *lblock) tok(tok Token) *BasicBlock {
 // specified label, creating it if needed.
 //
 func (b *builder) labelledBlock(label *Label) *lblock {
-	b.wr.labelledBlock(label)
-	lb := b.rd.labelledBlock()
-	b.buf.Reset()
+	var lb *lblock
+	b.split(func(w *writer, r *reader) {
+		w.labelledBlock(label)
+		lb = r.labelledBlock()
+	})
 	return lb
 }
 
 func (b *builder) useLabel(name *Name) *lblock {
-	b.wr.useLabel(name)
-	lb := b.rd.useLabel()
-	b.buf.Reset()
+	var lb *lblock
+	b.split(func(w *writer, r *reader) {
+		w.useLabel(name)
+		lb = r.useLabel()
+	})
 	return lb
 }
 
@@ -396,9 +400,11 @@ func (b *builder) defLocal(id *Name) *Alloc {
 // to function f and returns it.  pos is the optional source location.
 //
 func (b *builder) addLocal(typ Type, pos Pos) *Alloc {
-	b.wr.addLocal(typ, pos)
-	v := b.rd.addLocal()
-	b.buf.Reset()
+	var v *Alloc
+	b.split(func(w *writer, r *reader) {
+		w.addLocal(typ, pos)
+		v = r.addLocal()
+	})
 	return v
 }
 
