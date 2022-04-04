@@ -73,6 +73,10 @@ type builder struct {
 	Fn   *Function
 	info *Info
 
+	buf anyBuffer
+	wr  writer
+	rd  reader
+
 	currentBlock *BasicBlock    // where to emit code
 	objects      map[*Var]Value // addresses of local variables
 	namedResults []*Alloc       // tuple of named results
@@ -93,6 +97,11 @@ func (b *builder) golden(note string) bool { return false }
 
 func (prog *Program) build(fn *Function, info *Info, emitBody func(b *builder)) {
 	b := &builder{Prog: prog, Fn: fn, info: info}
+	b.wr.buf = &b.buf
+	b.wr.info = b.info
+	b.rd.buf = &b.buf
+	b.rd.b = b
+
 	b.startBody()
 	emitBody(b)
 	b.finishBody()
@@ -2171,6 +2180,7 @@ func (prog *Program) buildFunction(info *Info, fn *Function) {
 		}
 		return
 	}
+
 	if prog.mode&LogSource != 0 {
 		defer logStack("build function %s @ %s", fn, fn.Pos())()
 	}

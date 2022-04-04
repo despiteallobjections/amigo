@@ -160,19 +160,17 @@ func (lb *lblock) tok(tok Token) *BasicBlock {
 // specified label, creating it if needed.
 //
 func (b *builder) labelledBlock(label *Label) *lblock {
-	lb := &b.lblocks[label.index]
-	if lb._goto == nil {
-		lb._goto = b.newBasicBlock(label.Name())
-	}
+	b.wr.labelledBlock(label)
+	lb := b.rd.labelledBlock()
+	b.buf.Reset()
 	return lb
 }
 
 func (b *builder) useLabel(name *Name) *lblock {
-	if name == nil {
-		return &b.implicit
-	}
-	label := b.info.Uses[name].(*Label)
-	return b.labelledBlock(label)
+	b.wr.useLabel(name)
+	lb := b.rd.useLabel()
+	b.buf.Reset()
+	return lb
 }
 
 // addSpilledParam declares a parameter that is pre-spilled to the
@@ -241,20 +239,20 @@ func (b *builder) startBody() {
 // len(f.Params) == len(f.Signature.Params) + (f.Signature.Recv() ? 1 : 0)
 //
 func (b *builder) createSyntacticParams() {
-	f := b.Fn
-	if recv := f.Signature.Recv(); recv != nil {
+	sig := b.Fn.Signature
+	if recv := sig.Recv(); recv != nil {
 		b.addParam(recv, recv.Name() != "")
 	}
 
 	// Parameters.
-	params := f.Signature.Params()
+	params := sig.Params()
 	for i := 0; i < params.Len(); i++ {
 		param := params.At(i)
 		b.addParam(param, param.Name() != "")
 	}
 
 	// Named results.
-	results := f.Signature.Results()
+	results := sig.Results()
 	for i := 0; i < results.Len(); i++ {
 		result := results.At(i)
 		if result.Name() != "" {
@@ -398,12 +396,9 @@ func (b *builder) defLocal(id *Name) *Alloc {
 // to function f and returns it.  pos is the optional source location.
 //
 func (b *builder) addLocal(typ Type, pos Pos) *Alloc {
-	fn := b.Fn
-	v := &Alloc{}
-	v.setType(NewPointer(typ))
-	v.setPos(pos)
-	fn.Locals = append(fn.Locals, v)
-	b.emit(v)
+	b.wr.addLocal(typ, pos)
+	v := b.rd.addLocal()
+	b.buf.Reset()
 	return v
 }
 
