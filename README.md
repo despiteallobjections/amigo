@@ -61,7 +61,7 @@ advance, and amigo is no exception.
 
 ### cmd/asm
 
-Should amigo incorporate cmd/asm/asm too? I think yes, but cmd/asm
+Should amigo incorporate cmd/asm too? I think yes, but cmd/asm
 seems especially challenging to incorporate, without pulling in all of
 cmd/internal/obj.
 
