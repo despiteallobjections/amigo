@@ -5,7 +5,7 @@
 package types
 
 import (
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // This file implements a check to validate that a Go package doesn't

@@ -16,7 +16,7 @@ package types
 // each Go source function and generates SSA instructions for the
 // function body.  Initializer expressions for package-level variables
 // are emitted to the package's init() function in the order specified
-// by github.com/mdempsky/amigo/types.Info.InitOrder, then code for each function in the
+// by github.com/despiteallobjections/amigo/types.Info.InitOrder, then code for each function in the
 // package is generated in lexical order.
 // The BUILD phases for distinct packages are independent and are
 // executed in parallel.
@@ -36,7 +36,7 @@ import (
 	"os"
 	"sync"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 type opaqueType struct {

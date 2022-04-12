@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // langCompat reports an error if the representation of a numeric

@@ -12,7 +12,7 @@ import (
 	"go/constant"
 	"go/token"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // An operandMode specifies the (addressing) mode of an operand.

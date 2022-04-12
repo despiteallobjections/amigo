@@ -10,7 +10,7 @@ import (
 	"go/constant"
 	"sort"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 func (check *Checker) funcBody(decl *declInfo, obj *Func, iota constant.Value) {

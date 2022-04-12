@@ -4,7 +4,7 @@
 
 package types
 
-import . "github.com/mdempsky/amigo/syntax"
+import . "github.com/despiteallobjections/amigo/syntax"
 
 // ----------------------------------------------------------------------------
 // API

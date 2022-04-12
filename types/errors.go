@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 func unimplemented() {

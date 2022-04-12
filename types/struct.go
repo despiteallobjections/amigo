@@ -7,7 +7,7 @@ package types
 import (
 	"strconv"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // ----------------------------------------------------------------------------

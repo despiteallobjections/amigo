@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa/interp"
-	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/loader"
+	"github.com/despiteallobjections/amigo/ssa/interp"
+	"github.com/despiteallobjections/amigo/ssa/ssautil"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 // Each line contains a space-separated list of $GOROOT/test/

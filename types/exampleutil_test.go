@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"sort"
 
-	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/types"
 )
 
 func ExampleMap() {

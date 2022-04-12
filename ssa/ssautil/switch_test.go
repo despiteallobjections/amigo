@@ -13,9 +13,9 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/loader"
+	"github.com/despiteallobjections/amigo/ssa/ssautil"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 func TestSwitches(t *testing.T) {

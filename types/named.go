@@ -7,7 +7,7 @@ package types
 import (
 	"sync"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // A Named represents a named (defined) type.

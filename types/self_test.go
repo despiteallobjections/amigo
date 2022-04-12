@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/mdempsky/amigo/syntax"
-	. "github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/types"
 )
 
 func TestSelf(t *testing.T) {
@@ -22,7 +22,7 @@ func TestSelf(t *testing.T) {
 	}
 
 	conf := Config{Importer: defaultImporter()}
-	_, err = conf.Check("github.com/mdempsky/amigo/types", files, nil)
+	_, err = conf.Check("github.com/despiteallobjections/amigo/types", files, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

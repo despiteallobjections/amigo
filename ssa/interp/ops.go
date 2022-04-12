@@ -14,8 +14,8 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 // If the target program panics, the interpreter panics with this type.

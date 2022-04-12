@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/mdempsky/amigo/syntax"
+	"github.com/despiteallobjections/amigo/syntax"
 	"golang.org/x/tools/go/buildutil"
 )
 

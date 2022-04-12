@@ -39,7 +39,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/testenv"
+	"github.com/despiteallobjections/amigo/testenv"
 )
 
 const testdata = "testdata" // directory containing test files

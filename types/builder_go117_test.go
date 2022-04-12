@@ -10,11 +10,11 @@ package types_test
 import (
 	"testing"
 
-	"github.com/mdempsky/amigo/importer"
-	"github.com/mdempsky/amigo/ssa/ssautil"
-	. "github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
-	. "github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/importer"
+	"github.com/despiteallobjections/amigo/ssa/ssautil"
+	. "github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
+	. "github.com/despiteallobjections/amigo/types"
 )
 
 func TestBuildPackageGo117(t *testing.T) {

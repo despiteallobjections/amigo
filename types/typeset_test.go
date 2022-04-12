@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 func TestInvalidTypeSet(t *testing.T) {

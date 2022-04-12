@@ -11,9 +11,9 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/loader"
+	"github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 // Packages creates an SSA program for a set of packages.

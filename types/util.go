@@ -11,7 +11,7 @@ import (
 	"io"
 	"os"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 //// AST utilities
@@ -24,7 +24,7 @@ func isBlankIdent(e Expr) bool {
 	return ok && id.Value == "_"
 }
 
-//// Type utilities.  Some of these belong in github.com/mdempsky/amigo/types.
+//// Type utilities.  Some of these belong in github.com/despiteallobjections/amigo/types.
 
 func isInterface(T Type) bool { return IsInterface(T) }
 

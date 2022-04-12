@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdempsky/amigo/testenv"
+	"github.com/despiteallobjections/amigo/testenv"
 )
 
 // errh is a default error handler for basic tests.

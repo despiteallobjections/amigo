@@ -12,7 +12,7 @@ import (
 	"go/token"
 	"math"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 /*

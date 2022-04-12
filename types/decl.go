@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"go/constant"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 func (err *error_) recordAltDecl(obj Object) {

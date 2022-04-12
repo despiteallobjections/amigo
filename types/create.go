@@ -12,7 +12,7 @@ import (
 	"os"
 	"sync"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // NewProgram returns a new SSA Program.

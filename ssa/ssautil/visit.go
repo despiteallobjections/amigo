@@ -4,7 +4,7 @@
 
 package ssautil
 
-import "github.com/mdempsky/amigo/types"
+import "github.com/despiteallobjections/amigo/types"
 
 // This file defines utilities for visiting the SSA representation of
 // a Program.

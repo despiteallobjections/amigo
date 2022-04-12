@@ -13,7 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/mdempsky/amigo/syntax"
+	"github.com/despiteallobjections/amigo/syntax"
 )
 
 func NewHandler(errh syntax.ErrorHandler) syntax.PragmaHandler {

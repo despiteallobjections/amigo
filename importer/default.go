@@ -7,8 +7,8 @@ package importer
 import (
 	"go/build"
 
-	"github.com/mdempsky/amigo/srcimporter"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/srcimporter"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 var shared = srcimporter.New(&build.Default, map[string]*types.Package{})

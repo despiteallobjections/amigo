@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mdempsky/amigo/testenv"
-	types "github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/testenv"
+	types "github.com/despiteallobjections/amigo/types"
 
 	_ "golang.org/x/text/unicode/norm" // for TestImportedTypes
 )

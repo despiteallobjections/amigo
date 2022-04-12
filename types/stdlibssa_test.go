@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/testenv"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/loader"
+	"github.com/despiteallobjections/amigo/ssa/ssautil"
+	"github.com/despiteallobjections/amigo/testenv"
+	"github.com/despiteallobjections/amigo/types"
 	"golang.org/x/tools/go/buildutil"
 )
 

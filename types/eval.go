@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // Eval returns the type and, if constant, the value for the

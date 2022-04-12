@@ -29,7 +29,7 @@ import (
 	"go/constant"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // An TypeError describes a type-checking error; it implements the error interface.

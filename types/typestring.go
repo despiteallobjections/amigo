@@ -14,7 +14,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // A Qualifier controls how named package-level objects are printed in

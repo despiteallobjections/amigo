@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // Instantiate instantiates the type orig with the given type arguments targs.

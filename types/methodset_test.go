@@ -7,7 +7,7 @@ package types_test
 import (
 	"testing"
 
-	. "github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/types"
 )
 
 func TestNewMethodSet(t *testing.T) {

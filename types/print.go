@@ -15,7 +15,7 @@ import (
 	"sort"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // relName returns the name of v relative to i.

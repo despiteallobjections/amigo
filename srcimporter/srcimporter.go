@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/mdempsky/amigo/cgo"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/cgo"
+	"github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 // An Importer provides the context for importing packages from source code.

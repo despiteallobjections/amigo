@@ -20,7 +20,7 @@ import (
 
 	exec "golang.org/x/sys/execabs"
 
-	"github.com/mdempsky/amigo/cgo"
+	"github.com/despiteallobjections/amigo/cgo"
 )
 
 var (

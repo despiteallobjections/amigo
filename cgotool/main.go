@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mdempsky/amigo/edit"
+	"github.com/despiteallobjections/amigo/edit"
 )
 
 // A Package collects information about the package we're going to write.

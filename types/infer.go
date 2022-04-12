@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"fmt"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 const useConstraintTypeInference = true

@@ -12,7 +12,7 @@ import (
 	"go/constant"
 	"sync"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // A Program is a partial or complete Go program converted to SSA form.
@@ -40,7 +40,7 @@ type Program struct {
 // and unspecified other things too.
 //
 type SSAPackage struct {
-	Pkg *Package // the corresponding github.com/mdempsky/amigo/types.Package
+	Pkg *Package // the corresponding github.com/despiteallobjections/amigo/types.Package
 
 	// all package members keyed by name (incl. init and init#%d)
 	Members map[string]Member

@@ -4,6 +4,6 @@
 
 package types_test
 
-import "github.com/mdempsky/amigo/importer"
+import "github.com/despiteallobjections/amigo/importer"
 
 var defaultImporter = importer.Default

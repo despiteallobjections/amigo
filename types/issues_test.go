@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/testenv"
-	. "github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/testenv"
+	. "github.com/despiteallobjections/amigo/types"
 )
 
 func mustParse(t *testing.T, src string) *File {

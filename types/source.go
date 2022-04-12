@@ -4,7 +4,7 @@
 
 package types
 
-import . "github.com/mdempsky/amigo/syntax"
+import . "github.com/despiteallobjections/amigo/syntax"
 
 // This file defines utilities for working with source positions
 // or source-level named entities ("objects").

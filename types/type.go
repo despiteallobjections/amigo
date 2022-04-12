@@ -4,7 +4,7 @@
 
 package types
 
-import . "github.com/mdempsky/amigo/syntax"
+import . "github.com/despiteallobjections/amigo/syntax"
 
 // A Type represents a type of Go.
 // All types implement the Type interface.

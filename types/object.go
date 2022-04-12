@@ -11,7 +11,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // An Object describes a named language entity such as a package,

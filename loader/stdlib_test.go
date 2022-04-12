@@ -22,9 +22,9 @@ import (
 
 	"golang.org/x/tools/go/buildutil"
 
-	"github.com/mdempsky/amigo/loader"
-	"github.com/mdempsky/amigo/testenv"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/loader"
+	"github.com/despiteallobjections/amigo/testenv"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 func TestStdlib(t *testing.T) {

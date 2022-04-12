@@ -9,8 +9,8 @@ package types_test
 import (
 	"testing"
 
-	. "github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 // findStructType typechecks src and returns the first struct type encountered.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/types"
 )
 
 func TestInstantiateEquality(t *testing.T) {

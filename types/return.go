@@ -7,7 +7,7 @@
 package types
 
 import (
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // isTerminating reports if s is a terminating statement.

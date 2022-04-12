@@ -24,8 +24,8 @@ import (
 	"sort"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	. "github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 // ExampleScope prints the tree of Scopes of a package created from a

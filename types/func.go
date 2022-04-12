@@ -13,7 +13,7 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // addEdge adds a control-flow graph edge from from to to.

@@ -14,9 +14,9 @@ import (
 	oldssa "golang.org/x/tools/go/ssa"
 	oldssautil "golang.org/x/tools/go/ssa/ssautil"
 
-	newssautil "github.com/mdempsky/amigo/ssa/ssautil"
-	"github.com/mdempsky/amigo/testenv"
-	newssa "github.com/mdempsky/amigo/types"
+	newssautil "github.com/despiteallobjections/amigo/ssa/ssautil"
+	"github.com/despiteallobjections/amigo/testenv"
+	newssa "github.com/despiteallobjections/amigo/types"
 	"github.com/pmezard/go-difflib/difflib"
 )
 

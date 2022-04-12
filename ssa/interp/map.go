@@ -12,7 +12,7 @@ package interp
 // concurrent map access.
 
 import (
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 type hashable interface {

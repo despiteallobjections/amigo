@@ -5,7 +5,7 @@
 package types
 
 import (
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // labels checks correct label use in body.

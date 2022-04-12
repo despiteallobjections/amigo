@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // A declInfo describes a package-level const, type, var, or func declaration.

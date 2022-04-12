@@ -1,4 +1,4 @@
-module github.com/mdempsky/amigo
+module github.com/despiteallobjections/amigo
 
 go 1.17
 

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"sort"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // ----------------------------------------------------------------------------

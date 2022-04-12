@@ -5,7 +5,7 @@
 package types
 
 import (
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // Callee returns the named target of a function call, if any:

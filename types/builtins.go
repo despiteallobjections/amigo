@@ -10,7 +10,7 @@ import (
 	"go/constant"
 	"go/token"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // builtin type-checks a call to the built-in specified by id and

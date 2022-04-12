@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mdempsky/amigo/cgo"
-	"github.com/mdempsky/amigo/syntax"
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/cgo"
+	"github.com/despiteallobjections/amigo/syntax"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 var ignoreVendor build.ImportMode

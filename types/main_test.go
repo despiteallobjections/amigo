@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mdempsky/amigo/testenv"
+	"github.com/despiteallobjections/amigo/testenv"
 )
 
 func TestMain(m *testing.M) {

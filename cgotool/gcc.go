@@ -28,7 +28,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/mdempsky/amigo/quoted"
+	"github.com/despiteallobjections/amigo/quoted"
 )
 
 var debugDefine = flag.Bool("debug-define", false, "print relevant #defines")

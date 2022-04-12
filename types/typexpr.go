@@ -11,7 +11,7 @@ import (
 	"go/constant"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // ident type-checks identifier e and initializes x with the value or type of e.

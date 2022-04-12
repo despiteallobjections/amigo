@@ -9,7 +9,7 @@ package types
 import (
 	"fmt"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // emitNew emits to f a new (heap Alloc) instruction allocating an

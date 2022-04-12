@@ -7,7 +7,7 @@ package syntax
 import (
 	"testing"
 
-	"github.com/mdempsky/amigo/testenv"
+	"github.com/despiteallobjections/amigo/testenv"
 )
 
 func TestDump(t *testing.T) {

@@ -7,7 +7,7 @@ package types_test
 import (
 	"testing"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // TestErrorCalls makes sure that check.errorf calls have at

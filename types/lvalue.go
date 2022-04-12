@@ -8,7 +8,7 @@ package types
 // expressions.
 
 import (
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // An lvalue represents an assignable location that may appear on the

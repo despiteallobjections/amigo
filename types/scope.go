@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // A Scope maintains a set of objects and links to its containing

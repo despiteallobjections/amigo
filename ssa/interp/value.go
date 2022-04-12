@@ -42,7 +42,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/mdempsky/amigo/types"
+	"github.com/despiteallobjections/amigo/types"
 )
 
 type value interface{}

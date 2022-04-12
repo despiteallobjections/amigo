@@ -11,7 +11,7 @@ import (
 	"go/constant"
 	"strconv"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // NewSSAConst returns a new constant of the specified value and type.

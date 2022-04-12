@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mdempsky/amigo/testenv"
+	"github.com/despiteallobjections/amigo/testenv"
 )
 
 var (

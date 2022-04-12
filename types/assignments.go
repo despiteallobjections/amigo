@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // assignment reports whether x can be assigned to a variable of type T,

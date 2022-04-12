@@ -43,7 +43,7 @@ import (
 	"math/big"
 	"os"
 
-	. "github.com/mdempsky/amigo/syntax"
+	. "github.com/despiteallobjections/amigo/syntax"
 )
 
 // If true, show diagnostic information at each step of lifting.
