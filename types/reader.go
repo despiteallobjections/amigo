@@ -4,7 +4,11 @@
 
 package types
 
-import . "github.com/mdempsky/amigo/syntax"
+import (
+	"go/constant"
+
+	. "github.com/despiteallobjections/amigo/syntax"
+)
 
 type reader struct {
 	buf *anyBuffer
@@ -15,12 +19,14 @@ func (r *reader) sync() { assert(r.buf.ReadAny() == nil) }
 
 func (r *reader) bool() bool     { return r.buf.ReadAny().(bool) }
 func (r *reader) int() int       { return r.buf.ReadAny().(int) }
+func (r *reader) int64() int64   { return r.buf.ReadAny().(int64) }
 func (r *reader) string() string { return r.buf.ReadAny().(string) }
 
-func (r *reader) op() Operator { return r.buf.ReadAny().(Operator) }
-func (r *reader) pos() Pos     { return r.buf.ReadAny().(Pos) }
-func (r *reader) typ() Type    { return r.buf.ReadAny().(Type) }
-func (r *reader) obj() Object  { return r.buf.ReadAny().(Object) }
+func (r *reader) op() Operator        { return r.buf.ReadAny().(Operator) }
+func (r *reader) pos() Pos            { return r.buf.ReadAny().(Pos) }
+func (r *reader) val() constant.Value { return r.buf.ReadAny().(constant.Value) }
+func (r *reader) typ() Type           { return r.buf.ReadAny().(Type) }
+func (r *reader) obj() Object         { return r.buf.ReadAny().(Object) }
 
 func (r *reader) addLocal() *Alloc {
 	r.sync()
