@@ -101,6 +101,9 @@ func (s *Selection) Type() Type {
 // traversed to get from (the type of) x to f, starting at embedding depth 0.
 func (s *Selection) Index() []int { return s.index }
 
+func (s *Selection) Implicits() []int { return s.index[:len(s.index)-1] }
+func (s *Selection) Explicit() int    { return s.index[len(s.index)-1] }
+
 // Indirect reports whether any pointer indirection was required to get from
 // x to f in x.f.
 func (s *Selection) Indirect() bool { return s.indirect }

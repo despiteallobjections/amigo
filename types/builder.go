@@ -221,44 +221,75 @@ func (b *builder) logicalBinop(e *Operation) Value {
 // TypeAssertExpr, IndexExpr (when X is a map), and UnaryExpr (when Op
 // is token.ARROW).
 //
-func (b *builder) exprN(e Expr) Value {
+func (b *builder) exprN(e Expr) (res Value) {
+	e = Unparen(e)
+
 	typ := b.typeOf(e).(*Tuple)
 	switch e := e.(type) {
-	case *ParenExpr:
-		return b.exprN(e.X)
-
 	case *CallExpr:
-		// Currently, no built-in function nor type conversion
-		// has multiple results, so we can avoid some of the
-		// cases for single-valued CallExpr.
-		var c Call
-		b.setCall(e, &c.Call)
-		c.typ = typ
-		return b.emit(&c)
+		b.split(func(w *writer) {
+			// Currently, no built-in function nor type conversion
+			// has multiple results, so we can avoid some of the
+			// cases for single-valued CallExpr.
+			// TODO(mdempsky): Add asserts to enforce this.
+
+			w.setCall(e)
+		}, func(r *reader) {
+			var c Call
+			r.setCall(&c.Call)
+			c.typ = typ
+			res = b.emit(&c)
+		})
+		return
 
 	case *IndexExpr:
-		mapt := b.typeOf(e.X).Underlying().(*Map)
-		lookup := &Lookup{
-			X:       b.expr(e.X),
-			Index:   b.emitConv(b.expr(e.Index), mapt.Key()),
-			CommaOk: true,
-		}
-		lookup.setType(typ)
-		lookup.setPos(tokenPos(e, _Lbrack))
-		return b.emit(lookup)
+		b.split(func(w *writer) {
+			w.expr(e.X)
+			w.pos(tokenPos(e, _Lbrack))
+			w.expr(e.Index)
+		}, func(r *reader) {
+			x, pos, index := r.expr(), r.pos(), r.expr()
+			lookup := &Lookup{
+				X:       x,
+				Index:   b.emitConv(index, x.Type().Underlying().(*Map).Key()),
+				CommaOk: true,
+			}
+			lookup.setType(typ)
+			lookup.setPos(pos)
+			res = b.emit(lookup)
+		})
+		return
 
 	case *AssertExpr:
-		return b.emitTypeTest(b.expr(e.X), typ.At(0).Type(), tokenPos(e, _Lparen))
+		b.split(func(w *writer) {
+			w.expr(e.X)
+			w.pos(tokenPos(e, _Lparen))
+			w.typ(typ.At(0).Type())
+		}, func(r *reader) {
+			x, pos, typ := r.expr(), r.pos(), r.typ()
+			res = b.emitTypeTest(x, typ, pos)
+		})
+		return
 
 	case *Operation:
-		unop := &UnOp{
-			Op:      Recv,
-			X:       b.expr(e.X),
-			CommaOk: true,
-		}
-		unop.setType(typ)
-		unop.setPos(tokenPos(e, _OpPos))
-		return b.emit(unop)
+		b.split(func(w *writer) {
+			assert(e.Y == nil)
+			assert(e.Op == Recv)
+			w.pos(tokenPos(e, _OpPos))
+			w.expr(e.X)
+		}, func(r *reader) {
+			pos, x := r.pos(), r.expr()
+			unop := &UnOp{
+				Op:      Recv,
+				X:       x,
+				CommaOk: true,
+			}
+			unop.setType(typ)
+			unop.setPos(pos)
+			res = b.emit(unop)
+		})
+		return
+
 	}
 	panic(fmt.Sprintf("exprN(%T) in %s", e, b.Fn))
 }
@@ -414,7 +445,7 @@ func (w *writer) addr(e Expr, escaping bool) {
 		}
 		const wantAddr = true
 		w.receiver(e.X, wantAddr, escaping, sel)
-		w.int(sel.Index()[len(sel.Index())-1]) // field index
+		w.int(sel.Explicit()) // field index
 
 	case *IndexExpr:
 		t := w.typeOf(e.X).Underlying()
@@ -943,7 +974,7 @@ func (w *writer) expr0(e Expr) {
 	}
 }
 
-func (r *reader) expr0() Value {
+func (r *reader) expr0() (res Value) {
 	b := r.b
 	e := r.exprTODO()
 	tv := b.info.Types[e]
@@ -1017,10 +1048,15 @@ func (r *reader) expr0() Value {
 			}
 		}
 		// Regular function call.
-		var v Call
-		b.setCall(e, &v.Call)
-		v.setType(tv.Type)
-		return b.emit(&v)
+		b.split(func(w *writer) {
+			w.setCall(e)
+		}, func(r *reader) {
+			var v Call
+			r.setCall(&v.Call)
+			v.setType(tv.Type)
+			res = b.emit(&v)
+		})
+		return
 
 	case *Operation:
 		pos := r.pos()
@@ -1160,11 +1196,9 @@ func (r *reader) expr0() Value {
 			return b.emit(c)
 
 		case FieldVal:
-			indices := sel.Index()
-			last := len(indices) - 1
 			v := b.expr(e.X)
-			v = b.emitImplicitSelections(v, indices[:last])
-			v = b.emitFieldSelection(v, indices[last], false, e.Sel)
+			v = b.emitImplicitSelections(v, sel.Implicits())
+			v = b.emitFieldSelection(v, sel.Explicit(), false, e.Sel)
 			return v
 		}
 
@@ -1251,7 +1285,7 @@ func (w *writer) receiver(e Expr, wantAddr, escaping bool, sel *Selection) {
 	typ := w.typeOf(e)
 	w.bool(wantAddr)
 
-	indices := sel.Index()[:len(sel.Index())-1]
+	indices := sel.Implicits()
 	w.int(len(indices))
 	for _, index := range indices {
 		w.int(index)
@@ -1458,13 +1492,6 @@ func (r *reader) setCallArgs(args []Value) []Value {
 // setCall emits to fn code to evaluate all the parameters of a function
 // call e, and populates *c with those values.
 //
-func (b *builder) setCall(e *CallExpr, c *CallCommon) {
-	b.split(func(w *writer) {
-		w.setCall(e)
-	}, func(r *reader) {
-		r.setCall(c)
-	})
-}
 
 func (w *writer) setCall(e *CallExpr) {
 	w.pos(tokenPos(e, _Lparen))
@@ -2588,28 +2615,36 @@ start:
 		}
 
 	case *CallStmt:
-		switch s.Tok {
-		case Go:
-			// The "intrinsics" new/make/len/cap are forbidden here.
-			// panic is treated like an ordinary function call.
-			v := SSAGo{pos: tokenPos(s, _Go)}
-			b.setCall(s.Call, &v.Call)
-			b.emit(&v)
+		b.split(func(w *writer) {
+			w.tok(s.Tok)
+			w.pos(tokenPos(s, _Go /* or _Defer */))
+			w.setCall(s.Call)
+		}, func(r *reader) {
+			tok, pos := r.tok(), r.pos()
 
-		case Defer:
-			// The "intrinsics" new/make/len/cap are forbidden here.
-			// panic is treated like an ordinary function call.
-			v := SSADefer{pos: tokenPos(s, _Defer)}
-			b.setCall(s.Call, &v.Call)
-			b.emit(&v)
+			switch tok {
+			case Go:
+				// The "intrinsics" new/make/len/cap are forbidden here.
+				// panic is treated like an ordinary function call.
+				v := SSAGo{pos: pos}
+				r.setCall(&v.Call)
+				b.emit(&v)
 
-			// A deferred call can cause recovery from panic,
-			// and control resumes at the Recover block.
-			createRecoverBlock(b)
+			case Defer:
+				// The "intrinsics" new/make/len/cap are forbidden here.
+				// panic is treated like an ordinary function call.
+				v := SSADefer{pos: pos}
+				r.setCall(&v.Call)
+				b.emit(&v)
 
-		default:
-			panic("unexpected s.Tok")
-		}
+				// A deferred call can cause recovery from panic,
+				// and control resumes at the Recover block.
+				createRecoverBlock(b)
+
+			default:
+				panic("unexpected s.Tok")
+			}
+		})
 
 	case *ReturnStmt:
 		var results []Value

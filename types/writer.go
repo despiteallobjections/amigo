@@ -32,6 +32,7 @@ func (w *writer) int64(x int64)    { w.buf.WriteAny(x) }
 func (w *writer) string(s string)  { w.buf.WriteAny(s) }
 
 func (w *writer) op(op Operator)         { w.buf.WriteAny(op) }
+func (w *writer) tok(tok Token)          { w.buf.WriteAny(tok) }
 func (w *writer) pos(pos Pos)            { w.buf.WriteAny(pos) }
 func (w *writer) val(val constant.Value) { w.buf.WriteAny(val) }
 func (w *writer) typ(typ Type)           { w.buf.WriteAny(typ) }
