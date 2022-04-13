@@ -400,6 +400,7 @@ func (w *writer) addr(e Expr, escaping bool) {
 	case *CompositeLit:
 		w.typ(ssaDeref(w.typeOf(e)))
 		w.pos(tokenPos(e, _Lbrace))
+		w.compLit(e, true)
 
 	case *SelectorExpr:
 		sel, ok := w.info.Selections[e]
@@ -467,7 +468,7 @@ func (r *reader) addr() lvalue {
 		}
 		v.Comment = "complit"
 		var sb storebuf
-		b.compLit(v, e, true, &sb)
+		r.compLit(v, &sb)
 		sb.emit(b)
 		return &address{addr: v, pos: pos, expr: e}
 
@@ -664,40 +665,45 @@ func (b *builder) expr(e Expr) (res Value) {
 }
 
 func (w *writer) expr(e Expr) {
-	w.exprTODO(Unparen(e))
-}
+	e = Unparen(e)
 
-func (r *reader) expr() Value {
-	b := r.b
-	e := r.exprTODO()
-
-	tv := b.info.Types[e]
+	tv := w.info.Types[e]
 
 	// Is expression a constant?
-	if tv.Value != nil {
-		return NewSSAConst(tv.Value, tv.Type)
+	if w.bool(tv.Value != nil) {
+		w.typ(tv.Type)
+		w.val(tv.Value)
+		return
 	}
 
-	var v Value
-	if tv.Addressable() {
+	if w.bool(tv.Addressable()) {
 		// Prefer pointer arithmetic ({Index,Field}Addr) followed
 		// by Load over subelement extraction (e.g. Index, Field),
 		// to avoid large copies.
-		v = b.addr(e, false).load(b)
+		w.addr(e, false)
 	} else {
-		v = b.expr0(e)
+		w.expr0(e)
 	}
-	b.emitDebugRef(e, v, false)
-	return v
+	w.emitDebugRef(e, false)
 }
 
-func (b *builder) expr0(e Expr) (res Value) {
-	b.split(func(w *writer) {
-		w.expr0(e)
-	}, func(r *reader) {
-		res = r.expr0()
-	})
-	return
+func (r *reader) expr() Value {
+	if r.bool() { // constant
+		typ, val := r.typ(), r.val()
+		return NewSSAConst(val, typ)
+	}
+
+	var v Value
+	if r.bool() { // addressable
+		// Prefer pointer arithmetic ({Index,Field}Addr) followed
+		// by Load over subelement extraction (e.g. Index, Field),
+		// to avoid large copies.
+		v = r.addr().load(r.b)
+	} else {
+		v = r.expr0()
+	}
+	r.emitDebugRef(v)
+	return v
 }
 
 func (w *writer) expr0(e Expr) {
@@ -1622,13 +1628,6 @@ func (w *writer) arrayLen(elts []Expr) int64 {
 // literal has type *T behaves like &T{}.
 // In that case, addr must hold a T, not a *T.
 //
-func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf) {
-	b.split(func(w *writer) {
-		w.compLit(e, isZero)
-	}, func(r *reader) {
-		r.compLit(addr, sb)
-	})
-}
 
 func (w *writer) compLit(e *CompositeLit, isZero bool) {
 	w.exprTODO(e)
