@@ -134,6 +134,14 @@ pass that operates exclusively on the final SSA form, to identify
 cases where the combined partial summaries are giving incorrect or
 suboptimal results.
 
+In fact, there are most certainly cases where SSA optimizations could
+narrow down escape analysis results (e.g., identifying unreachable
+code paths, and thus unreachable data flows). So the partial analysis
+results may only be useful for cross-function optimization decisions
+like inlining and stenciling, and then we want a fully precise
+analysis based on the final, optimized SSA representation (or as late
+as we're allowed to push escape analysis).
+
 ## Further opportunities
 
 ### Non-exported interface methods
