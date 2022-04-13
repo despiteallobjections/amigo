@@ -795,7 +795,7 @@ type SSAField struct {
 type IndexAddr struct {
 	register
 	X     Value // slice or *array,
-	Index Value // numeric index
+	Index Value // integer index
 }
 
 // The Index instruction yields element Index of array X.
@@ -829,7 +829,7 @@ type Index struct {
 type Lookup struct {
 	register
 	X       Value // string or map
-	Index   Value // numeric or key-typed index
+	Index   Value // integer or key-typed index
 	CommaOk bool  // return a value,ok pair
 }
 
@@ -922,8 +922,7 @@ type Range struct {
 //
 type Next struct {
 	register
-	Iter     Value
-	IsString bool // true => string iterator; false => map iterator.
+	Iter Value
 }
 
 // The TypeAssert instruction tests whether interface value X has type

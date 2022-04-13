@@ -2399,11 +2399,8 @@ func (b *builder) rangeIter(x Value, tk, tv Type, pos Pos) (k, v Value, loop, do
 	b.emitJump(loop)
 	b.currentBlock = loop
 
-	_, isString := x.Type().Underlying().(*Basic)
-
 	okv := &Next{
-		Iter:     it,
-		IsString: isString,
+		Iter: it,
 	}
 	okv.setType(NewTuple(
 		varOk,
