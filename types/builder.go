@@ -560,71 +560,72 @@ func (sb *storebuf) emit(b *builder) {
 // literal that may reference parts of the LHS.
 //
 func (b *builder) assign(loc lvalue, e Expr, isZero bool, sb *storebuf) {
+	_, addressLoc := loc.(*address)
+	var locType Type = Typ[Invalid]
+	if _, ok := loc.(blank); !ok {
+		locType = loc.typ()
+	}
+
 	b.split(func(w *writer) {
-		w.assign(e, isZero)
+		w.assign(e, addressLoc, locType, isZero)
 	}, func(r *reader) {
 		r.assign(loc, sb)
 	})
 }
 
-func (w *writer) assign(e Expr, isZero bool) {
-	w.exprTODO(e)
-	w.bool(isZero)
+func (w *writer) assign(e Expr, addressLoc bool, locType Type, isZero bool) {
+	e = Unparen(e)
+
+	// Can we initialize it in place?
+	//
+	// isInterface(locType):
+	// e.g. var x interface{} = T{...}
+	// Can't in-place initialize an interface value.
+	// Fall back to copying.
+	if e, ok := e.(*CompositeLit); w.bool(ok && addressLoc && !isInterface(locType)) {
+		// x = T{...} or x := T{...}
+		w.compLit(e, isZero)
+
+		// Subtle: emit debug ref for aggregate types only;
+		// slice and map are handled by store ops in compLit.
+		switch locType.Underlying().(type) {
+		case *Struct, *Array:
+			w.emitDebugRef(e, true)
+		}
+
+		return
+	}
+
+	// simple case: just copy
+	w.expr(e)
 }
 
 func (r *reader) assign(loc lvalue, sb *storebuf) {
 	b := r.b
-	e := r.exprTODO()
-	isZero := r.bool()
 
-	// Can we initialize it in place?
-	if e, ok := Unparen(e).(*CompositeLit); ok {
-		// A CompositeLit never evaluates to a pointer,
-		// so if the type of the location is a pointer,
-		// an &-operation is implied.
-		if _, ok := loc.(blank); !ok { // avoid calling blank.typ()
-			if isPointer(loc.typ()) {
-				ptr := b.addr(e, true).address(b)
-				// copy address
-				if sb != nil {
-					sb.store(loc, ptr)
-				} else {
-					loc.store(b, ptr)
-				}
-				return
-			}
+	if r.bool() {
+		// x = T{...} or x := T{...}
+		addr := loc.address(b)
+		if sb != nil {
+			r.compLit(addr, sb)
+		} else {
+			var sb storebuf
+			r.compLit(addr, &sb)
+			sb.emit(b)
 		}
 
-		if _, ok := loc.(*address); ok {
-			if isInterface(loc.typ()) {
-				// e.g. var x interface{} = T{...}
-				// Can't in-place initialize an interface value.
-				// Fall back to copying.
-			} else {
-				// x = T{...} or x := T{...}
-				addr := loc.address(b)
-				if sb != nil {
-					b.compLit(addr, e, isZero, sb)
-				} else {
-					var sb storebuf
-					b.compLit(addr, e, isZero, &sb)
-					sb.emit(b)
-				}
-
-				// Subtle: emit debug ref for aggregate types only;
-				// slice and map are handled by store ops in compLit.
-				switch loc.typ().Underlying().(type) {
-				case *Struct, *Array:
-					b.emitDebugRef(e, addr, true)
-				}
-
-				return
-			}
+		// Subtle: emit debug ref for aggregate types only;
+		// slice and map are handled by store ops in compLit.
+		switch loc.typ().Underlying().(type) {
+		case *Struct, *Array:
+			r.emitDebugRef(addr)
 		}
+
+		return
 	}
 
 	// simple case: just copy
-	rhs := b.expr(e)
+	rhs := r.expr()
 	if sb != nil {
 		sb.store(loc, rhs)
 	} else {
@@ -1350,6 +1351,23 @@ func (b *builder) arrayLen(elts []Expr) int64 {
 // In that case, addr must hold a T, not a *T.
 //
 func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf) {
+	b.split(func(w *writer) {
+		w.compLit(e, isZero)
+	}, func(r *reader) {
+		r.compLit(addr, sb)
+	})
+}
+
+func (w *writer) compLit(e *CompositeLit, isZero bool) {
+	w.exprTODO(e)
+	w.bool(isZero)
+}
+
+func (r *reader) compLit(addr Value, sb *storebuf) {
+	b := r.b
+	e := r.exprTODO().(*CompositeLit)
+	isZero := r.bool()
+
 	typ := ssaDeref(b.typeOf(e))
 	switch t := typ.Underlying().(type) {
 	case *Struct:
@@ -1426,9 +1444,9 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 			b.emit(iaddr)
 			if t != at { // slice
 				// backing array is unaliased => storebuf not needed.
-				b.assign(&address{addr: iaddr, pos: pos, expr: e}, e, true, nil)
+				b.compLitElem(&address{addr: iaddr, pos: pos, expr: e}, e, true, nil)
 			} else {
-				b.assign(&address{addr: iaddr, pos: pos, expr: e}, e, true, sb)
+				b.compLitElem(&address{addr: iaddr, pos: pos, expr: e}, e, true, sb)
 			}
 		}
 
@@ -1476,13 +1494,28 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 			// map[int]*struct{}{0: {}} implies &struct{}{}.
 			// In-place update is of course impossible,
 			// and no storebuf is needed.
-			b.assign(&loc, e.Value, true, nil)
+			b.compLitElem(&loc, e.Value, true, nil)
 		}
 		sb.store(&address{addr: addr, pos: tokenPos(e, _Lbrace), expr: e}, m)
 
 	default:
 		panic("unexpected CompositeLit type: " + t.String())
 	}
+}
+
+func (b *builder) compLitElem(loc lvalue, e Expr, isZero bool, sb *storebuf) {
+	if e, ok := e.(*CompositeLit); ok && isPointer(loc.typ()) {
+		ptr := b.addr(e, true).address(b)
+		// copy address
+		if sb != nil {
+			sb.store(loc, ptr)
+		} else {
+			loc.store(b, ptr)
+		}
+		return
+	}
+
+	b.assign(loc, e, isZero, sb)
 }
 
 // switchStmt emits to fn code for the switch statement s, optionally
