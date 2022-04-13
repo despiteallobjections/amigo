@@ -576,6 +576,13 @@ func (b *builder) assign(loc lvalue, e Expr, isZero bool, sb *storebuf) {
 func (w *writer) assign(e Expr, addressLoc bool, locType Type, isZero bool) {
 	e = Unparen(e)
 
+	// TODO(mdempsky): Restore original structure and comments from
+	// builder.assign.
+	if e, ok := e.(*CompositeLit); w.bool(ok && isPointer(locType)) {
+		w.addr(e, true)
+		return
+	}
+
 	// Can we initialize it in place?
 	//
 	// isInterface(locType):
@@ -602,6 +609,17 @@ func (w *writer) assign(e Expr, addressLoc bool, locType Type, isZero bool) {
 
 func (r *reader) assign(loc lvalue, sb *storebuf) {
 	b := r.b
+
+	if r.bool() {
+		ptr := r.addr().address(b)
+		// copy address
+		if sb != nil {
+			sb.store(loc, ptr)
+		} else {
+			loc.store(b, ptr)
+		}
+		return
+	}
 
 	if r.bool() {
 		// x = T{...} or x := T{...}
@@ -1406,6 +1424,8 @@ func (w *writer) compLit(e *CompositeLit, isZero bool) {
 		}
 
 	case *Array, *Slice:
+		et := t.(interface{ Elem() Type }).Elem()
+
 		var idx int64 = -1
 		for _, e := range e.ElemList {
 			pos2 := e.Pos()
@@ -1428,7 +1448,10 @@ func (w *writer) compLit(e *CompositeLit, isZero bool) {
 			// x/tools/go/ssa golden testing.
 			w.typ(idxType)
 
+			// TODO(mdempsky): Explain why we use "true" instead of "isZero"
+			// here.
 			w.exprTODO(e)
+			w.assign(e, true, et, true)
 		}
 
 	case *Map:
@@ -1451,7 +1474,7 @@ func (w *writer) compLit(e *CompositeLit, isZero bool) {
 			}
 
 			w.pos(tokenPos(e, _Colon))
-			w.exprTODO(e.Value)
+			w.assign(e.Value, false, t.Elem(), true)
 		}
 	}
 }
@@ -1521,9 +1544,9 @@ func (r *reader) compLit(addr Value, sb *storebuf) {
 			b.emit(iaddr)
 			if t != at { // slice
 				// backing array is unaliased => storebuf not needed.
-				b.compLitElem(&address{addr: iaddr, pos: pos2, expr: e}, e, true, nil)
+				r.assign(&address{addr: iaddr, pos: pos2, expr: e}, nil)
 			} else {
-				b.compLitElem(&address{addr: iaddr, pos: pos2, expr: e}, e, true, sb)
+				r.assign(&address{addr: iaddr, pos: pos2, expr: e}, sb)
 			}
 		}
 
@@ -1563,29 +1586,13 @@ func (r *reader) compLit(addr Value, sb *storebuf) {
 			// map[int]*struct{}{0: {}} implies &struct{}{}.
 			// In-place update is of course impossible,
 			// and no storebuf is needed.
-			value := r.exprTODO()
-			b.compLitElem(&loc, value, true, nil)
+			r.assign(&loc, nil)
 		}
 		sb.store(&address{addr: addr, pos: lbrace, expr: e}, m)
 
 	default:
 		panic("unexpected CompositeLit type: " + t.String())
 	}
-}
-
-func (b *builder) compLitElem(loc lvalue, e Expr, isZero bool, sb *storebuf) {
-	if e, ok := e.(*CompositeLit); ok && isPointer(loc.typ()) {
-		ptr := b.addr(e, true).address(b)
-		// copy address
-		if sb != nil {
-			sb.store(loc, ptr)
-		} else {
-			loc.store(b, ptr)
-		}
-		return
-	}
-
-	b.assign(loc, e, isZero, sb)
 }
 
 // switchStmt emits to fn code for the switch statement s, optionally
