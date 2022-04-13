@@ -373,6 +373,24 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 // - references to variables in lexically enclosing functions.
 //
 func (b *builder) addr(e Expr, escaping bool) (res lvalue) {
+	b.split(func(w *writer) {
+		w.addr(e, escaping)
+	}, func(r *reader) {
+		res = r.addr()
+	})
+	return
+}
+
+func (w *writer) addr(e Expr, escaping bool) {
+	w.exprTODO(e)
+	w.bool(escaping)
+}
+
+func (r *reader) addr() (res lvalue) {
+	b := r.b
+	e := r.exprTODO()
+	escaping := r.bool()
+
 	switch e := e.(type) {
 	case *Name:
 		if isBlankIdent(e) {
@@ -389,11 +407,11 @@ func (b *builder) addr(e Expr, escaping bool) (res lvalue) {
 		b.split(func(w *writer) {
 			w.typ(ssaDeref(w.typeOf(e)))
 			w.pos(tokenPos(e, _Lbrace))
-			w.expr(e)
+			w.exprTODO(e)
 		}, func(r *reader) {
 			t := r.typ()
 			pos := r.pos()
-			e := r.expr().(*CompositeLit)
+			e := r.exprTODO().(*CompositeLit)
 
 			var v *Alloc
 			if escaping {
@@ -502,6 +520,23 @@ func (sb *storebuf) emit(b *builder) {
 // literal that may reference parts of the LHS.
 //
 func (b *builder) assign(loc lvalue, e Expr, isZero bool, sb *storebuf) {
+	b.split(func(w *writer) {
+		w.assign(e, isZero)
+	}, func(r *reader) {
+		r.assign(loc, sb)
+	})
+}
+
+func (w *writer) assign(e Expr, isZero bool) {
+	w.exprTODO(e)
+	w.bool(isZero)
+}
+
+func (r *reader) assign(loc lvalue, sb *storebuf) {
+	b := r.b
+	e := r.exprTODO()
+	isZero := r.bool()
+
 	// Can we initialize it in place?
 	if e, ok := Unparen(e).(*CompositeLit); ok {
 		// A CompositeLit never evaluates to a pointer,
@@ -560,8 +595,22 @@ func (b *builder) assign(loc lvalue, e Expr, isZero bool, sb *storebuf) {
 // expr lowers a single-result expression e to SSA form, emitting code
 // to fn and returning the Value defined by the expression.
 //
-func (b *builder) expr(e Expr) Value {
-	e = Unparen(e)
+func (b *builder) expr(e Expr) (res Value) {
+	b.split(func(w *writer) {
+		w.expr(e)
+	}, func(r *reader) {
+		res = r.expr()
+	})
+	return
+}
+
+func (w *writer) expr(e Expr) {
+	w.exprTODO(Unparen(e))
+}
+
+func (r *reader) expr() Value {
+	b := r.b
+	e := r.exprTODO()
 
 	tv := b.info.Types[e]
 
@@ -577,13 +626,30 @@ func (b *builder) expr(e Expr) Value {
 		// to avoid large copies.
 		v = b.addr(e, false).load(b)
 	} else {
-		v = b.expr0(e, tv)
+		v = b.expr0(e)
 	}
 	b.emitDebugRef(e, v, false)
 	return v
 }
 
-func (b *builder) expr0(e Expr, tv TypeAndValue) Value {
+func (b *builder) expr0(e Expr) (res Value) {
+	b.split(func(w *writer) {
+		w.expr0(e)
+	}, func(r *reader) {
+		res = r.expr0()
+	})
+	return
+}
+
+func (w *writer) expr0(e Expr) {
+	w.exprTODO(e)
+}
+
+func (r *reader) expr0() Value {
+	b := r.b
+	e := r.exprTODO()
+	tv := b.info.Types[e]
+
 	switch e := e.(type) {
 	case *BasicLit:
 		panic("non-constant BasicLit") // unreachable

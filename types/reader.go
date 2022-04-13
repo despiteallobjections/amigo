@@ -27,7 +27,7 @@ func (r *reader) pos() Pos            { return r.buf.ReadAny().(Pos) }
 func (r *reader) val() constant.Value { return r.buf.ReadAny().(constant.Value) }
 func (r *reader) typ() Type           { return r.buf.ReadAny().(Type) }
 func (r *reader) obj() Object         { return r.buf.ReadAny().(Object) }
-func (r *reader) expr() Expr          { return r.buf.ReadAny().(Expr) }
+func (r *reader) exprTODO() Expr      { return r.buf.ReadAny().(Expr) }
 
 func (r *reader) addLocal() *Alloc {
 	r.sync()
@@ -73,7 +73,7 @@ func (r *reader) emitDebugRef(v Value) {
 		return // blank, const, or predeclared
 	}
 
-	e := r.expr()
+	e := r.exprTODO()
 	isAddr := r.bool()
 	var obj Object
 	if r.bool() {

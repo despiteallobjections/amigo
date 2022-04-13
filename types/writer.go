@@ -36,7 +36,7 @@ func (w *writer) pos(pos Pos)            { w.buf.WriteAny(pos) }
 func (w *writer) val(val constant.Value) { w.buf.WriteAny(val) }
 func (w *writer) typ(typ Type)           { w.buf.WriteAny(typ) }
 func (w *writer) obj(obj Object)         { w.buf.WriteAny(obj) }
-func (w *writer) expr(expr Expr)         { w.buf.WriteAny(expr) }
+func (w *writer) exprTODO(expr Expr)     { w.buf.WriteAny(expr) }
 
 func (w *writer) addLocal(typ Type, pos Pos) {
 	w.sync()
@@ -79,7 +79,7 @@ func (w *writer) emitDebugRef(e Expr, isAddr bool) {
 	}
 
 	w.bool(true)
-	w.expr(e)
+	w.exprTODO(e)
 	w.bool(isAddr)
 	if w.bool(obj != nil) {
 		w.obj(obj)
