@@ -302,15 +302,68 @@ func (b *builder) exprN(e Expr) (res Value) {
 // the caller should treat this like an ordinary library function
 // call.
 //
-func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
+
+func (w *writer) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) bool {
+	w.obj(obj)
+	w.pos(pos)
+	w.typ(typ)
+
 	switch obj.Name() {
 	case "make":
 		switch typ.Underlying().(type) {
 		case *Slice:
-			n := b.expr(args[1])
+			w.expr(args[1])
+			if w.bool(len(args) == 3) {
+				w.expr(args[2])
+			}
+			return true
+
+		case *Chan, *Map:
+			if w.bool(len(args) == 2) {
+				w.expr(args[1])
+			}
+			return true
+		}
+
+	case "new":
+		return true
+
+	case "len", "cap":
+		// Special case: len or cap of an array or *array is
+		// based on the type, not the value which may be nil.
+		// We must still evaluate the value, though.  (If it
+		// was side-effect free, the whole call would have
+		// been constant-folded.)
+		t := ssaDeref(w.typeOf(args[0])).Underlying()
+		if at, ok := t.(*Array); w.bool(ok) {
+			w.expr(args[0]) // for effects only
+			w.int64(at.Len())
+			return true
+		}
+		// Otherwise treat as normal.
+
+	case "panic":
+		w.expr(args[0])
+		return true
+	}
+
+	return false
+}
+
+func (r *reader) builtin() Value {
+	b := r.b
+	obj := r.obj()
+	pos := r.pos()
+	typ := r.typ()
+
+	switch obj.Name() {
+	case "make":
+		switch typ.Underlying().(type) {
+		case *Slice:
+			n := r.expr()
 			m := n
-			if len(args) == 3 {
-				m = b.expr(args[2])
+			if r.bool() {
+				m = r.expr()
 			}
 			if m, ok := m.(*SSAConst); ok {
 				// treat make([]T, n, m) as new([m]T)[:n]
@@ -336,8 +389,8 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 
 		case *Map:
 			var res Value
-			if len(args) == 2 {
-				res = b.expr(args[1])
+			if r.bool() {
+				res = r.expr()
 			}
 			v := &MakeMap{Reserve: res}
 			v.setPos(pos)
@@ -346,8 +399,8 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 
 		case *Chan:
 			var sz Value = vZero
-			if len(args) == 2 {
-				sz = b.expr(args[1])
+			if r.bool() {
+				sz = r.expr()
 			}
 			v := &MakeChan{Size: sz}
 			v.setPos(pos)
@@ -361,27 +414,23 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 		return alloc
 
 	case "len", "cap":
-		// Special case: len or cap of an array or *array is
-		// based on the type, not the value which may be nil.
-		// We must still evaluate the value, though.  (If it
-		// was side-effect free, the whole call would have
-		// been constant-folded.)
-		t := ssaDeref(b.typeOf(args[0])).Underlying()
-		if at, ok := t.(*Array); ok {
-			b.expr(args[0]) // for effects only
-			return intConst(at.Len())
+		if r.bool() {
+			r.expr() // for effects only
+			return intConst(r.int64())
 		}
-		// Otherwise treat as normal.
 
 	case "panic":
+		x := r.expr()
 		b.emit(&Panic{
-			X:   b.emitConv(b.expr(args[0]), tEface),
+			X:   b.emitConv(x, tEface),
 			pos: pos,
 		})
 		b.currentBlock = b.newBasicBlock("unreachable")
 		return vTrue // any non-nil Value will do
 	}
-	return nil // treat all others as a regular function call
+
+	// treat all others as a regular function call
+	return nil
 }
 
 // addr lowers a single-result addressable expression e to SSA form,
@@ -762,19 +811,16 @@ func (w *writer) expr0(e Expr) {
 			w.expr(e.ArgList[0])
 			return
 		}
-		// // Call to "intrinsic" built-ins, e.g. new, make, panic.
-		// if id, ok := Unparen(e.Fun).(*Name); ok {
-		// 	if obj, ok := b.info.Uses[id].(*Builtin); ok {
-		// 		if v := b.builtin(obj, e.ArgList, tv.Type, tokenPos(e, _Lparen)); v != nil {
-		// 			return v
-		// 		}
-		// 	}
-		// }
-		// // Regular function call.
-		// var v Call
-		// b.setCall(e, &v.Call)
-		// v.setType(tv.Type)
-		// return b.emit(&v)
+		// Call to "intrinsic" built-ins, e.g. new, make, panic.
+		if id, ok := Unparen(e.Fun).(*Name); w.bool(ok) {
+			if obj, ok := w.info.Uses[id].(*Builtin); w.bool(ok) {
+				if w.builtin(obj, e.ArgList, tv.Type, tokenPos(e, _Lparen)) {
+					return
+				}
+			}
+		}
+		// Regular function call.
+		w.setCall(e)
 
 	case *Operation:
 		w.pos(tokenPos(e, _OpPos))
@@ -1039,24 +1085,19 @@ func (r *reader) expr0() (res Value) {
 			}
 			return y
 		}
+
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
-		if id, ok := Unparen(e.Fun).(*Name); ok {
-			if obj, ok := b.info.Uses[id].(*Builtin); ok {
-				if v := b.builtin(obj, e.ArgList, tv.Type, tokenPos(e, _Lparen)); v != nil {
-					return v
-				}
+		if r.bool() && r.bool() {
+			if v := r.builtin(); v != nil {
+				return v
 			}
 		}
+
 		// Regular function call.
-		b.split(func(w *writer) {
-			w.setCall(e)
-		}, func(r *reader) {
-			var v Call
-			r.setCall(&v.Call)
-			v.setType(tv.Type)
-			res = b.emit(&v)
-		})
-		return
+		var v Call
+		r.setCall(&v.Call)
+		v.setType(tv.Type)
+		return b.emit(&v)
 
 	case *Operation:
 		pos := r.pos()
