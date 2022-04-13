@@ -105,3 +105,11 @@ func (w *writer) typeOf(e Expr) Type {
 	panic(fmt.Sprintf("no type for %T @ %s",
 		e, e.Pos()))
 }
+
+func (w *writer) int64Of(e Expr) int64 {
+	tv, ok := w.info.Types[e]
+	assert(ok)
+	x, ok := constant.Int64Val(tv.Value)
+	assert(ok)
+	return x
+}

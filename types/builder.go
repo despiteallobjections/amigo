@@ -81,11 +81,11 @@ type builder struct {
 }
 
 func (b *builder) unexpected(what string, p poser) error {
-	return fmt.Errorf("%s: unexpected %s: %v", p.Pos(), what, p)
+	return fmt.Errorf("%s: unexpected %s: %v (%T)", p.Pos(), what, p, p)
 }
 
 func (w *writer) unexpected(what string, p poser) error {
-	return fmt.Errorf("%s: unexpected %s: %v", p.Pos(), what, p)
+	return fmt.Errorf("%s: unexpected %s: %v (%T)", p.Pos(), what, p, p)
 }
 
 // golden reports whether we should emit instructions identical to
@@ -1331,6 +1331,21 @@ func (b *builder) arrayLen(elts []Expr) int64 {
 	return max + 1
 }
 
+func (w *writer) arrayLen(elts []Expr) int64 {
+	var i, max int64 = -1, -1
+	for _, e := range elts {
+		if kv, ok := e.(*KeyValueExpr); ok {
+			i = w.int64Of(kv.Key)
+		} else {
+			i++
+		}
+		if i > max {
+			max = i
+		}
+	}
+	return max + 1
+}
+
 // compLit emits to fn code to initialize a composite literal e at
 // address addr with type typ.
 //
@@ -1361,22 +1376,13 @@ func (b *builder) compLit(addr Value, e *CompositeLit, isZero bool, sb *storebuf
 func (w *writer) compLit(e *CompositeLit, isZero bool) {
 	w.exprTODO(e)
 	w.bool(isZero)
-}
+	typ := ssaDeref(w.typeOf(e))
+	w.typ(typ)
+	w.pos(tokenPos(e, _Lbrace))
+	w.int(len(e.ElemList))
 
-func (r *reader) compLit(addr Value, sb *storebuf) {
-	b := r.b
-	e := r.exprTODO().(*CompositeLit)
-	isZero := r.bool()
-
-	typ := ssaDeref(b.typeOf(e))
 	switch t := typ.Underlying().(type) {
 	case *Struct:
-		if !isZero && len(e.ElemList) != t.NumFields() {
-			// memclear
-			sb.store(&address{addr, tokenPos(e, _Lbrace), nil},
-				zeroValue(b, ssaDeref(addr.Type())))
-			isZero = true
-		}
 		for i, e := range e.ElemList {
 			fieldIndex := i
 			pos := e.Pos()
@@ -1392,76 +1398,40 @@ func (r *reader) compLit(addr Value, sb *storebuf) {
 					}
 				}
 			}
-			sf := t.Field(fieldIndex)
-			faddr := &FieldAddr{
-				X:     addr,
-				Field: fieldIndex,
-			}
-			faddr.setType(NewPointer(sf.Type()))
-			b.emit(faddr)
-			b.assign(&address{addr: faddr, pos: pos, expr: e}, e, isZero, sb)
+
+			w.pos(pos)
+			w.int(fieldIndex)
+			w.exprTODO(e)
+			w.assign(e, true, t.Field(fieldIndex).Type(), isZero)
 		}
 
 	case *Array, *Slice:
-		var at *Array
-		var array Value
-		switch t := t.(type) {
-		case *Slice:
-			at = NewArray(t.Elem(), b.arrayLen(e.ElemList))
-			alloc := b.emitNew(at, tokenPos(e, _Lbrace))
-			alloc.Comment = "slicelit"
-			array = alloc
-		case *Array:
-			at = t
-			array = addr
-
-			if !isZero && int64(len(e.ElemList)) != at.Len() {
-				// memclear
-				sb.store(&address{array, tokenPos(e, _Lbrace), nil},
-					zeroValue(b, ssaDeref(array.Type())))
-			}
-		}
-
-		var idx *SSAConst
+		var idx int64 = -1
 		for _, e := range e.ElemList {
-			pos := e.Pos()
+			pos2 := e.Pos()
+			var idxType Type = tInt
 			if kv, ok := e.(*KeyValueExpr); ok {
-				idx = b.expr(kv.Key).(*SSAConst)
-				pos = tokenPos(kv, _Colon)
+				idx = w.int64Of(kv.Key)
+				idxType = w.typeOf(kv.Key)
+				pos2 = tokenPos(kv, _Colon)
 				e = kv.Value
 			} else {
-				var idxval int64
-				if idx != nil {
-					idxval = idx.Int64() + 1
-				}
-				idx = intConst(idxval)
+				idx++
 			}
-			iaddr := &IndexAddr{
-				X:     array,
-				Index: idx,
-			}
-			iaddr.setType(NewPointer(at.Elem()))
-			b.emit(iaddr)
-			if t != at { // slice
-				// backing array is unaliased => storebuf not needed.
-				b.compLitElem(&address{addr: iaddr, pos: pos, expr: e}, e, true, nil)
-			} else {
-				b.compLitElem(&address{addr: iaddr, pos: pos, expr: e}, e, true, sb)
-			}
-		}
 
-		if t != at { // slice
-			s := &SSASlice{X: array}
-			s.setPos(tokenPos(e, _Lbrace))
-			s.setType(typ)
-			sb.store(&address{addr: addr, pos: tokenPos(e, _Lbrace), expr: e}, b.emit(s))
+			w.pos(pos2)
+			w.int64(idx)
+
+			// TODO(mdempsky): This is always a in-range constant index, so
+			// the type here is completely useless. We should be able to
+			// just always use "int". However, currently it's necessary for
+			// x/tools/go/ssa golden testing.
+			w.typ(idxType)
+
+			w.exprTODO(e)
 		}
 
 	case *Map:
-		m := &MakeMap{Reserve: intConst(int64(len(e.ElemList)))}
-		m.setPos(tokenPos(e, _Lbrace))
-		m.setType(typ)
-		b.emit(m)
 		for _, e := range e.ElemList {
 			e := e.(*KeyValueExpr)
 
@@ -1471,21 +1441,120 @@ func (r *reader) compLit(addr Value, sb *storebuf) {
 			//	map[*struct{}]bool{{}: true}
 			// An &-operation may be implied:
 			//	map[*struct{}]bool{&struct{}{}: true}
-			var key Value
-			if _, ok := Unparen(e.Key).(*CompositeLit); ok && isPointer(t.Key()) {
+			if _, ok := Unparen(e.Key).(*CompositeLit); w.bool(ok && isPointer(t.Key())) {
 				// A CompositeLit never evaluates to a pointer,
 				// so if the type of the location is a pointer,
 				// an &-operation is implied.
-				key = b.addr(e.Key, true).address(b)
+				w.addr(e.Key, true)
 			} else {
-				key = b.expr(e.Key)
+				w.expr(e.Key)
 			}
+
+			w.pos(tokenPos(e, _Colon))
+			w.exprTODO(e.Value)
+		}
+	}
+}
+
+func (r *reader) compLit(addr Value, sb *storebuf) {
+	b := r.b
+	e := r.exprTODO().(*CompositeLit)
+	isZero := r.bool()
+	typ := r.typ()
+	lbrace := r.pos()
+	nElems := r.int()
+
+	switch t := typ.Underlying().(type) {
+	case *Struct:
+		if !isZero && nElems != t.NumFields() {
+			// memclear
+			sb.store(&address{addr, lbrace, nil},
+				zeroValue(b, ssaDeref(addr.Type())))
+			isZero = true
+		}
+		for i := 0; i < nElems; i++ {
+			pos := r.pos()
+			fieldIndex := r.int()
+			e := r.exprTODO()
+
+			sf := t.Field(fieldIndex)
+			faddr := &FieldAddr{
+				X:     addr,
+				Field: fieldIndex,
+			}
+			faddr.setType(NewPointer(sf.Type()))
+			b.emit(faddr)
+			r.assign(&address{addr: faddr, pos: pos, expr: e}, sb)
+		}
+
+	case *Array, *Slice:
+		var at *Array
+		var array Value
+		switch t := t.(type) {
+		case *Slice:
+			at = NewArray(t.Elem(), b.arrayLen(e.ElemList))
+			alloc := b.emitNew(at, lbrace)
+			alloc.Comment = "slicelit"
+			array = alloc
+		case *Array:
+			at = t
+			array = addr
+
+			if !isZero && int64(len(e.ElemList)) != at.Len() {
+				// memclear
+				sb.store(&address{array, lbrace, nil},
+					zeroValue(b, ssaDeref(array.Type())))
+			}
+		}
+
+		for i := 0; i < nElems; i++ {
+			pos2 := r.pos()
+			idx := r.int64()
+			idxType := r.typ()
+			e := r.exprTODO()
+
+			iaddr := &IndexAddr{
+				X:     array,
+				Index: NewSSAConst(constant.MakeInt64(idx), idxType),
+			}
+			iaddr.setType(NewPointer(at.Elem()))
+			b.emit(iaddr)
+			if t != at { // slice
+				// backing array is unaliased => storebuf not needed.
+				b.compLitElem(&address{addr: iaddr, pos: pos2, expr: e}, e, true, nil)
+			} else {
+				b.compLitElem(&address{addr: iaddr, pos: pos2, expr: e}, e, true, sb)
+			}
+		}
+
+		if t != at { // slice
+			s := &SSASlice{X: array}
+			s.setPos(lbrace)
+			s.setType(typ)
+			sb.store(&address{addr: addr, pos: lbrace, expr: e}, b.emit(s))
+		}
+
+	case *Map:
+		m := &MakeMap{Reserve: intConst(int64(nElems))}
+		m.setPos(lbrace)
+		m.setType(typ)
+		b.emit(m)
+
+		for i := 0; i < nElems; i++ {
+			var key Value
+			if r.bool() {
+				key = r.addr().address(b)
+			} else {
+				key = r.expr()
+			}
+
+			colon := r.pos()
 
 			loc := element{
 				m:   m,
 				k:   b.emitConv(key, t.Key()),
 				t:   t.Elem(),
-				pos: tokenPos(e, _Colon),
+				pos: colon,
 			}
 
 			// We call assign() only because it takes care
@@ -1494,9 +1563,10 @@ func (r *reader) compLit(addr Value, sb *storebuf) {
 			// map[int]*struct{}{0: {}} implies &struct{}{}.
 			// In-place update is of course impossible,
 			// and no storebuf is needed.
-			b.compLitElem(&loc, e.Value, true, nil)
+			value := r.exprTODO()
+			b.compLitElem(&loc, value, true, nil)
 		}
-		sb.store(&address{addr: addr, pos: tokenPos(e, _Lbrace), expr: e}, m)
+		sb.store(&address{addr: addr, pos: lbrace, expr: e}, m)
 
 	default:
 		panic("unexpected CompositeLit type: " + t.String())
