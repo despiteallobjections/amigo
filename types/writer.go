@@ -7,6 +7,7 @@ package types
 import (
 	"fmt"
 	"go/constant"
+	"reflect"
 
 	. "github.com/despiteallobjections/amigo/syntax"
 )
@@ -30,6 +31,8 @@ func (w *writer) bool(b bool) bool { w.buf.WriteAny(b); return b }
 func (w *writer) int(x int)        { w.buf.WriteAny(x) }
 func (w *writer) int64(x int64)    { w.buf.WriteAny(x) }
 func (w *writer) string(s string)  { w.buf.WriteAny(s) }
+
+func (w *writer) tag(x interface{}) { w.buf.WriteAny(reflect.TypeOf(x)) }
 
 func (w *writer) op(op Operator)         { w.buf.WriteAny(op) }
 func (w *writer) tok(tok Token)          { w.buf.WriteAny(tok) }

@@ -6,6 +6,7 @@ package types
 
 import (
 	"go/constant"
+	"reflect"
 
 	. "github.com/despiteallobjections/amigo/syntax"
 )
@@ -21,6 +22,8 @@ func (r *reader) bool() bool     { return r.buf.ReadAny().(bool) }
 func (r *reader) int() int       { return r.buf.ReadAny().(int) }
 func (r *reader) int64() int64   { return r.buf.ReadAny().(int64) }
 func (r *reader) string() string { return r.buf.ReadAny().(string) }
+
+func (r *reader) tag() interface{} { return reflect.Zero(r.buf.ReadAny().(reflect.Type)).Interface() }
 
 func (r *reader) op() Operator        { return r.buf.ReadAny().(Operator) }
 func (r *reader) tok() Token          { return r.buf.ReadAny().(Token) }

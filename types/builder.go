@@ -117,68 +117,112 @@ func (b *builder) String() string { return b.Fn.String() }
 // Postcondition: b.currentBlock is nil.
 //
 func (b *builder) cond(e Expr, t, f *BasicBlock) {
-	switch e := e.(type) {
-	case *ParenExpr:
-		b.cond(e.X, t, f)
-		return
+	b.split(func(w *writer) {
+		w.cond(e)
+	}, func(r *reader) {
+		r.cond(t, f)
+	})
+}
 
-	case *Operation:
-		if e.Y != nil { // BinaryExpr
-			switch e.Op {
-			case AndAnd:
-				ltrue := b.newBasicBlock("cond.true")
-				b.cond(e.X, ltrue, f)
-				b.currentBlock = ltrue
-				b.cond(e.Y, t, f)
-				return
+func (w *writer) cond(e Expr) {
+	e = Unparen(e)
 
-			case OrOr:
-				lfalse := b.newBasicBlock("cond.false")
-				b.cond(e.X, t, lfalse)
-				b.currentBlock = lfalse
-				b.cond(e.Y, t, f)
-				return
-			}
-		} else { // UnaryExpr
-			if e.Op == Not {
-				b.cond(e.X, f, t)
-				return
-			}
+	if e, ok := e.(*Operation); ok {
+		switch e.Op {
+		case Not:
+			w.op(e.Op)
+			w.cond(e.X)
+			return
+		case AndAnd, OrOr:
+			w.op(e.Op)
+			w.cond(e.X)
+			w.cond(e.Y)
+			return
 		}
 	}
 
-	// A traditional compiler would simplify "if false" (etc) here
-	// but we do not, for better fidelity to the source code.
-	//
-	// The value of a constant condition may be platform-specific,
-	// and may cause blocks that are reachable in some configuration
-	// to be hidden from subsequent analyses such as bug-finding tools.
-	b.emitIf(b.expr(e), t, f)
+	w.op(0)
+	w.expr(e)
+}
+
+func (r *reader) cond(t, f *BasicBlock) {
+	b := r.b
+
+	switch r.op() {
+	default:
+		panic("unexpected")
+	case Not:
+		r.cond(f, t)
+		return
+	case AndAnd:
+		ltrue := b.newBasicBlock("cond.true")
+		r.cond(ltrue, f)
+		b.currentBlock = ltrue
+		r.cond(t, f)
+		return
+	case OrOr:
+		lfalse := b.newBasicBlock("cond.false")
+		r.cond(t, lfalse)
+		b.currentBlock = lfalse
+		r.cond(t, f)
+		return
+	case 0:
+		// A traditional compiler would simplify "if false" (etc) here
+		// but we do not, for better fidelity to the source code.
+		//
+		// The value of a constant condition may be platform-specific,
+		// and may cause blocks that are reachable in some configuration
+		// to be hidden from subsequent analyses such as bug-finding tools.
+		b.emitIf(r.expr(), t, f)
+	}
 }
 
 // logicalBinop emits code to fn to evaluate e, a &&- or
 // ||-expression whose reified boolean value is wanted.
 // The value is returned.
 //
-func (b *builder) logicalBinop(e *Operation) Value {
-	rhs := b.newBasicBlock("binop.rhs")
-	done := b.newBasicBlock("binop.done")
 
+func (w *writer) logicalBinop(e *Operation) {
 	// T(e) = T(e.X) = T(e.Y) after untyped constants have been
 	// eliminated.
 	// TODO(adonovan): not true; MyBool==MyBool yields UntypedBool.
-	t := b.typeOf(e)
+	w.typ(w.typeOf(e))
+	w.bool(e.Op == AndAnd)
+	w.cond(e.X)
+	w.pos(tokenPos(e, _OpPos))
+	w.expr(e.Y)
+}
+
+func (r *reader) logicalBinop() Value {
+	b := r.b
+	rhs := b.newBasicBlock("binop.rhs")
+	done := b.newBasicBlock("binop.done")
+
+	t := r.typ()
+
+	op := OrOr
+	if r.bool() {
+		op = AndAnd
+	}
 
 	var short Value // value of the short-circuit path
-	switch e.Op {
+	switch op {
 	case AndAnd:
-		b.cond(e.X, rhs, done)
+		r.cond(rhs, done)
 		short = NewSSAConst(constant.MakeBool(false), t)
-
 	case OrOr:
-		b.cond(e.X, done, rhs)
+		r.cond(done, rhs)
 		short = NewSSAConst(constant.MakeBool(true), t)
 	}
+
+	pos := r.pos()
+
+	// NOTE(mdempsky): Caution: these "unreachable" optimizations
+	// aren't exercised by TestGolden's current set of packages
+	// (runtime, fmt, net/http).
+
+	b.currentBlock = rhs
+	y := r.expr()
 
 	// Is rhs unreachable?
 	if rhs.Preds == nil {
@@ -190,8 +234,7 @@ func (b *builder) logicalBinop(e *Operation) Value {
 	// Is done unreachable?
 	if done.Preds == nil {
 		// Simplify true&&y (or false||y) to y.
-		b.currentBlock = rhs
-		return b.expr(e.Y)
+		return y
 	}
 
 	// All edges from e.X to done carry the short-circuit value.
@@ -201,13 +244,12 @@ func (b *builder) logicalBinop(e *Operation) Value {
 	}
 
 	// The edge from e.Y to done carries the value of e.Y.
-	b.currentBlock = rhs
-	edges = append(edges, b.expr(e.Y))
+	edges = append(edges, y)
 	b.emitJump(done)
 	b.currentBlock = done
 
-	phi := &Phi{Edges: edges, Comment: e.Op.String()}
-	phi.pos = tokenPos(e, _OpPos)
+	phi := &Phi{Edges: edges, Comment: op.String()}
+	phi.pos = pos
 	phi.typ = t
 	return done.emit(phi)
 }
@@ -851,7 +893,8 @@ func (w *writer) expr0(e Expr) {
 		} else { // BinaryExpr
 			switch w.op(e.Op); e.Op {
 			case AndAnd, OrOr:
-				// 		return b.logicalBinop(e)
+				w.logicalBinop(e)
+
 			case Shl, Shr:
 				fallthrough
 			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
@@ -1131,7 +1174,8 @@ func (r *reader) expr0() (res Value) {
 		} else { // BinaryExpr
 			switch op := r.op(); op {
 			case AndAnd, OrOr:
-				return b.logicalBinop(e)
+				return r.logicalBinop()
+
 			case Shl, Shr:
 				fallthrough
 			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
