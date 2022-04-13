@@ -84,6 +84,10 @@ func (b *builder) unexpected(what string, p poser) error {
 	return fmt.Errorf("%s: unexpected %s: %v", p.Pos(), what, p)
 }
 
+func (w *writer) unexpected(what string, p poser) error {
+	return fmt.Errorf("%s: unexpected %s: %v", p.Pos(), what, p)
+}
+
 // golden reports whether we should emit instructions identical to
 // x/tools/go/ssa.
 //
@@ -382,21 +386,69 @@ func (b *builder) addr(e Expr, escaping bool) (res lvalue) {
 }
 
 func (w *writer) addr(e Expr, escaping bool) {
+	e = Unparen(e)
 	w.exprTODO(e)
 	w.bool(escaping)
+
+	switch e := e.(type) {
+	case *Name:
+		if w.bool(isBlankIdent(e)) {
+			return
+		}
+		w.obj(w.objectOf(e).(*Var))
+
+	case *CompositeLit:
+		w.typ(ssaDeref(w.typeOf(e)))
+		w.pos(tokenPos(e, _Lbrace))
+
+	case *SelectorExpr:
+		sel, ok := w.info.Selections[e]
+		if w.bool(!ok) {
+			// qualified identifier
+			w.addr(e.Sel, escaping)
+			return
+		}
+		if sel.Kind() != FieldVal {
+			panic(sel)
+		}
+		const wantAddr = true
+		w.receiver(e.X, wantAddr, escaping, sel)
+		w.int(sel.Index()[len(sel.Index())-1]) // field index
+
+	case *IndexExpr:
+		t := w.typeOf(e.X).Underlying()
+		w.typ(t)
+
+		if _, ok := t.(*Array); w.bool(ok) {
+			w.addr(e.X, escaping)
+		} else {
+			w.expr(e.X)
+		}
+		w.pos(tokenPos(e, _Lbrack))
+		w.expr(e.Index)
+
+	case *Operation:
+		assert(e.Op == Mul)
+		assert(e.Y == nil)
+		w.pos(tokenPos(e, _OpPos))
+		w.expr(e.X)
+
+	default:
+		panic(w.unexpected("address", e))
+	}
 }
 
-func (r *reader) addr() (res lvalue) {
+func (r *reader) addr() lvalue {
 	b := r.b
 	e := r.exprTODO()
 	escaping := r.bool()
 
 	switch e := e.(type) {
 	case *Name:
-		if isBlankIdent(e) {
+		if r.bool() {
 			return blank{}
 		}
-		obj := b.objectOf(e).(*Var)
+		obj := r.obj().(*Var)
 		v := b.Prog.packageLevelValue(obj) // var (address)
 		if v == nil {
 			v = b.lookup(obj, escaping)
@@ -404,85 +456,73 @@ func (r *reader) addr() (res lvalue) {
 		return &address{addr: v, pos: e.Pos(), expr: e}
 
 	case *CompositeLit:
-		b.split(func(w *writer) {
-			w.typ(ssaDeref(w.typeOf(e)))
-			w.pos(tokenPos(e, _Lbrace))
-			w.exprTODO(e)
-		}, func(r *reader) {
-			t := r.typ()
-			pos := r.pos()
-			e := r.exprTODO().(*CompositeLit)
+		t := r.typ()
+		pos := r.pos()
 
-			var v *Alloc
-			if escaping {
-				v = b.emitNew(t, pos)
-			} else {
-				v = b.addLocal(t, pos)
-			}
-			v.Comment = "complit"
-			var sb storebuf
-			b.compLit(v, e, true, &sb)
-			sb.emit(b)
-			res = &address{addr: v, pos: pos, expr: e}
-		})
-		return
-
-	case *ParenExpr:
-		return b.addr(e.X, escaping)
+		var v *Alloc
+		if escaping {
+			v = b.emitNew(t, pos)
+		} else {
+			v = b.addLocal(t, pos)
+		}
+		v.Comment = "complit"
+		var sb storebuf
+		b.compLit(v, e, true, &sb)
+		sb.emit(b)
+		return &address{addr: v, pos: pos, expr: e}
 
 	case *SelectorExpr:
-		sel, ok := b.info.Selections[e]
-		if !ok {
-			// qualified identifier
-			return b.addr(e.Sel, escaping)
+		if r.bool() { // qualified identifier
+			return r.addr()
 		}
-		if sel.Kind() != FieldVal {
-			panic(sel)
-		}
-		wantAddr := true
-		v := b.receiver(e.X, wantAddr, escaping, sel)
-		last := len(sel.Index()) - 1
+		v := r.receiver()
+		fieldIndex := r.int()
 		return &address{
-			addr: b.emitFieldSelection(v, sel.Index()[last], true, e.Sel),
+			addr: b.emitFieldSelection(v, fieldIndex, true, e.Sel),
 			pos:  e.Sel.Pos(),
 			expr: e.Sel,
 		}
 
 	case *IndexExpr:
+		t := r.typ()
+
 		var x Value
+		if r.bool() {
+			x = r.addr().address(b)
+		} else {
+			x = r.expr()
+		}
+		pos, index := r.pos(), r.expr()
+
 		var et Type
-		switch t := b.typeOf(e.X).Underlying().(type) {
+		switch t := t.(type) {
 		case *Array:
-			x = b.addr(e.X, escaping).address(b)
 			et = NewPointer(t.Elem())
 		case *Pointer:
-			x = b.expr(e.X)
 			et = NewPointer(t.Elem().Underlying().(*Array).Elem())
 		case *Slice:
-			x = b.expr(e.X)
 			et = NewPointer(t.Elem())
 		case *Map:
 			return &element{
-				m:   b.expr(e.X),
-				k:   b.emitConv(b.expr(e.Index), t.Key()),
+				m:   x,
+				k:   b.emitConv(index, t.Key()),
 				t:   t.Elem(),
-				pos: tokenPos(e, _Lbrack),
+				pos: pos,
 			}
 		default:
 			panic("unexpected container type in IndexExpr: " + t.String())
 		}
 		v := &IndexAddr{
 			X:     x,
-			Index: b.emitConv(b.expr(e.Index), tInt),
+			Index: b.emitConv(index, tInt),
 		}
-		v.setPos(tokenPos(e, _Lbrack))
+		v.setPos(pos)
 		v.setType(et)
-		return &address{addr: b.emit(v), pos: tokenPos(e, _Lbrack), expr: e}
+		return &address{addr: b.emit(v), pos: pos, expr: e}
 
 	case *Operation:
-		assert(e.Op == Mul)
-		assert(e.Y == nil)
-		return &address{addr: b.expr(e.X), pos: tokenPos(e, _OpPos), expr: e}
+		pos, x := r.pos(), r.expr()
+		return &address{addr: x, pos: pos, expr: e}
 	}
 
 	panic(b.unexpected("address", e))
@@ -943,6 +983,7 @@ func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) (res
 }
 
 func (w *writer) receiver(e Expr, wantAddr, escaping bool, sel *Selection) {
+	w.sync()
 	typ := w.typeOf(e)
 	w.bool(wantAddr)
 
@@ -961,6 +1002,7 @@ func (w *writer) receiver(e Expr, wantAddr, escaping bool, sel *Selection) {
 
 func (r *reader) receiver() Value {
 	b := r.b
+	r.sync()
 	wantAddr := r.bool()
 
 	indices := make([]int, r.int())
