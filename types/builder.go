@@ -702,6 +702,239 @@ func (b *builder) expr0(e Expr) (res Value) {
 
 func (w *writer) expr0(e Expr) {
 	w.exprTODO(e)
+
+	tv := w.info.Types[e]
+
+	switch e := e.(type) {
+	case *BasicLit:
+		panic("non-constant BasicLit") // unreachable
+
+	case *FuncLit:
+		obj := w.info.Implicits[e].(*Func)
+		w.obj(obj)
+
+	case *AssertExpr:
+		w.expr(e.X)
+		w.pos(tokenPos(e, _Lparen))
+		w.typ(tv.Type)
+
+	case *CallExpr:
+		if w.bool(w.info.Types[e.Fun].IsType()) {
+			w.typ(tv.Type)
+			w.pos(tokenPos(e, _Lparen))
+			w.expr(e.ArgList[0])
+			return
+		}
+		// // Call to "intrinsic" built-ins, e.g. new, make, panic.
+		// if id, ok := Unparen(e.Fun).(*Name); ok {
+		// 	if obj, ok := b.info.Uses[id].(*Builtin); ok {
+		// 		if v := b.builtin(obj, e.ArgList, tv.Type, tokenPos(e, _Lparen)); v != nil {
+		// 			return v
+		// 		}
+		// 	}
+		// }
+		// // Regular function call.
+		// var v Call
+		// b.setCall(e, &v.Call)
+		// v.setType(tv.Type)
+		// return b.emit(&v)
+
+	case *Operation:
+		w.pos(tokenPos(e, _OpPos))
+		if w.bool(e.Y == nil) { // UnaryExpr
+			switch w.op(e.Op); e.Op {
+			case And:
+				w.addr(e.X, true)
+
+				// &*p must panic if p is nil (http://golang.org/s/go12nil).
+				// For simplicity, we'll just (suboptimally) rely
+				// on the side effects of a load.
+				x, ok := Unparen(e.X).(*Operation)
+				w.bool(ok && x.Op == Mul)
+
+			case Add:
+				w.expr(e.X)
+
+			case Not, Recv, Sub, Xor:
+				w.expr(e.X)
+
+			case Mul:
+				// Addressable types (lvalues)
+				w.addr(e, false)
+
+			default:
+				panic(e.Op)
+			}
+		} else { // BinaryExpr
+			switch w.op(e.Op); e.Op {
+			case AndAnd, OrOr:
+				// 		return b.logicalBinop(e)
+			case Shl, Shr:
+				fallthrough
+			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
+				w.expr(e.X)
+				w.expr(e.Y)
+
+			case Eql, Neq, Gtr, Lss, Leq, Geq:
+				w.expr(e.X)
+				w.expr(e.Y)
+
+			default:
+				panic("illegal op in BinaryExpr: " + e.Op.String())
+			}
+		}
+
+	case *SliceExpr:
+		// var low, high, max Value
+		// var x Value
+		// switch b.typeOf(e.X).Underlying().(type) {
+		// case *Array:
+		// 	// Potentially escaping.
+		// 	x = b.addr(e.X, true).address(b)
+		// case *Basic, *Slice, *Pointer:
+		// 	x = b.expr(e.X)
+		// default:
+		// 	panic("unreachable")
+		// }
+		// // TODO(mdempsky): Why do we evaluate high before low?
+		// // See go.dev/issue/52142.
+		// if e.Index[1] != nil {
+		// 	high = b.expr(e.Index[1])
+		// }
+		// if e.Index[0] != nil {
+		// 	low = b.expr(e.Index[0])
+		// }
+		// if e.Index[2] != nil {
+		// 	max = b.expr(e.Index[2])
+		// }
+		// v := &SSASlice{
+		// 	X:    x,
+		// 	Low:  low,
+		// 	High: high,
+		// 	Max:  max,
+		// }
+		// v.setPos(tokenPos(e, _Lbrack))
+		// v.setType(tv.Type)
+		// return b.emit(v)
+
+	case *Name:
+		// switch obj := b.info.Uses[e].(type) {
+		// case *Builtin:
+		// 	return &SSABuiltin{name: obj.Name(), sig: tv.Type.(*Signature)}
+		// case *Func:
+		// 	return b.Prog.packageLevelValue(obj)
+		// case *Nil:
+		// 	return nilConst(tv.Type)
+		// case *Var:
+		// 	addr := b.Prog.packageLevelValue(obj)
+		// 	if addr == nil {
+		// 		b.lookup(obj, false)
+		// 	}
+		// 	return b.emitLoad(addr)
+		// }
+
+	case *SelectorExpr:
+		sel, ok := w.info.Selections[e]
+		if w.bool(!ok) {
+			// builtin unsafe.{Add,Slice}
+			if obj, ok := w.info.Uses[e.Sel].(*Builtin); w.bool(ok) {
+				w.string(obj.Name())
+				w.typ(tv.Type.(*Signature))
+				return
+			}
+			// qualified identifier
+			w.expr(e.Sel)
+			return
+		}
+
+		switch sel.Kind() {
+		case MethodExpr:
+			// 	// (*T).f or T.f, the method f from the method-set of type T.
+			// 	// The result is a "thunk".
+			// 	return b.emitConv(b.Prog.makeThunk(sel), tv.Type)
+
+		case MethodVal:
+			// 	// e.f where e is an expression and f is a method.
+			// 	// The result is a "bound".
+			// 	obj := sel.Obj().(*Func)
+			// 	rt := recvType(obj)
+			// 	wantAddr := isPointer(rt)
+			// 	escaping := true
+			// 	v := b.receiver(e.X, wantAddr, escaping, sel)
+			// 	if isInterface(rt) {
+			// 		// If v has interface type I,
+			// 		// we must emit a check that v is non-nil.
+			// 		// We use: typeassert v.(I).
+			// 		b.emitTypeAssert(v, rt, NoPos)
+			// 	}
+			// 	c := &MakeClosure{
+			// 		Fn:       b.Prog.makeBound(obj),
+			// 		Bindings: []Value{v},
+			// 	}
+			// 	c.setPos(e.Sel.Pos())
+			// 	c.setType(tv.Type)
+			// 	return b.emit(c)
+
+		case FieldVal:
+			// 	indices := sel.Index()
+			// 	last := len(indices) - 1
+			// 	v := b.expr(e.X)
+			// 	v = b.emitImplicitSelections(v, indices[:last])
+			// 	v = b.emitFieldSelection(v, indices[last], false, e.Sel)
+			// 	return v
+
+		default:
+			panic("unexpected expression-relative selector")
+		}
+
+	case *IndexExpr:
+	// switch t := b.typeOf(e.X).Underlying().(type) {
+	// case *Array:
+	// 	// Non-addressable array (in a register).
+	// 	v := &Index{
+	// 		X:     b.expr(e.X),
+	// 		Index: b.emitConv(b.expr(e.Index), tInt),
+	// 	}
+	// 	v.setPos(tokenPos(e, _Lbrack))
+	// 	v.setType(t.Elem())
+	// 	return b.emit(v)
+
+	//	case *Map:
+	// 	// Maps are not addressable.
+	// 	mapt := b.typeOf(e.X).Underlying().(*Map)
+	// 	v := &Lookup{
+	// 		X:     b.expr(e.X),
+	// 		Index: b.emitConv(b.expr(e.Index), mapt.Key()),
+	// 	}
+	// 	v.setPos(tokenPos(e, _Lbrack))
+	// 	v.setType(mapt.Elem())
+	// 	return b.emit(v)
+
+	// case *Basic:
+	// 	// Strings are not addressable.
+	// 	v := &Lookup{
+	// 		X:     b.expr(e.X),
+	// 		Index: b.expr(e.Index),
+	// 	}
+	// 	v.setPos(tokenPos(e, _Lbrack))
+	// 	v.setType(tByte)
+	// 	return b.emit(v)
+
+	// case *Slice, *Pointer:
+	// 	// Addressable slice/array; use IndexAddr and Load.
+	// 	return b.addr(e, false).load(b)
+
+	// default:
+	// 	panic("unexpected container type in IndexExpr: " + t.String())
+	// }
+
+	case *CompositeLit:
+		// Addressable types (lvalues)
+		w.addr(e, false)
+
+	default:
+		panic(w.unexpected("expr", e))
+	}
 }
 
 func (r *reader) expr0() Value {
@@ -714,7 +947,7 @@ func (r *reader) expr0() Value {
 		panic("non-constant BasicLit") // unreachable
 
 	case *FuncLit:
-		obj := b.info.Implicits[e].(*Func)
+		obj := r.obj().(*Func)
 		fn2 := &Function{
 			name:      fmt.Sprintf("%s$%d", b.Fn.Name(), 1+len(b.Fn.AnonFuncs)),
 			object:    obj,
@@ -736,15 +969,18 @@ func (r *reader) expr0() Value {
 		return b.emit(v)
 
 	case *AssertExpr:
-		return b.emitTypeAssert(b.expr(e.X), tv.Type, tokenPos(e, _Lparen))
+		x, pos, typ := r.expr(), r.pos(), r.typ()
+		return b.emitTypeAssert(x, typ, pos)
 
 	case *CallExpr:
-		if b.info.Types[e.Fun].IsType() {
+		if r.bool() {
 			// Explicit type conversion, e.g. string(x) or big.Int(x)
-			x := b.expr(e.ArgList[0])
-			y := b.emitConv(x, tv.Type)
+			typ := r.typ()
+			pos := r.pos()
+			x := r.expr()
+			y := b.emitConv(x, typ)
+
 			if y != x {
-				pos := tokenPos(e, _Lparen)
 				switch y := y.(type) {
 				default:
 					panic(fmt.Errorf("%s: unexpected conversion: %T", e.Pos(), y))
@@ -781,49 +1017,51 @@ func (r *reader) expr0() Value {
 		return b.emit(&v)
 
 	case *Operation:
-		if e.Y == nil { // UnaryExpr
-			switch e.Op {
+		pos := r.pos()
+		if r.bool() { // UnaryExpr
+			switch op := r.op(); op {
 			case And:
-				addr := b.addr(e.X, true)
-				if x, ok := Unparen(e.X).(*Operation); ok && x.Op == Mul {
-					// &*p must panic if p is nil (http://golang.org/s/go12nil).
-					// For simplicity, we'll just (suboptimally) rely
-					// on the side effects of a load.
+				addr := r.addr()
+				if r.bool() {
 					// TODO(adonovan): emit dedicated nilcheck.
 					addr.load(b)
 				}
 				return addr.address(b)
+
 			case Add:
-				return b.expr(e.X)
+				return r.expr()
+
 			case Not, Recv, Sub, Xor:
 				v := &UnOp{
-					Op: e.Op,
-					X:  b.expr(e.X),
+					Op: op,
+					X:  r.expr(),
 				}
-				v.setPos(tokenPos(e, _OpPos))
+				v.setPos(pos)
 				v.setType(tv.Type)
 				return b.emit(v)
 			case Mul:
 				// Addressable types (lvalues)
-				return b.addr(e, false).load(b)
+				return r.addr().load(b)
 			default:
-				panic(e.Op)
+				panic(op)
 			}
 		} else { // BinaryExpr
-			switch e.Op {
+			switch op := r.op(); op {
 			case AndAnd, OrOr:
 				return b.logicalBinop(e)
 			case Shl, Shr:
 				fallthrough
 			case Add, Sub, Mul, Div, Rem, And, Or, Xor, AndNot:
-				return b.emitArith(e.Op, b.expr(e.X), b.expr(e.Y), tv.Type, tokenPos(e, _OpPos))
+				x, y := r.expr(), r.expr()
+				return b.emitArith(op, x, y, tv.Type, pos)
 
 			case Eql, Neq, Gtr, Lss, Leq, Geq:
-				cmp := b.emitCompare(e.Op, b.expr(e.X), b.expr(e.Y), tokenPos(e, _OpPos))
+				x, y := r.expr(), r.expr()
+				cmp := b.emitCompare(op, x, y, pos)
 				// The type of x==y may be UntypedBool.
 				return b.emitConv(cmp, Default(tv.Type))
 			default:
-				panic("illegal op in BinaryExpr: " + e.Op.String())
+				panic("illegal op in BinaryExpr: " + op.String())
 			}
 		}
 
@@ -877,15 +1115,16 @@ func (r *reader) expr0() Value {
 		}
 
 	case *SelectorExpr:
-		sel, ok := b.info.Selections[e]
-		if !ok {
+		sel, _ := b.info.Selections[e]
+		if r.bool() {
 			// builtin unsafe.{Add,Slice}
-			if obj, ok := b.info.Uses[e.Sel].(*Builtin); ok {
-				return &SSABuiltin{name: obj.Name(), sig: tv.Type.(*Signature)}
+			if r.bool() {
+				return &SSABuiltin{name: r.string(), sig: r.typ().(*Signature)}
 			}
 			// qualified identifier
-			return b.expr(e.Sel)
+			return r.expr()
 		}
+
 		switch sel.Kind() {
 		case MethodExpr:
 			// (*T).f or T.f, the method f from the method-set of type T.
@@ -968,7 +1207,7 @@ func (r *reader) expr0() Value {
 
 	case *CompositeLit:
 		// Addressable types (lvalues)
-		return b.addr(e, false).load(b)
+		return r.addr().load(b)
 	}
 
 	panic(b.unexpected("expr", e))
