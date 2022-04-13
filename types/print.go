@@ -356,12 +356,27 @@ func (s *MapUpdate) String() string {
 }
 
 func (s *DebugRef) String() string {
-	p := s.Pos()
-	var descr interface{}
+	p := StartPos(s.Expr)
+	var descr string
 	if s.object != nil {
-		descr = s.object // e.g. "var x int"
+		descr = fmt.Sprint(s.object) // e.g. "var x int"
 	} else {
-		descr = reflect.TypeOf(s.Expr) // e.g. "*syntax.CallExpr"
+		switch e := s.Expr.(type) {
+		case *Operation:
+			switch {
+			case e.Y != nil:
+				descr = "*ast.BinaryExpr"
+			case e.Op == Mul:
+				descr = "*ast.StarExpr"
+			default:
+				descr = "*ast.UnaryExpr"
+			}
+		case *AssertExpr:
+			descr = "*ast.TypeAssertExpr"
+		default:
+			descr = fmt.Sprint(reflect.TypeOf(e)) // e.g. "*syntax.CallExpr"
+			descr = strings.ReplaceAll(descr, "*syntax.", "*ast.")
+		}
 	}
 	var addr string
 	if s.IsAddr {

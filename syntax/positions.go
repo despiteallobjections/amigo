@@ -43,7 +43,8 @@ func StartPos(n Node) Pos {
 			m = n.X
 		case *IndexExpr:
 			m = n.X
-		// case *SliceExpr:
+		case *SliceExpr:
+			m = n.X
 		case *AssertExpr:
 			m = n.X
 		case *TypeSwitchGuard:

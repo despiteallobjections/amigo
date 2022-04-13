@@ -33,10 +33,10 @@ func TestGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldProg, _ := oldssautil.AllPackages(initial, 0)
+	oldProg, _ := oldssautil.AllPackages(initial, oldssa.GlobalDebug)
 	oldProg.Build()
 
-	newProg, _ := newssautil.AllPackages(initial, 0)
+	newProg, _ := newssautil.AllPackages(initial, newssa.GlobalDebug)
 
 	for _, oldPkg := range oldProg.AllPackages() {
 		path := oldPkg.Pkg.Path()

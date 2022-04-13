@@ -967,7 +967,7 @@ func (r *reader) expr0() Value {
 			return fn2
 		}
 		v := &MakeClosure{Fn: fn2}
-		v.setType(tv.Type)
+		v.setType(obj.Type())
 		for _, fv := range fn2.FreeVars {
 			outer := b.lookup(fv.object, true) // escaping
 			v.Bindings = append(v.Bindings, outer)
