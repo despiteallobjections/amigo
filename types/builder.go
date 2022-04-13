@@ -98,12 +98,10 @@ func (prog *Program) build(fn *Function, info *Info, emitBody func(b *builder)) 
 	b.finishBody()
 }
 
-func (b *builder) split(fn func(w *writer, r *reader)) {
+func (b *builder) split(wr func(w *writer), rd func(r *reader)) {
 	var buf anyBuffer
-	w := writer{buf: &buf, info: b.info}
-	r := reader{buf: &buf, b: b}
-
-	fn(&w, &r)
+	wr(&writer{buf: &buf, info: b.info})
+	rd(&reader{buf: &buf, b: b})
 	assert(buf.empty())
 }
 
@@ -374,7 +372,7 @@ func (b *builder) builtin(obj *Builtin, args []Expr, typ Type, pos Pos) Value {
 // - a[:] iff a is an array (not *array)
 // - references to variables in lexically enclosing functions.
 //
-func (b *builder) addr(e Expr, escaping bool) lvalue {
+func (b *builder) addr(e Expr, escaping bool) (res lvalue) {
 	switch e := e.(type) {
 	case *Name:
 		if isBlankIdent(e) {
@@ -388,18 +386,28 @@ func (b *builder) addr(e Expr, escaping bool) lvalue {
 		return &address{addr: v, pos: e.Pos(), expr: e}
 
 	case *CompositeLit:
-		t := ssaDeref(b.typeOf(e))
-		var v *Alloc
-		if escaping {
-			v = b.emitNew(t, tokenPos(e, _Lbrace))
-		} else {
-			v = b.addLocal(t, tokenPos(e, _Lbrace))
-		}
-		v.Comment = "complit"
-		var sb storebuf
-		b.compLit(v, e, true, &sb)
-		sb.emit(b)
-		return &address{addr: v, pos: tokenPos(e, _Lbrace), expr: e}
+		b.split(func(w *writer) {
+			w.typ(ssaDeref(w.typeOf(e)))
+			w.pos(tokenPos(e, _Lbrace))
+			w.expr(e)
+		}, func(r *reader) {
+			t := r.typ()
+			pos := r.pos()
+			e := r.expr().(*CompositeLit)
+
+			var v *Alloc
+			if escaping {
+				v = b.emitNew(t, pos)
+			} else {
+				v = b.addLocal(t, pos)
+			}
+			v.Comment = "complit"
+			var sb storebuf
+			b.compLit(v, e, true, &sb)
+			sb.emit(b)
+			res = &address{addr: v, pos: pos, expr: e}
+		})
+		return
 
 	case *ParenExpr:
 		return b.addr(e.X, escaping)

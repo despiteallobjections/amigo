@@ -36,6 +36,7 @@ func (w *writer) pos(pos Pos)            { w.buf.WriteAny(pos) }
 func (w *writer) val(val constant.Value) { w.buf.WriteAny(val) }
 func (w *writer) typ(typ Type)           { w.buf.WriteAny(typ) }
 func (w *writer) obj(obj Object)         { w.buf.WriteAny(obj) }
+func (w *writer) expr(expr Expr)         { w.buf.WriteAny(expr) }
 
 func (w *writer) addLocal(typ Type, pos Pos) {
 	w.sync()
@@ -55,6 +56,34 @@ func (w *writer) useLabel(name *Name) {
 	}
 	label := w.info.Uses[name].(*Label)
 	w.labelledBlock(label)
+}
+
+func (w *writer) emitDebugRef(e Expr, isAddr bool) {
+	if e == nil {
+		panic("nil")
+	}
+
+	var obj Object
+	e = Unparen(e)
+	if id, ok := e.(*Name); ok {
+		if isBlankIdent(id) {
+			w.bool(false)
+			return
+		}
+		obj = w.objectOf(id)
+		switch obj.(type) {
+		case *Nil, *Const, *Builtin:
+			w.bool(false)
+			return
+		}
+	}
+
+	w.bool(true)
+	w.expr(e)
+	w.bool(isAddr)
+	if w.bool(obj != nil) {
+		w.obj(obj)
+	}
 }
 
 // Like ObjectOf, but panics instead of returning nil.

@@ -27,6 +27,7 @@ func (r *reader) pos() Pos            { return r.buf.ReadAny().(Pos) }
 func (r *reader) val() constant.Value { return r.buf.ReadAny().(constant.Value) }
 func (r *reader) typ() Type           { return r.buf.ReadAny().(Type) }
 func (r *reader) obj() Object         { return r.buf.ReadAny().(Object) }
+func (r *reader) expr() Expr          { return r.buf.ReadAny().(Expr) }
 
 func (r *reader) addLocal() *Alloc {
 	r.sync()
@@ -61,4 +62,33 @@ func (r *reader) useLabel() *lblock {
 		return &r.b.implicit
 	}
 	return r.labelledBlock()
+}
+
+func (r *reader) emitDebugRef(v Value) {
+	if v == nil {
+		panic("nil")
+	}
+
+	if !r.bool() {
+		return // blank, const, or predeclared
+	}
+
+	e := r.expr()
+	isAddr := r.bool()
+	var obj Object
+	if r.bool() {
+		obj = r.obj()
+	}
+
+	if !r.b.debugInfo() {
+		// TODO(mdempsky): Allow skipping reading the expr/obj
+		// entirely in this case?
+		return // debugging not enabled
+	}
+	r.b.emit(&DebugRef{
+		X:      v,
+		Expr:   e,
+		IsAddr: isAddr,
+		object: obj,
+	})
 }

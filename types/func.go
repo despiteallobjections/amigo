@@ -161,8 +161,9 @@ func (lb *lblock) tok(tok Token) *BasicBlock {
 //
 func (b *builder) labelledBlock(label *Label) *lblock {
 	var lb *lblock
-	b.split(func(w *writer, r *reader) {
+	b.split(func(w *writer) {
 		w.labelledBlock(label)
+	}, func(r *reader) {
 		lb = r.labelledBlock()
 	})
 	return lb
@@ -170,8 +171,9 @@ func (b *builder) labelledBlock(label *Label) *lblock {
 
 func (b *builder) useLabel(name *Name) *lblock {
 	var lb *lblock
-	b.split(func(w *writer, r *reader) {
+	b.split(func(w *writer) {
 		w.useLabel(name)
+	}, func(r *reader) {
 		lb = r.useLabel()
 	})
 	return lb
@@ -401,8 +403,9 @@ func (b *builder) defLocal(id *Name) *Alloc {
 //
 func (b *builder) addLocal(typ Type, pos Pos) *Alloc {
 	var v *Alloc
-	b.split(func(w *writer, r *reader) {
+	b.split(func(w *writer) {
 		w.addLocal(typ, pos)
+	}, func(r *reader) {
 		v = r.addLocal()
 	})
 	return v

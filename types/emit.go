@@ -37,29 +37,10 @@ func (b *builder) emitLoad(addr Value) *UnOp {
 // expression e with value v.
 //
 func (b *builder) emitDebugRef(e Expr, v Value, isAddr bool) {
-	if !b.debugInfo() {
-		return // debugging not enabled
-	}
-	if v == nil || e == nil {
-		panic("nil")
-	}
-	var obj Object
-	e = Unparen(e)
-	if id, ok := e.(*Name); ok {
-		if isBlankIdent(id) {
-			return
-		}
-		obj = b.objectOf(id)
-		switch obj.(type) {
-		case *Nil, *Const, *Builtin:
-			return
-		}
-	}
-	b.emit(&DebugRef{
-		X:      v,
-		Expr:   e,
-		IsAddr: isAddr,
-		object: obj,
+	b.split(func(w *writer) {
+		w.emitDebugRef(e, isAddr)
+	}, func(r *reader) {
+		r.emitDebugRef(v)
 	})
 }
 
