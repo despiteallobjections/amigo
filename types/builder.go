@@ -933,16 +933,49 @@ func (b *builder) stmtList(list []Stmt) {
 //
 // escaping is defined as per builder.addr().
 //
-func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) Value {
-	var v Value
-	if wantAddr && !sel.Indirect() && !isPointer(b.typeOf(e)) {
-		v = b.addr(e, escaping).address(b)
-	} else {
-		v = b.expr(e)
+func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) (res Value) {
+	b.split(func(w *writer) {
+		w.receiver(e, wantAddr, escaping, sel)
+	}, func(r *reader) {
+		res = r.receiver()
+	})
+	return
+}
+
+func (w *writer) receiver(e Expr, wantAddr, escaping bool, sel *Selection) {
+	typ := w.typeOf(e)
+	w.bool(wantAddr)
+
+	indices := sel.Index()[:len(sel.Index())-1]
+	w.int(len(indices))
+	for _, index := range indices {
+		w.int(index)
 	}
 
-	last := len(sel.Index()) - 1
-	v = b.emitImplicitSelections(v, sel.Index()[:last])
+	if w.bool(wantAddr && !sel.Indirect() && !isPointer(typ)) {
+		w.addr(e, escaping)
+	} else {
+		w.expr(e)
+	}
+}
+
+func (r *reader) receiver() Value {
+	b := r.b
+	wantAddr := r.bool()
+
+	indices := make([]int, r.int())
+	for i := range indices {
+		indices[i] = r.int()
+	}
+
+	var v Value
+	if r.bool() {
+		v = r.addr().address(b)
+	} else {
+		v = r.expr()
+	}
+
+	v = b.emitImplicitSelections(v, indices)
 	if !wantAddr && isPointer(v.Type()) {
 		v = b.emitLoad(v)
 	}
@@ -953,27 +986,18 @@ func (b *builder) receiver(e Expr, wantAddr, escaping bool, sel *Selection) Valu
 // (Func, Method, Recv, Args[0]) based on the kind of invocation
 // occurring in e.
 //
-func (b *builder) setCallFunc(e *CallExpr, c *CallCommon) {
-	c.pos = tokenPos(e, _Lparen)
-
+func (w *writer) setCallFunc(e *CallExpr) {
 	// Is this a method call?
 	if selector, ok := Unparen(e.Fun).(*SelectorExpr); ok {
-		sel, ok := b.info.Selections[selector]
+		sel, ok := w.info.Selections[selector]
 		if ok && sel.Kind() == MethodVal {
 			obj := sel.Obj().(*Func)
 			recv := recvType(obj)
 			wantAddr := isPointer(recv)
 			escaping := true
-			v := b.receiver(selector.X, wantAddr, escaping, sel)
-			if isInterface(recv) {
-				// Invoke-mode call.
-				c.Value = v
-				c.Method = obj
-			} else {
-				// "Call"-mode call.
-				c.Value = b.Prog.declaredFunc(obj)
-				c.Args = append(c.Args, v)
-			}
+			w.bool(true)
+			w.receiver(selector.X, wantAddr, escaping, sel)
+			w.obj(obj)
 			return
 		}
 
@@ -1009,20 +1033,59 @@ func (b *builder) setCallFunc(e *CallExpr, c *CallCommon) {
 	}
 
 	// Evaluate the function operand in the usual way.
-	c.Value = b.expr(e.Fun)
+	w.bool(false)
+	w.expr(e.Fun)
 }
 
-// emitCallArgs emits to f code for the actual parameters of call e to
+func (r *reader) setCallFunc(c *CallCommon) {
+	if r.bool() { // method call
+		v := r.receiver()
+		obj := r.obj().(*Func)
+		if isInterface(recvType(obj)) {
+			// Invoke-mode call.
+			c.Value = v
+			c.Method = obj
+		} else {
+			// "Call"-mode call.
+			c.Value = r.b.Prog.declaredFunc(obj)
+			c.Args = append(c.Args, v)
+		}
+		return
+	}
+
+	c.Value = r.expr()
+}
+
+// setCallArgs emits to f code for the actual parameters of call e to
 // a (possibly built-in) function of effective type sig.
 // The argument values are appended to args, which is then returned.
 //
-func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Value {
-	// f(x, y, z...): pass slice z straight through.
-	if e.HasDots {
-		for i, arg := range e.ArgList {
-			v := b.emitConv(b.expr(arg), sig.Params().At(i).Type())
+func (w *writer) setCallArgs(sig *Signature, e *CallExpr) {
+	// TODO(mdempsky): This can be encoded more efficiently. E.g., the
+	// signature should be implied by the callee expression already;
+	// HasDots is only needed when sig.Variadic() is true; and
+	// len(e.ArgList) is only needed when sig.Variadic() && !HasDots.
+	w.typ(sig)
+	w.bool(e.HasDots)
+	w.int(len(e.ArgList))
+	for _, arg := range e.ArgList {
+		w.expr(arg)
+	}
+	w.pos(tokenPos(e, _Rparen))
+}
+
+func (r *reader) setCallArgs(args []Value) []Value {
+	b := r.b
+	sig := r.typ().(*Signature)
+	hasDots := r.bool()
+	nArgs := r.int()
+
+	if hasDots {
+		for i := 0; i < nArgs; i++ {
+			v := b.emitConv(r.expr(), sig.Params().At(i).Type())
 			args = append(args, v)
 		}
+		r.pos() // rparen
 		return args
 	}
 
@@ -1033,8 +1096,8 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 	// If this is a chained call of the form f(g()) where g has
 	// multiple return values (MRV), they are flattened out into
 	// args; a suffix of them may end up in a varargs slice.
-	for _, arg := range e.ArgList {
-		v := b.expr(arg)
+	for i := 0; i < nArgs; i++ {
+		v := r.expr()
 		if ttuple, ok := v.Type().(*Tuple); ok { // MRV chain
 			for i, n := 0, ttuple.Len(); i < n; i++ {
 				args = append(args, b.emitExtract(v, i))
@@ -1043,6 +1106,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 			args = append(args, v)
 		}
 	}
+	rparen := r.pos()
 
 	// Actual->formal assignability conversions for normal parameters.
 	np := sig.Params().Len() // number of normal parameters
@@ -1065,7 +1129,7 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 			// Replace a suffix of args with a slice containing it.
 			at := NewArray(vt, int64(len(varargs)))
 			a := b.emitNew(at, NoPos)
-			a.setPos(tokenPos(e, _Rparen))
+			a.setPos(rparen)
 			a.Comment = "varargs"
 			for i, arg := range varargs {
 				iaddr := &IndexAddr{
@@ -1089,15 +1153,31 @@ func (b *builder) emitCallArgs(sig *Signature, e *CallExpr, args []Value) []Valu
 // call e, and populates *c with those values.
 //
 func (b *builder) setCall(e *CallExpr, c *CallCommon) {
+	b.split(func(w *writer) {
+		w.setCall(e)
+	}, func(r *reader) {
+		r.setCall(c)
+	})
+}
+
+func (w *writer) setCall(e *CallExpr) {
+	w.pos(tokenPos(e, _Lparen))
+
 	// First deal with the f(...) part and optional receiver.
-	b.setCallFunc(e, c)
+	w.setCallFunc(e)
 
 	// Then append the other actual parameters.
-	sig, _ := b.typeOf(e.Fun).Underlying().(*Signature)
+	sig, _ := w.typeOf(e.Fun).Underlying().(*Signature)
 	if sig == nil {
 		panic(fmt.Sprintf("no signature for call of %s", e.Fun))
 	}
-	c.Args = b.emitCallArgs(sig, e, c.Args)
+	w.setCallArgs(sig, e)
+}
+
+func (r *reader) setCall(c *CallCommon) {
+	c.pos = r.pos()
+	r.setCallFunc(c)
+	c.Args = r.setCallArgs(c.Args)
 }
 
 // assignOp emits to fn code to perform loc <op>= val.
