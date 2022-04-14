@@ -806,10 +806,6 @@ func (w *writer) expr(e Expr) {
 
 	// Is expression a constant?
 	if w.bool(tv.Value != nil) {
-		if false && tv.Value.Kind() == constant.Int && constant.Compare(tv.Value, token.EQL, constant.MakeInt64(8)) {
-			fmt.Printf("%v: %v has value %v and type %v\n", e.Pos(), NodeString(e), tv.Value, tv.Type)
-		}
-
 		w.typ(tv.Type)
 		w.val(tv.Value)
 		return
