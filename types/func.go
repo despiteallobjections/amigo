@@ -485,8 +485,8 @@ func (f *Function) RelString(from *Package) string {
 	}
 
 	// Thunk?
-	if f.method != nil {
-		return f.relMethod(from, f.method.Recv())
+	if f.wrapperRecvType != nil {
+		return f.relMethod(from, f.wrapperRecvType)
 	}
 
 	// Bound?

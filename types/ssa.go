@@ -268,10 +268,10 @@ type SSANode interface {
 // Type() returns the function's Signature.
 //
 type Function struct {
-	name      string
-	object    *Func      // a declared *types.Func or one of its wrappers
-	method    *Selection // info about provenance of synthetic methods
-	Signature *Signature
+	name            string
+	object          *Func // a declared *types.Func or one of its wrappers
+	wrapperRecvType Type  // info about provenance of synthetic methods
+	Signature       *Signature
 
 	Synthetic string        // provenance of synthetic function; "" for true source functions
 	parent    *Function     // enclosing function if anon; nil if global

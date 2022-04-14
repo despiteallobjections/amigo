@@ -21,6 +21,8 @@ package types
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // -- wrappers -----------------------------------------------------------
@@ -41,14 +43,18 @@ import (
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
 //
 func (prog *Program) makeWrapper(sel *Selection) *Function {
-	obj := sel.Obj().(*Func)       // the declared function
-	sig := sel.Type().(*Signature) // type of this wrapper
+	return prog.makeWrapperKey(sel.asKey())
+}
+
+func (prog *Program) makeWrapperKey(key selectionKey) *Function {
+	obj := key.obj.(*Func) // the declared function
+	sig := key.sig         // type of this wrapper
 
 	var recv *Var // wrapper's receiver or thunk's params[0]
 	name := obj.Name()
 	var description string
 	var start int // first regular param
-	if sel.Kind() == MethodExpr {
+	if key.kind == MethodExpr {
 		name += "$thunk"
 		description = "thunk"
 		recv = sig.Params().At(0)
@@ -58,25 +64,25 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 		recv = sig.Recv()
 	}
 
-	description = fmt.Sprintf("%s for %s", description, sel.Obj())
+	description = fmt.Sprintf("%s for %s", description, key.obj)
 	if prog.mode&LogSource != 0 {
 		defer logStack("make %s to (%s)", description, recv.Type())()
 	}
 	fn := &Function{
-		name:      name,
-		method:    sel,
-		object:    obj,
-		Signature: sig,
-		Synthetic: description,
+		name:            name,
+		wrapperRecvType: key.recv,
+		object:          obj,
+		Signature:       sig,
+		Synthetic:       description,
 	}
 	prog.build(fn, nil, func(b *builder) {
 		b.addSpilledParam(recv)
 		b.createParams(start)
 
-		indices := sel.Index()
+		indices := key.indexSlice()
 
 		var v Value = fn.Locals[0] // spilled receiver
-		if isPointer(sel.Recv()) {
+		if isPointer(key.recv) {
 			v = b.emitLoad(v)
 
 			// For simple indirection wrappers, perform an informative nil-check:
@@ -86,13 +92,13 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 				c.Call.Value = &SSABuiltin{
 					name: "ssa:wrapnilchk",
 					sig: NewSignatureType(nil, nil, nil,
-						NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),
-						NewTuple(anonVar(sel.Recv())), false),
+						NewTuple(anonVar(key.recv), anonVar(tString), anonVar(tString)),
+						NewTuple(anonVar(key.recv)), false),
 				}
 				c.Call.Args = []Value{
 					v,
-					stringConst(ssaDeref(sel.Recv()).String()),
-					stringConst(sel.Obj().Name()),
+					stringConst(ssaDeref(key.recv).String()),
+					stringConst(key.obj.Name()),
 				}
 				c.setType(v.Type())
 				v = b.emit(&c)
@@ -243,14 +249,38 @@ func (prog *Program) makeThunk(sel *Selection) *Function {
 		panic(sel)
 	}
 
-	key := selectionKey{
+	return prog.makeThunkKey(sel.asKey())
+}
+
+func (sel *Selection) asKey() selectionKey {
+	return selectionKey{
 		kind:     sel.Kind(),
 		recv:     sel.Recv(),
 		obj:      sel.Obj(),
+		sig:      sel.Type().(*Signature),
 		index:    fmt.Sprint(sel.Index()),
 		indirect: sel.Indirect(),
 	}
+}
 
+func (key selectionKey) indexSlice() []int {
+	var res []int
+
+	s := key.index
+	s = strings.TrimPrefix(s, "[")
+	s = strings.TrimSuffix(s, "]")
+
+	for _, e := range strings.Split(s, " ") {
+		n, err := strconv.Atoi(e)
+		if err != nil {
+			panic(err)
+		}
+		res = append(res, n)
+	}
+	return res
+}
+
+func (prog *Program) makeThunkKey(key selectionKey) *Function {
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
 
@@ -262,9 +292,18 @@ func (prog *Program) makeThunk(sel *Selection) *Function {
 	}
 	key.recv = canonRecv
 
+	if key.sig != nil {
+		canonSig, ok := prog.canon.At(key.sig).(*Signature)
+		if !ok {
+			canonSig = key.sig
+			prog.canon.Set(key.sig, canonSig)
+		}
+		key.sig = canonSig
+	}
+
 	fn, ok := prog.thunks[key]
 	if !ok {
-		fn = prog.makeWrapper(sel)
+		fn = prog.makeWrapperKey(key)
 		if fn.Signature.Recv() != nil {
 			panic(fn) // unexpected receiver
 		}
@@ -282,6 +321,7 @@ type selectionKey struct {
 	kind     SelectionKind
 	recv     Type // canonicalized via Program.canon
 	obj      Object
+	sig      *Signature
 	index    string
 	indirect bool
 }

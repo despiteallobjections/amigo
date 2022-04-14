@@ -264,76 +264,87 @@ func (r *reader) logicalBinop() Value {
 // is token.ARROW).
 //
 func (b *builder) exprN(e Expr) (res Value) {
+	b.split(func(w *writer) {
+		w.exprN(e)
+	}, func(r *reader) {
+		res = r.exprN()
+	})
+	return
+}
+
+func (w *writer) exprN(e Expr) {
 	e = Unparen(e)
 
-	typ := b.typeOf(e).(*Tuple)
+	typ := w.typeOf(e).(*Tuple)
+	w.typ(typ)
+
+	w.tag(e)
 	switch e := e.(type) {
 	case *CallExpr:
-		b.split(func(w *writer) {
-			// Currently, no built-in function nor type conversion
-			// has multiple results, so we can avoid some of the
-			// cases for single-valued CallExpr.
-			// TODO(mdempsky): Add asserts to enforce this.
+		// Currently, no built-in function nor type conversion
+		// has multiple results, so we can avoid some of the
+		// cases for single-valued CallExpr.
+		// TODO(mdempsky): Add asserts to enforce this.
 
-			w.setCall(e)
-		}, func(r *reader) {
-			var c Call
-			r.setCall(&c.Call)
-			c.typ = typ
-			res = b.emit(&c)
-		})
-		return
+		w.setCall(e)
 
 	case *IndexExpr:
-		b.split(func(w *writer) {
-			w.expr(e.X)
-			w.pos(tokenPos(e, _Lbrack))
-			w.expr(e.Index)
-		}, func(r *reader) {
-			x, pos, index := r.expr(), r.pos(), r.expr()
-			lookup := &Lookup{
-				X:       x,
-				Index:   b.emitConv(index, x.Type().Underlying().(*Map).Key()),
-				CommaOk: true,
-			}
-			lookup.setType(typ)
-			lookup.setPos(pos)
-			res = b.emit(lookup)
-		})
-		return
+		w.expr(e.X)
+		w.pos(tokenPos(e, _Lbrack))
+		w.expr(e.Index)
 
 	case *AssertExpr:
-		b.split(func(w *writer) {
-			w.expr(e.X)
-			w.pos(tokenPos(e, _Lparen))
-			w.typ(typ.At(0).Type())
-		}, func(r *reader) {
-			x, pos, typ := r.expr(), r.pos(), r.typ()
-			res = b.emitTypeTest(x, typ, pos)
-		})
-		return
+		w.expr(e.X)
+		w.pos(tokenPos(e, _Lparen))
+		w.typ(typ.At(0).Type())
 
 	case *Operation:
-		b.split(func(w *writer) {
-			assert(e.Y == nil)
-			assert(e.Op == Recv)
-			w.pos(tokenPos(e, _OpPos))
-			w.expr(e.X)
-		}, func(r *reader) {
-			pos, x := r.pos(), r.expr()
-			unop := &UnOp{
-				Op:      Recv,
-				X:       x,
-				CommaOk: true,
-			}
-			unop.setType(typ)
-			unop.setPos(pos)
-			res = b.emit(unop)
-		})
-		return
-
+		assert(e.Y == nil)
+		assert(e.Op == Recv)
+		w.pos(tokenPos(e, _OpPos))
+		w.expr(e.X)
 	}
-	panic(fmt.Sprintf("exprN(%T) in %s", e, b.Fn))
+}
+
+func (r *reader) exprN() Value {
+	b := r.b
+	typ := r.typ()
+	switch tag := r.tag().(type) {
+	case *CallExpr:
+		var c Call
+		r.setCall(&c.Call)
+		c.typ = typ
+		return b.emit(&c)
+
+	case *IndexExpr:
+		x, pos, index := r.expr(), r.pos(), r.expr()
+		lookup := &Lookup{
+			X:       x,
+			Index:   b.emitConv(index, x.Type().Underlying().(*Map).Key()),
+			CommaOk: true,
+		}
+		lookup.setType(typ)
+		lookup.setPos(pos)
+		return b.emit(lookup)
+
+	case *AssertExpr:
+		x, pos, typ := r.expr(), r.pos(), r.typ()
+		return b.emitTypeTest(x, typ, pos)
+
+	case *Operation:
+		pos, x := r.pos(), r.expr()
+		unop := &UnOp{
+			Op:      Recv,
+			X:       x,
+			CommaOk: true,
+		}
+		unop.setType(typ)
+		unop.setPos(pos)
+		return b.emit(unop)
+
+	default:
+		panic(fmt.Sprintf("exprN(%T) in %s", tag, b.Fn))
+	}
 }
 
 // builtin emits to fn SSA instructions to implement a call to the
@@ -911,37 +922,25 @@ func (w *writer) expr0(e Expr) {
 		}
 
 	case *SliceExpr:
-		// var low, high, max Value
-		// var x Value
-		// switch b.typeOf(e.X).Underlying().(type) {
-		// case *Array:
-		// 	// Potentially escaping.
-		// 	x = b.addr(e.X, true).address(b)
-		// case *Basic, *Slice, *Pointer:
-		// 	x = b.expr(e.X)
-		// default:
-		// 	panic("unreachable")
-		// }
-		// // TODO(mdempsky): Why do we evaluate high before low?
-		// // See go.dev/issue/52142.
-		// if e.Index[1] != nil {
-		// 	high = b.expr(e.Index[1])
-		// }
-		// if e.Index[0] != nil {
-		// 	low = b.expr(e.Index[0])
-		// }
-		// if e.Index[2] != nil {
-		// 	max = b.expr(e.Index[2])
-		// }
-		// v := &SSASlice{
-		// 	X:    x,
-		// 	Low:  low,
-		// 	High: high,
-		// 	Max:  max,
-		// }
-		// v.setPos(tokenPos(e, _Lbrack))
-		// v.setType(tv.Type)
-		// return b.emit(v)
+		switch w.typeOf(e.X).Underlying().(type) {
+		case *Array:
+			w.bool(true)
+			// Potentially escaping.
+			w.addr(e.X, true)
+		case *Basic, *Slice, *Pointer:
+			w.bool(false)
+			w.expr(e.X)
+		default:
+			panic("unreachable")
+		}
+		w.pos(tokenPos(e, _Lbrack))
+		// TODO(mdempsky): Why do we evaluate high before low?
+		// See go.dev/issue/52142.
+		for _, index := range []Expr{e.Index[1], e.Index[0], e.Index[2]} {
+			if w.bool(index != nil) {
+				w.expr(index)
+			}
+		}
 
 	case *Name:
 		// switch obj := b.info.Uses[e].(type) {
@@ -1165,9 +1164,11 @@ func (r *reader) expr0() (res Value) {
 				v.setPos(pos)
 				v.setType(tv.Type)
 				return b.emit(v)
+
 			case Mul:
 				// Addressable types (lvalues)
 				return r.addr().load(b)
+
 			default:
 				panic(op)
 			}
@@ -1187,41 +1188,35 @@ func (r *reader) expr0() (res Value) {
 				cmp := b.emitCompare(op, x, y, pos)
 				// The type of x==y may be UntypedBool.
 				return b.emitConv(cmp, Default(tv.Type))
+
 			default:
 				panic("illegal op in BinaryExpr: " + op.String())
 			}
 		}
 
 	case *SliceExpr:
-		var low, high, max Value
 		var x Value
-		switch b.typeOf(e.X).Underlying().(type) {
-		case *Array:
-			// Potentially escaping.
-			x = b.addr(e.X, true).address(b)
-		case *Basic, *Slice, *Pointer:
-			x = b.expr(e.X)
-		default:
-			panic("unreachable")
+		if r.bool() {
+			x = r.addr().address(b)
+		} else {
+			x = r.expr()
+		}
+		pos := r.pos()
+		var indices [3]Value
+		for i := range indices {
+			if r.bool() {
+				indices[i] = r.expr()
+			}
 		}
 		// TODO(mdempsky): Why do we evaluate high before low?
 		// See go.dev/issue/52142.
-		if e.Index[1] != nil {
-			high = b.expr(e.Index[1])
-		}
-		if e.Index[0] != nil {
-			low = b.expr(e.Index[0])
-		}
-		if e.Index[2] != nil {
-			max = b.expr(e.Index[2])
-		}
 		v := &SSASlice{
 			X:    x,
-			Low:  low,
-			High: high,
-			Max:  max,
+			Low:  indices[1],
+			High: indices[0],
+			Max:  indices[2],
 		}
-		v.setPos(tokenPos(e, _Lbrack))
+		v.setPos(pos)
 		v.setType(tv.Type)
 		return b.emit(v)
 
@@ -1256,7 +1251,25 @@ func (r *reader) expr0() (res Value) {
 		case MethodExpr:
 			// (*T).f or T.f, the method f from the method-set of type T.
 			// The result is a "thunk".
-			return b.emitConv(b.Prog.makeThunk(sel), tv.Type)
+			b.split(func(w *writer) {
+				w.typ(sel.Recv())
+				w.obj(sel.Obj())
+				w.typ(sel.Type())
+				w.string(fmt.Sprint(sel.Index())) // TODO(mdempsky): This can be more efficient.
+				w.bool(sel.Indirect())
+			}, func(r *reader) {
+				key := selectionKey{
+					kind:     MethodExpr,
+					recv:     r.typ(),
+					obj:      r.obj(),
+					sig:      r.typ().(*Signature),
+					index:    r.string(),
+					indirect: r.bool(),
+				}
+
+				res = b.emitConv(b.Prog.makeThunkKey(key), tv.Type)
+			})
+			return
 
 		case MethodVal:
 			// e.f where e is an expression and f is a method.
