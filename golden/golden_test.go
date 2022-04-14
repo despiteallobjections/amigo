@@ -28,7 +28,7 @@ func TestGolden(t *testing.T) {
 	}
 
 	cfg := &packages.Config{Mode: packages.LoadAllSyntax}
-	initial, err := packages.Load(cfg, "runtime", "fmt", "net/http")
+	initial, err := packages.Load(cfg, "runtime", "fmt", "net/http", "go/types")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,6 +53,12 @@ func TestGolden(t *testing.T) {
 		}
 
 		for name, oldMem := range oldPkg.Members {
+			// TODO(mdempsky): Remove when go.dev/issue/52342 is fixed, and
+			// we re-sync against upstream.
+			if path == "go/constant" && name == "Bytes" {
+				continue
+			}
+
 			if oldFn, ok := oldMem.(*oldssa.Function); ok {
 				newFn := newPkg.Members[name].(*newssa.Function)
 
@@ -66,8 +72,8 @@ func TestGolden(t *testing.T) {
 					diff := difflib.UnifiedDiff{
 						A:        difflib.SplitLines(oldStr),
 						B:        difflib.SplitLines(newStr),
-						FromFile: "Original",
-						ToFile:   "Current",
+						FromFile: "old " + oldFn.String(),
+						ToFile:   "new " + newFn.String(),
 						Context:  3,
 					}
 					text, err := difflib.GetUnifiedDiffString(diff)

@@ -48,26 +48,36 @@ func (prog *Program) makeWrapper(sel *Selection) *Function {
 
 func (prog *Program) makeWrapperKey(key selectionKey) *Function {
 	obj := key.obj.(*Func) // the declared function
-	sig := key.sig         // type of this wrapper
+	objSig := obj.Type().(*Signature)
+	objRecv := objSig.Recv()
 
-	var recv *Var // wrapper's receiver or thunk's params[0]
+	recv := NewVar(objRecv.Pos(), objRecv.Pkg(), objRecv.Name(), key.recv)
+
+	var sig *Signature
+
 	name := obj.Name()
 	var description string
 	var start int // first regular param
 	if key.kind == MethodExpr {
 		name += "$thunk"
 		description = "thunk"
-		recv = sig.Params().At(0)
 		start = 1
+
+		params := []*Var{recv}
+		for i := 0; i < objSig.Params().Len(); i++ {
+			params = append(params, objSig.Params().At(i))
+		}
+		sig = NewSignatureType(nil, nil, nil, NewTuple(params...), objSig.Results(), objSig.Variadic())
 	} else {
 		description = "wrapper"
-		recv = sig.Recv()
+		sig = changeRecv(objSig, recv)
 	}
 
 	description = fmt.Sprintf("%s for %s", description, key.obj)
 	if prog.mode&LogSource != 0 {
 		defer logStack("make %s to (%s)", description, recv.Type())()
 	}
+
 	fn := &Function{
 		name:            name,
 		wrapperRecvType: key.recv,
@@ -257,7 +267,6 @@ func (sel *Selection) asKey() selectionKey {
 		kind:     sel.Kind(),
 		recv:     sel.Recv(),
 		obj:      sel.Obj(),
-		sig:      sel.Type().(*Signature),
 		index:    fmt.Sprint(sel.Index()),
 		indirect: sel.Indirect(),
 	}
@@ -292,15 +301,6 @@ func (prog *Program) makeThunkKey(key selectionKey) *Function {
 	}
 	key.recv = canonRecv
 
-	if key.sig != nil {
-		canonSig, ok := prog.canon.At(key.sig).(*Signature)
-		if !ok {
-			canonSig = key.sig
-			prog.canon.Set(key.sig, canonSig)
-		}
-		key.sig = canonSig
-	}
-
 	fn, ok := prog.thunks[key]
 	if !ok {
 		fn = prog.makeWrapperKey(key)
@@ -321,7 +321,6 @@ type selectionKey struct {
 	kind     SelectionKind
 	recv     Type // canonicalized via Program.canon
 	obj      Object
-	sig      *Signature
 	index    string
 	indirect bool
 }

@@ -226,6 +226,7 @@ func (r *reader) logicalBinop() Value {
 
 	// Is rhs unreachable?
 	if rhs.Preds == nil {
+		panic("TODO")
 		// Simplify false&&y to false, true||y to true.
 		b.currentBlock = done
 		return short
@@ -233,6 +234,7 @@ func (r *reader) logicalBinop() Value {
 
 	// Is done unreachable?
 	if done.Preds == nil {
+		panic("TODO")
 		// Simplify true&&y (or false||y) to y.
 		return y
 	}
@@ -804,6 +806,10 @@ func (w *writer) expr(e Expr) {
 
 	// Is expression a constant?
 	if w.bool(tv.Value != nil) {
+		if false && tv.Value.Kind() == constant.Int && constant.Compare(tv.Value, token.EQL, constant.MakeInt64(8)) {
+			fmt.Printf("%v: %v has value %v and type %v\n", e.Pos(), NodeString(e), tv.Value, tv.Type)
+		}
+
 		w.typ(tv.Type)
 		w.val(tv.Value)
 		return
@@ -1254,7 +1260,6 @@ func (r *reader) expr0() (res Value) {
 			b.split(func(w *writer) {
 				w.typ(sel.Recv())
 				w.obj(sel.Obj())
-				w.typ(sel.Type())
 				w.string(fmt.Sprint(sel.Index())) // TODO(mdempsky): This can be more efficient.
 				w.bool(sel.Indirect())
 			}, func(r *reader) {
@@ -1262,7 +1267,6 @@ func (r *reader) expr0() (res Value) {
 					kind:     MethodExpr,
 					recv:     r.typ(),
 					obj:      r.obj(),
-					sig:      r.typ().(*Signature),
 					index:    r.string(),
 					indirect: r.bool(),
 				}
@@ -1614,7 +1618,12 @@ func (r *reader) setCall(c *CallCommon) {
 // assignOp emits to fn code to perform loc <op>= val.
 func (b *builder) assignOp(loc lvalue, val Value, op Operator, pos Pos) {
 	oldv := loc.load(b)
-	loc.store(b, b.emitArith(op, oldv, b.emitConv(val, oldv.Type()), loc.typ(), pos))
+	// TODO(mdempsky): Remove "true ||" when go.dev/issue/52342 is
+	// fixed, and we re-sync against upstream.
+	if true || op != Shl && op != Shr {
+		val = b.emitConv(val, oldv.Type())
+	}
+	loc.store(b, b.emitArith(op, oldv, val, loc.typ(), pos))
 }
 
 // localValueSpec emits to fn code to define all of the vars in the
